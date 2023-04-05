@@ -1,0 +1,9 @@
+%include <head.h>
+
+#cd %PYDIR%
+#source ./load_modules python3
+
+echo %DATES%
+
+
+%include <tail.h>

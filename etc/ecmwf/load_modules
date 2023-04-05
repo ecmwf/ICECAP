@@ -1,0 +1,31 @@
+# Sourcing this script will load modules needed to run CEPDIAG
+# and globally suppress some Python Warnings.
+
+#########################################################
+# Load modules
+#########################################################
+# Module versions are parsed from the file module_versions.
+# If any command-line options present, read them as module names.
+# If no command-line options present, do all modules.
+
+if [[ $# -gt 0 ]]; then
+  module_names=$*
+else
+  module_names="cdo ecmwf-toolbox ecflow nco python3"
+fi
+
+for module in $module_names; do
+  version=$(gawk -F = "/$module/"' { print $2 }' module_versions)
+  module unload $module
+  module load $module/$version
+done
+
+###########################################
+# Suppress Python Warnings
+###########################################
+# Note that this is convenient and appropriate to do here, but makes
+# the name of the script slightly misleading.
+# Use this facility with care. Globally ignoring any Python Warning
+# needs a good reason and should be rarely used.
+
+# export PYTHONWARNINGS="some string that matches warning message"

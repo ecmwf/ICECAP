@@ -1,0 +1,12 @@
+# This is the central configuration of module versions.
+# Will be parsed by load_modules script that should be
+# used in the ecFlow scripts and interactive terminals.
+# The format is module=version. Capitalization matters.
+# One module per line, no spaces allowed. Extra lines
+# that do not contain a module name will be ignored.
+
+cdo=1.9.10
+ecmwf-toolbox=2021.08.1.0
+ecflow=5.7.0
+nco=4.9.7
+python3=3.8.8-01
