@@ -66,7 +66,7 @@ class ExecutionHost:
         if self.ecflow == 'yes':
             _directories_create += self.directories_create_ecflow
         for directory in _directories_create:
-            self._make_dir(directory, verbose=args.verbose)
+            make_dir(directory, verbose=args.verbose)
 
         fromdir = self.sourcedir + '/icecap'
         self._copy_python_scripts(fromdir, args)
@@ -145,20 +145,20 @@ class ExecutionHost:
             print('Copying file {} --> {}'.format(sfile, target_dir))
         shutil.copy(sfile, target_dir)
 
-    @staticmethod
-    def _make_dir(directory_name, verbose=False):
-        """
-        routine to create directory on operating system
-        :param directory_name: name of directory to create
-        :param verbose: if verbose is True provide additional output
-        """
-        if not os.path.isdir(directory_name):
-            try:
-                os.makedirs(directory_name)
-            except OSError:
-                raise RuntimeError('OS reported error when trying to create\n'
-                                   + directory_name
-                                   + '\nIs the path reachable, '
-                                     'and do you have write permission?') from None
-            if verbose:
-                print(f'Created directory {directory_name}')
+
+def make_dir(directory_name, verbose=False):
+    """
+    routine to create directory on operating system
+    :param directory_name: name of directory to create
+    :param verbose: if verbose is True provide additional output
+    """
+    if not os.path.isdir(directory_name):
+        try:
+            os.makedirs(directory_name)
+        except OSError:
+            raise RuntimeError('OS reported error when trying to create\n'
+                               + directory_name
+                               + '\nIs the path reachable, '
+                                 'and do you have write permission?') from None
+        if verbose:
+            print(f'Created directory {directory_name}')

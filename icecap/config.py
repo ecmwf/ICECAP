@@ -85,6 +85,10 @@ config_optnames = {
             'printname':'variable name',
             'optional' : False
         },
+        'ndays': {
+            'printname' : 'number of days to be staged',
+            'optional' : False
+        }
     }, # end staging
     'fc' : {
         'fcsystem' : {
@@ -342,6 +346,7 @@ class Configuration():
             # check if hcrefdate given for mode='hc/both' and machine='ecmwf'
             if self.hcrefdate is None and self.machine in ['ecmwf'] and self.mode in ['hc', 'both']:
                 raise 'hcrefdate needs to be defined for hindcast mode on ecmwf'
+
 
             self.fcsets[self.expname] = ForecastObject(
                 fcsystem = self.fcsystem,
