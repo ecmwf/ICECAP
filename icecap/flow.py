@@ -52,7 +52,7 @@ class Tree:
             self.sourcedir = conf.sourcedir
             self.pydir = conf.pydir
             self.stagedir = conf.stagedir
-            self.verana = conf.verana
+            self.verana = conf.verdata
             self.fcsets = conf.fcsets
             self.defs_file = self.rundir + '/' + self.suitename + '.def'
             self.defs = ecflow.Defs()
@@ -132,6 +132,7 @@ class Tree:
         suite_f.add_variable('ECF_FILES', self.ecffilesdir)
         suite_f.add_variable('ECF_HOME', self.ecfhomedir)
         suite_f.add_variable('PYDIR', self.pydir)
+        suite_f.add_variable('ETCDIR', self.rundir+'/etc')
 
         _todict = self._create_dict_from_tree()
 
@@ -286,3 +287,4 @@ class ProcessTree(Tree):
     def __init__(self, conf):
         super().__init__(conf)
         # here the next steps which are independent from machines will be listed
+        self.add_attr(['task:verdata_retrieve;mars'], 'retrieval:verdata')

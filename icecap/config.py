@@ -12,6 +12,7 @@ import numpy as np
 
 
 
+
 DEFAULT_CONF_NAME = 'icecap.conf'
 
 # this dictionary defines all option names which can be provided through the config file
@@ -77,16 +78,12 @@ config_optnames = {
             'optional' : True,
             'default_value' : 1.0/1.0,
         },
-        'verana' : {
-            'printname' : 'verifying analyses',
+        'verdata' : {
+            'printname' : 'verifying dataset',
             'optional' : False
         },
         'params':{
             'printname':'variable name',
-            'optional' : False
-        },
-        'ndays': {
-            'printname' : 'number of days to be staged',
             'optional' : False
         }
     }, # end staging
@@ -126,9 +123,9 @@ config_optnames = {
             'printname' : 'first hindcast year',
             'optional' : ['mode:hc','mode:both'],
         },
-        'steps' : {
-            'printname' : 'steps',
-            'optional' : True,
+        'ndays': {
+            'printname' : 'number of days to be staged',
+            'optional' : False
         },
         'ref' : {
             'printname' : 'use this forecast as reference',
@@ -203,6 +200,9 @@ class ConflictingOptions(ConfigurationError):
         super().__init__(hmessage)
 
 
+
+
+
 class ForecastObject:
     """A forecast object corresponds to a single numerical experiment."""
 # dates : config dates
@@ -219,12 +219,16 @@ class ForecastObject:
         self.hcfromdate = kwargs['hcfromdate']
         self.hctodate = kwargs['hctodate']
         self.ref = kwargs['ref']
+        self.ndays = kwargs['ndays']
 
 
 
         _dates_list = _dates_to_list(self.dates)
         self.dtdates = [dt.datetime.strptime(d, '%Y%m%d') for d in _dates_list]
         self.sdates = [d.strftime('%Y%m%d') for d in self.dtdates]
+        self.dtalldates = _make_days_datelist(self.dtdates, self.ndays)
+
+
 
         if self.mode in ['hc','both']:
             _dates_list_ref  = _dates_to_list(self.hcrefdate)
@@ -238,6 +242,16 @@ class ForecastObject:
 
             self.hcdates = _make_hc_datelist(self.dthcfromdate, self.dthctodate)
             self.shcdates = [d.strftime('%Y%m%d') for d in self.hcdates]
+            self.dtalldates += _make_days_datelist(self.hcdates, self.ndays)
+
+        self.salldates = list(dict.fromkeys([d.strftime('%Y%m%d') for d in self.dtalldates]))
+
+def _make_days_datelist(_dates, _ndays):
+    alldates = []
+    for _date in _dates:
+        alldates += [_date + dt.timedelta(days=x) for x in range(_ndays)]
+    return alldates
+
 
 
 def _dates_to_list(_args):
@@ -285,7 +299,7 @@ class Configuration():
         self.ecflow_host = None
         self.ecflow_port = None
         self.lonlatres = None
-        self.verana = None
+        self.verdata = None
         self.params = None
         self.fcsystem = None
         self.expname = None
@@ -295,7 +309,6 @@ class Configuration():
         self.hcrefdate = None
         self.hcfromdate = None
         self.hctodate = None
-        self.steps = None
         self.ref = None
 
         conf_parser = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
@@ -357,7 +370,8 @@ class Configuration():
                 hcrefdate = self.hcrefdate,
                 hcfromdate = self.hcfromdate,
                 hctodate=self.hctodate,
-                ref = self.ref
+                ref = self.ref,
+                ndays = int(self.ndays)
             )
 
         # check for 'ref' keyword
@@ -367,6 +381,12 @@ class Configuration():
             if len(_ref_list) > 1:
                 raise 'More than one experiment labelled with ref = yes in config'
 
+
+        # all daily dates as one list (used later for obs retrieval)
+        sdates_verif = []
+        for fcset in self.fcsets:
+            sdates_verif += getattr(self.fcsets[fcset], 'salldates')
+        self.salldates = list(dict.fromkeys(sdates_verif))
 
 
 
@@ -405,6 +425,9 @@ class Configuration():
                 if hasattr(self.fcsets[expid], optname):
                     lines.append(f'%s: {getattr(self.fcsets[expid], optname)}'
                                  % (config_optnames[secname][optname]['printname']))
+
+
+
 
 
         return '\n  '.join(lines)

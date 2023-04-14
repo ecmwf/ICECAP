@@ -31,11 +31,13 @@ class ExecutionHost:
         self.machine = conf.machine
         self.ecflow = conf.ecflow
         self.ecffilesdir = conf.ecffilesdir
+        self.etcdir = conf.rundir+'/etc'
         self.filename = conf.filename
 
         self.directories_create = [conf.pydir, conf.pydir + '/metrics', conf.pydir + '/contrib',
                               conf.pydir + '/aux', conf.stagedir, conf.metricdir, conf.plotdir,
-                              conf.stagedir + '/aux', conf.cachedir, conf.tmpdir]
+                              conf.stagedir + '/aux', conf.cachedir, conf.tmpdir,
+                                   self.etcdir]
         self.directories_create_ecflow = [conf.ecffilesdir, conf.ecfincdir, conf.ecfhomeroot]
         self.directories_wipe = [conf.rundir, conf.datadir, conf.tmpdir,
                                  ]
@@ -74,11 +76,25 @@ class ExecutionHost:
         if self.ecflow == 'yes':
             fromdir = self.sourcedir + f'/ecf/{self.machine}'
             self._copy_ecflow_files(fromdir, args)
+            fromdir = self.sourcedir + '/ecf'
+            self._copy_ecflow_files(fromdir, args, base_level_files_only=True)
+
+        # copy etc files for machine
+        fromdir = self.sourcedir + f'/etc/{self.machine}'
+        self._copy_etc_files(fromdir,args)
+
 
         # copy config file
         self._safe_copy(args, self.filename, './', self.pydir)
 
-    def _copy_ecflow_files(self, fromdir, args):
+    def _copy_etc_files(self, fromdir, args):
+        files = ['load_modules', 'module_versions']
+        target_dir = self.etcdir
+        for file in files:
+            self._safe_copy(args, file, fromdir, target_dir)
+
+
+    def _copy_ecflow_files(self, fromdir, args, base_level_files_only=False):
         """
         Recursively copy system dependent ecflow scripts to the location specified in ECF_FILES.
         :param conf: configuration object
@@ -91,12 +107,20 @@ class ExecutionHost:
         if not os.path.exists(ecfsourcedir):
             raise RuntimeError(f'Source directory with ecFlow scripts '
                                f'{ecfsourcedir} does not exist')
-        for root, dirs, files in os.walk(ecfsourcedir):
-            dirs[:] = [d for d in dirs if not d.startswith('.')]
-            for file in files:
-                target_dir = self.ecffilesdir + root.replace(ecfsourcedir, '')
+
+        if not base_level_files_only:
+            for root, dirs, files in os.walk(ecfsourcedir):
+                dirs[:] = [d for d in dirs if not d.startswith('.')]
+                for file in files:
+                    target_dir = self.ecffilesdir + root.replace(ecfsourcedir, '')
+                    if file.endswith('.ecf') or file.endswith('.h') or file in module_files:
+                        self._safe_copy(args, file, root, target_dir)
+        else:
+            for file in os.listdir(ecfsourcedir):
+                target_dir = self.ecffilesdir
                 if file.endswith('.ecf') or file.endswith('.h') or file in module_files:
-                    self._safe_copy(args, file, root, target_dir)
+                    self._safe_copy(args, file, ecfsourcedir, target_dir)
+
 
     def _copy_python_scripts(self, fromdir, args):
         """

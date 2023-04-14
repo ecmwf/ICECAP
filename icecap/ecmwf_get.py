@@ -23,11 +23,22 @@ if __name__ == '__main__':
 
     clargs.add_staging_exptype(parser)
     clargs.add_staging_mode(parser)
+    clargs.add_verbose_option(parser)
+
     args = parser.parse_args()
 
     conf = config.Configuration(file=args.configfile)
 
-    marsdata = ecmwf.EcmwfData(conf, args)
- #   marsdata.get_from_tape(dryrun=True)
-    marsdata.process()
-#    marsdata._check_files()
+    data = ecmwf.EcmwfData(conf, args)
+
+    if not data.check_cache(verbose=args.verbose):
+        data.get_from_tape(dryrun=False)
+        data.process()
+        data.clean_up()
+    else:
+        print('All done')
+
+
+#    data.get_from_tape(dryrun=True)
+#    data.process()
+#    data._check_files()

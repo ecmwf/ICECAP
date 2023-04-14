@@ -28,3 +28,8 @@ def add_config_option(parser):
     parser.add_argument('-c', '--configfile',
                         default='icecap.conf',
                         help='configuration file to use')
+
+def add_verbose_option(parser):
+    """Add to parser an option for more debugging output"""
+    parser.add_argument('-v', '--verbose', action='store_true', default=False,
+                        help='verbose for more debugging output')

@@ -31,6 +31,7 @@ class EcmwfTree(flow.ProcessTree):
                        'variable:EXEHOST;hpc-batch'], 'global')
 
         for expid in conf.fcsets.keys():
+            self.add_attr([f'variable:EXPID;{expid}'], f'retrieval:{expid}')
             if conf.fcsets[expid].mode in ['fc', 'both']:
                 self.add_attr(['variable:MODE;fc',
                                'repeat:DATES;{}'.format(self.fcsets[expid].sdates)],
@@ -113,6 +114,11 @@ class EcmwfRetrieval:
                 with open(requestfilename, 'r') as rfile:
                     subprocess.check_call('mars', stdin=rfile)
 
+    def clean_up(self):
+        tfile = self.kwargs['target']
+        os.remove(tfile)
+
+
 class _EcmwfExtendedRangeRetrieval(EcmwfRetrieval):
     """Defines MARS retrieval of step data for ENS forecast"""
     # keywords needed: class, date, expver, [hdate], levtype, number, param, step,
@@ -146,7 +152,7 @@ class EcmwfData:
         # provided by ecflow/env variable
         self.startdates = args.startdate
         self.type = args.exptype
-        self.targetfile = '/home/nedb/transfer/tmp.grb'
+        self.tmptargetfile = f'{conf.tmpdir}/tmp_{args.expid}_{args.startdate}_{self.type}.grb'
         self.fcast = conf.fcsets[args.expid]
         if args.mode == 'hc':
             self.refdate =  self.fcast.hcrefdate
@@ -156,7 +162,7 @@ class EcmwfData:
         self.cachedir = f'{conf.cachedir}/{self.fcast.fcsystem}/{self.fcast.expname}/{self.refdate}/{args.mode}/'
         setup_icecap.make_dir(self.cachedir)
 
-        self.ndays = int(conf.ndays)
+        self.ndays = int(self.fcast.ndays)
         self.mode = args.mode
         self.params = conf.params
 
@@ -170,9 +176,9 @@ class EcmwfData:
             exptype=args.exptype,
             date=self.startdates,
             fcastobj=self.fcast,
-            tfile = self.targetfile,
+            tfile = self.tmptargetfile,
             type = self.type,
-            ndays = conf.ndays,
+            ndays = self.ndays,
             mode = args.mode,
             param = self.params
         )
@@ -182,6 +188,9 @@ class EcmwfData:
     def get_from_tape(self, dryrun=False):
         """perform the MARS retrievals set up in init"""
         self.retrieval_request.execute(dryrun=dryrun)
+
+    def clean_up(self):
+        os.remove(self.tmptargetfile)
 
     @staticmethod
     def _calc_dmean(da_tmp, group_dim):
@@ -194,39 +203,60 @@ class EcmwfData:
             da_tmp_out.append(da_in_tmp)
         return da_tmp_out
 
-    def _check_files(self, check_level=2):
+    def check_cache(self, check_level=2, verbose=False):
+        """Check if files already exist in cache directory"""
 
         files_to_check = self.make_filelist()
         for file in files_to_check:
             # quick check if exist
             if not os.path.exists(f'{self.cachedir}/{file}'):
-                print(f'{self.cachedir}/{file}')
-                raise 'Error: not all files are found in cache'
+                if verbose:
+                    print(f'Not all files are found in cache {file}')
+                return False
+
         if check_level > 1:
             global xr
             if xr is None:
                 import xarray as xr
 
             for file in files_to_check:
-                print(f'{self.cachedir}/{file}')
                 ds_in = xr.open_dataset(f'{self.cachedir}/{file}')
-                print(len(ds_in.time))
                 if len(ds_in.time) < self.ndays:
-                    raise f'Error: not all timesteps needed found in {self.cachedir}/{file}'
+                    if verbose:
+                        print(f'Not all timesteps needed found in {self.cachedir}/{file}')
+                    return False
+        return True
 
 
 
     def make_filelist(self):
+        """Generate a list of files which are expected to be staged"""
         if self.fcast.fcsystem == 'extended-range':
             if self.mode == 'hc':
-                files = [f'{date}_mem-{entry+1:03d}_{self.params}.nc'
-                         for date in self.fcast.shcdates
-                         for entry in range(int(self.fcast.enssize)-1)]
+                if self.type == 'cf':
+                    files = [f'{date}_mem-{member:03d}_{self.params}.nc'
+                            for date in self.fcast.shcdates
+                            for member in range(1)]
+                elif self.type == 'pf':
+                    files = [f'{date}_mem-{member + 1:03d}_{self.params}.nc'
+                             for date in self.fcast.shcdates
+                             for member in range(int(self.fcast.enssize) - 1)]
+            if self.mode == 'fc':
+                if self.type == 'cf':
+                    files = [f'{date}_mem-{member:03d}_{self.params}.nc'
+                             for date in self.fcast.sdates
+                             for member in range(1)]
+                elif self.type == 'pf':
+                    files = [f'{date}_mem-{member+1:03d}_{self.params}.nc'
+                             for date in self.fcast.sdates
+                             for member in range(int(self.fcast.enssize) - 1)]
+
 
         return files
 
 
     def process(self):
+        """Process retrieved ECMWF data and write to cache"""
         global xr
         if xr is None:
             import xarray as xr
@@ -241,13 +271,15 @@ class EcmwfData:
         is_step = 'step' in da_in.dims
         is_time = 'time' in da_in.dims
 
+
         # make it a 5d array
         if not is_number:
-            da_in.expand_dims({'number': 1})
+            da_in = da_in.expand_dims({'number': 1})
         if not is_step:
-            da_in.expand_dims({'step': 1})
+            da_in = da_in.expand_dims({'step': 1})
         if not is_time:
-            da_in.expand_dims({'time': 1})
+            da_in = da_in.expand_dims({'time': 1})
+
 
         da_in = da_in.transpose('number', 'time', 'step', 'latitude', 'longitude')
         da_in = da_in.rename({'time': 'starttime'})

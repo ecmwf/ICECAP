@@ -1,9 +1,9 @@
 %include <head.h>
 
-#cd %PYDIR%
-#source ./load_modules python3
+cd %ETCDIR%
+source ./load_modules python3
 
-echo %DATES%
+cd %PYDIR%
 
-
+python3 ecmwf_get.py %EXPID% %DATES% %TYPE% %MODE%
 %include <tail.h>
