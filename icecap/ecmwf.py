@@ -6,6 +6,7 @@ import os
 import subprocess
 import flow
 import setup_icecap
+import dataobjects
 
 xr = None  # This is a lazy import. Loading xarray is slow and we don't always need it.
 
@@ -144,11 +145,13 @@ class _EcmwfExtendedRangeRetrieval(EcmwfRetrieval):
 
 
 
-class EcmwfData:
+class EcmwfData(dataobjects.DataObject):
     """ECMWF Data object calling a factory to
     retrieve appropriate class"""
 
     def __init__(self, conf, args):
+        super().__init__(conf)
+
         # provided by ecflow/env variable
         self.startdates = args.startdate
         self.type = args.exptype
@@ -164,7 +167,7 @@ class EcmwfData:
 
         self.ndays = int(self.fcast.ndays)
         self.mode = args.mode
-        self.params = conf.params
+
 
         self.ldmean = False
         if self.fcast.fcsystem in ['extended-range']:
@@ -203,60 +206,40 @@ class EcmwfData:
             da_tmp_out.append(da_in_tmp)
         return da_tmp_out
 
-    def check_cache(self, check_level=2, verbose=False):
-        """Check if files already exist in cache directory"""
 
-        files_to_check = self.make_filelist()
-        for file in files_to_check:
-            # quick check if exist
-            if not os.path.exists(f'{self.cachedir}/{file}'):
-                if verbose:
-                    print(f'Not all files are found in cache {file}')
-                return False
-
-        if check_level > 1:
-            global xr
-            if xr is None:
-                import xarray as xr
-
-            for file in files_to_check:
-                ds_in = xr.open_dataset(f'{self.cachedir}/{file}')
-                if len(ds_in.time) < self.ndays:
-                    if verbose:
-                        print(f'Not all timesteps needed found in {self.cachedir}/{file}')
-                    return False
-        return True
 
 
 
     def make_filelist(self):
         """Generate a list of files which are expected to be staged"""
+        filename = self._filenaming_convention('fc')
+
         if self.fcast.fcsystem == 'extended-range':
             if self.mode == 'hc':
                 if self.type == 'cf':
-                    files = [f'{date}_mem-{member:03d}_{self.params}.nc'
+                    files = [filename.format(date,member,self.params)
                             for date in self.fcast.shcdates
                             for member in range(1)]
                 elif self.type == 'pf':
-                    files = [f'{date}_mem-{member + 1:03d}_{self.params}.nc'
+                    files = [filename.format(date,member,self.params)
                              for date in self.fcast.shcdates
                              for member in range(int(self.fcast.enssize) - 1)]
             if self.mode == 'fc':
                 if self.type == 'cf':
-                    files = [f'{date}_mem-{member:03d}_{self.params}.nc'
+                    files = [filename.format(date,member,self.params)
                              for date in self.fcast.sdates
                              for member in range(1)]
                 elif self.type == 'pf':
-                    files = [f'{date}_mem-{member+1:03d}_{self.params}.nc'
+                    files = [filename.format(date,member,self.params)
                              for date in self.fcast.sdates
                              for member in range(int(self.fcast.enssize) - 1)]
-
 
         return files
 
 
     def process(self):
         """Process retrieved ECMWF data and write to cache"""
+
         global xr
         if xr is None:
             import xarray as xr
@@ -290,10 +273,11 @@ class EcmwfData:
         for da_out_save in da_out:
             for number in da_out_save['number']:
                 da_out_save = da_out_save.isel(time=slice(self.ndays))
-                da_out_save.sel(number=number).to_netcdf(self._get_cachename(da_out_save.sel(number=number)))
+                da_out_save.sel(number=number).to_netcdf(self._save_filename(da_out_save.sel(number=number)))
 
-
-    def _get_cachename(self,da_tmp):
-        return f'{self.cachedir}/' \
-               f'{da_tmp.time[0].dt.strftime("%Y%m%d").values}' \
-               f'_mem-{int(da_tmp["number"]):03d}_{da_tmp.name}.nc'
+    def _save_filename(self, da_tmp):
+        filename = self._filenaming_convention('fc')
+        return f'{self.cachedir}/' + \
+               filename.format(da_tmp.time[0].dt.strftime("%Y%m%d").values,
+                               int(da_tmp["number"]),
+                               da_tmp.name)

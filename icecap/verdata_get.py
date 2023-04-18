@@ -1,16 +1,13 @@
-"""Script to be executed to retrieve and process data at ECMWF"""
+"""Script to be executed to retrieve and process verification data"""
 
-
-import argparse
 import os
+import argparse
 import config
 import clargs
-import ecmwf
+import verdata
 import setup_icecap
 
-
 os.environ['HDF5_USE_FILE_LOCKING']='FALSE'
-
 
 if __name__ == '__main__':
     description = 'Stage forecast or analysis from MARS tape archive'
@@ -18,23 +15,14 @@ if __name__ == '__main__':
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
 
     clargs.add_config_option(parser)
-    clargs.add_staging_expid(parser)
-
-    clargs.add_staging_startdate(parser, allow_multiple=False)
-
-    clargs.add_staging_exptype(parser)
-    clargs.add_staging_mode(parser)
     clargs.add_verbose_option(parser)
-
     args = parser.parse_args()
-
     conf = config.Configuration(file=args.configfile)
 
-    data = ecmwf.EcmwfData(conf, args)
+    data = verdata.VerifData(conf)
+    if not data.check_cache(check_level=1, verbose=args.verbose):
+        data.process(verbose=args.verbose)
 
-    if not data.check_cache(verbose=args.verbose):
-        data.get_from_tape(dryrun=False)
-        data.process()
-        data.clean_up()
+
 
     setup_icecap.print_banner('ALL DONE')

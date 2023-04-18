@@ -1,0 +1,9 @@
+%include <head.h>
+
+cd %ETCDIR%
+source ./load_modules python3
+
+cd %PYDIR%
+python3 verdata_get.py
+
+%include <tail.h>

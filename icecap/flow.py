@@ -287,4 +287,4 @@ class ProcessTree(Tree):
     def __init__(self, conf):
         super().__init__(conf)
         # here the next steps which are independent from machines will be listed
-        self.add_attr(['task:verdata_retrieve;mars'], 'retrieval:verdata')
+        self.add_attr(['task:verdata_retrieve'], 'retrieval:verdata')
