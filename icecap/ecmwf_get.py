@@ -6,7 +6,7 @@ import os
 import config
 import clargs
 import ecmwf
-import setup_icecap
+import utils
 
 
 os.environ['HDF5_USE_FILE_LOCKING']='FALSE'
@@ -37,4 +37,4 @@ if __name__ == '__main__':
         data.process()
         data.clean_up()
 
-    setup_icecap.print_banner('ALL DONE')
+    utils.print_banner('ALL DONE')

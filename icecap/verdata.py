@@ -1,7 +1,10 @@
 """Module containing verification classes"""
 
+import xarray as xr
+
 import dataobjects
-import setup_icecap
+import utils
+
 
 params_verdata = {
     'sic' : {
@@ -29,15 +32,14 @@ class VerifyingData(dataobjects.DataObject):
     def __init__(self, conf):
         super().__init__(conf)
         self.name = conf.verdata
-        self.salldates = conf.salldates
-        self.cachedir = f'{conf.cachedir}/{self.name}/'
-        self.param = conf.params
+
+
 
 
     def make_filelist(self):
         """Generate a list of files which are expected to be staged"""
         filename = self._filenaming_convention('verif')
-        files = [filename.format(date, self.params)
+        files = [self.obscachedir+'/'+filename.format(date, self.params)
                  for date in self.salldates]
         return files
 
@@ -60,16 +62,14 @@ class _EumetsatThredsRetrieval(VerifyingData):
         :param verbose: more debugging output
         """
         filename = self._filenaming_convention('verif')
-        setup_icecap.make_dir(self.cachedir)
-
-        import xarray as xr
+        utils.make_dir(self.obscachedir)
 
         for _date in self.salldates:
             file = f'{self.root_server}{_date[:4]}/{_date[4:6]}/{self.filebase}{_date}{self.fileext}'
             if verbose:
                 print(f'Processing file {file}')
-            da_in = xr.open_dataset(file)[params_verdata[self.param][self.name]]
-            da_in = da_in.rename(self.param)
+            da_in = xr.open_dataset(file)[params_verdata[self.params][self.name]]
+            da_in = da_in.rename(self.params)
             da_in = da_in.rename({'lon': 'longitude', 'lat': 'latitude'})
             da_in = da_in.transpose( 'time', 'yc', 'xc')
-            da_in.to_netcdf(f'{self.cachedir}/{filename.format(_date, self.param)}')
+            da_in.to_netcdf(f'{self.obscachedir}/{filename.format(_date, self.params)}')

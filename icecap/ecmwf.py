@@ -4,11 +4,11 @@ mars retrieval, ecmwf retrieval flow
 """
 import os
 import subprocess
-import flow
-import setup_icecap
-import dataobjects
+import xarray as xr
 
-xr = None  # This is a lazy import. Loading xarray is slow and we don't always need it.
+import flow
+import utils
+import dataobjects
 
 params_ecmwf = {
     'sic' : {
@@ -24,7 +24,7 @@ class EcmwfTree(flow.ProcessTree):
     """
     def __init__(self, conf):
         super().__init__(conf)
-        # self.add_attr(['variable:EXEHOST;hpc-batch'], f'global')
+        # _object.add_attr(['variable:EXEHOST;hpc-batch'], f'global')
         site = 'hpc'
         self.add_attr([f'variable:ECF_JOB_CMD;troika submit -o %ECF_JOBOUT% {site} %ECF_JOB%',
                        f'variable:ECF_KILL_CMD;troika kill {site} %ECF_JOB%',
@@ -32,7 +32,8 @@ class EcmwfTree(flow.ProcessTree):
                        'variable:EXEHOST;hpc-batch'], 'global')
 
         for expid in conf.fcsets.keys():
-            self.add_attr([f'variable:EXPID;{expid}'], f'retrieval:{expid}')
+            self.add_attr([f'variable:EXPID;{expid}',
+                           'trigger:verdata==complete'], f'retrieval:{expid}')
             if conf.fcsets[expid].mode in ['fc', 'both']:
                 self.add_attr(['variable:MODE;fc',
                                'repeat:DATES;{}'.format(self.fcsets[expid].sdates)],
@@ -115,10 +116,6 @@ class EcmwfRetrieval:
                 with open(requestfilename, 'r') as rfile:
                     subprocess.check_call('mars', stdin=rfile)
 
-    def clean_up(self):
-        tfile = self.kwargs['target']
-        os.remove(tfile)
-
 
 class _EcmwfExtendedRangeRetrieval(EcmwfRetrieval):
     """Defines MARS retrieval of step data for ENS forecast"""
@@ -140,40 +137,31 @@ class _EcmwfExtendedRangeRetrieval(EcmwfRetrieval):
 
         self.kwargs['grid'] = [1.0,1.0]
 
-
-
-
-
-
-class EcmwfData(dataobjects.DataObject):
+class EcmwfData(dataobjects.ForecastObject):
     """ECMWF Data object calling a factory to
     retrieve appropriate class"""
 
     def __init__(self, conf, args):
-        super().__init__(conf)
+
+        super().__init__(conf, args)
 
         # provided by ecflow/env variable
         self.startdates = args.startdate
         self.type = args.exptype
-        self.tmptargetfile = f'{conf.tmpdir}/tmp_{args.expid}_{args.startdate}_{self.type}.grb'
-        self.fcast = conf.fcsets[args.expid]
-        if args.mode == 'hc':
-            self.refdate =  self.fcast.hcrefdate
-        else:
-            self.refdate = self.fcast.dates
-
-        self.cachedir = f'{conf.cachedir}/{self.fcast.fcsystem}/{self.fcast.expname}/{self.refdate}/{args.mode}/'
-        setup_icecap.make_dir(self.cachedir)
+        self.tmptargetfile = f'{conf.tmpdir}/{args.expid}_{args.startdate}_{self.type}_{self.mode}/' \
+                             f'tmp_{args.expid}_{args.startdate}_{self.type}_{self.mode}.grb'
+        utils.make_dir(os.path.dirname(self.tmptargetfile))
 
         self.ndays = int(self.fcast.ndays)
-        self.mode = args.mode
+
 
 
         self.ldmean = False
         if self.fcast.fcsystem in ['extended-range']:
             setattr(self, 'ldmean', True)
 
-
+        self.linterp = True
+        self.grid = self.verif_name
 
         factory_args = dict(
             exptype=args.exptype,
@@ -193,21 +181,10 @@ class EcmwfData(dataobjects.DataObject):
         self.retrieval_request.execute(dryrun=dryrun)
 
     def clean_up(self):
+        """ Remove temporary files"""
         os.remove(self.tmptargetfile)
-
-    @staticmethod
-    def _calc_dmean(da_tmp, group_dim):
-        da_tmp_out = []
-        for (label, group) in da_tmp.groupby(group_dim):
-            da_in_tmp = group.copy()
-            da_in_tmp['step'] = da_in_tmp.step + da_in_tmp[group_dim]
-            da_in_tmp = da_in_tmp.rename({'step': 'time'})
-            da_in_tmp = da_in_tmp.resample(time='1D').mean()
-            da_tmp_out.append(da_in_tmp)
-        return da_tmp_out
-
-
-
+        if self.linterp:
+            self.regridder.clean_weight_file()
 
 
     def make_filelist(self):
@@ -217,32 +194,37 @@ class EcmwfData(dataobjects.DataObject):
         if self.fcast.fcsystem == 'extended-range':
             if self.mode == 'hc':
                 if self.type == 'cf':
-                    files = [filename.format(date,member,self.params)
+                    files = [filename.format(date,member,self.params,self.grid)
                             for date in self.fcast.shcdates
                             for member in range(1)]
                 elif self.type == 'pf':
-                    files = [filename.format(date,member,self.params)
+                    files = [filename.format(date,member,self.params,self.grid)
                              for date in self.fcast.shcdates
                              for member in range(int(self.fcast.enssize) - 1)]
             if self.mode == 'fc':
                 if self.type == 'cf':
-                    files = [filename.format(date,member,self.params)
+                    files = [filename.format(date,member,self.params,self.grid)
                              for date in self.fcast.sdates
                              for member in range(1)]
                 elif self.type == 'pf':
-                    files = [filename.format(date,member,self.params)
+                    files = [filename.format(date,member,self.params,self.grid)
                              for date in self.fcast.sdates
                              for member in range(int(self.fcast.enssize) - 1)]
 
-        return files
+        files_list = [self.fccachedir+'/'+file for file in files]
+        return files_list
 
+    @staticmethod
+    def _calc_dmean(da_tmp):
+        da_in_tmp = da_tmp.copy()
+        da_in_tmp['step'] = da_in_tmp.step + da_in_tmp['starttime']
+        da_in_tmp = da_in_tmp.rename({'step': 'time'})
+        da_in_tmp = da_in_tmp.resample(time='1D').mean()
+
+        return da_in_tmp
 
     def process(self):
         """Process retrieved ECMWF data and write to cache"""
-
-        global xr
-        if xr is None:
-            import xarray as xr
 
         iname = params_ecmwf[self.params]["xr_code"]
 
@@ -267,17 +249,38 @@ class EcmwfData(dataobjects.DataObject):
         da_in = da_in.transpose('number', 'time', 'step', 'latitude', 'longitude')
         da_in = da_in.rename({'time': 'starttime'})
 
-        if self.ldmean:
-            da_out = self._calc_dmean(da_in, 'starttime')
+        da_in.to_netcdf('/home/nedb/transfer/test.nc')
+        # split into list of files with one starttime
+        files_pp = [da_in.sel(starttime=stime) for stime in da_in['starttime']]
 
-        for da_out_save in da_out:
+
+        if self.ldmean:
+            files_pp_dmean = [self._calc_dmean(file) for file in files_pp]
+            files_pp = files_pp_dmean
+
+        if self.keep_native == "yes":
+            self.grid = 'native'
+            for da_out_save in files_pp:
+                for number in da_out_save['number']:
+                    da_out_save = da_out_save.isel(time=slice(self.ndays))
+                    ofile = self._save_filename(da_out_save.sel(number=number))
+                    da_out_save.sel(number=number).to_netcdf(ofile)
+
+        self.grid = self.verif_name
+        if self.linterp:
+            files_pp_interp = [self.interpolate(file) for file in files_pp]
+            files_pp = files_pp_interp
+
+        for da_out_save in files_pp:
             for number in da_out_save['number']:
                 da_out_save = da_out_save.isel(time=slice(self.ndays))
-                da_out_save.sel(number=number).to_netcdf(self._save_filename(da_out_save.sel(number=number)))
+                ofile = self._save_filename(da_out_save.sel(number=number))
+                da_out_save.sel(number=number).to_netcdf(ofile)
 
     def _save_filename(self, da_tmp):
         filename = self._filenaming_convention('fc')
-        return f'{self.cachedir}/' + \
+        return f'{self.fccachedir}/' + \
                filename.format(da_tmp.time[0].dt.strftime("%Y%m%d").values,
                                int(da_tmp["number"]),
-                               da_tmp.name)
+                               da_tmp.name,
+                               self.grid)

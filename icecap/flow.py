@@ -68,7 +68,7 @@ class Tree:
 
     def _create_dict_from_tree(self):
         """
-        Internal function to create dictionary from self.attrs and self.attrs_parents
+        Internal function to create dictionary from _object.attrs and _object.attrs_parents
         :return: dictionary of flow object
         """
         out_dict = OrderedDict()
@@ -81,7 +81,7 @@ class Tree:
                 if n_i < len(x_val.split(':')) - 1:
                     current = current[name]
             for attr in self.attrs[x_i]:
-                # current[name] = self.attrs[x_i]
+                # current[name] = _object.attrs[x_i]
                 if not attr.split(':')[0] in current[name].keys():
                     current[name][attr.split(':')[0]] = [attr.split(':')[1]]
                 else:
@@ -107,13 +107,12 @@ class Tree:
             json_dumps_str = json.dumps(_todict, indent=4)
             print(json_dumps_str, file=fout)
 
-    def build_ecflow(self, clargs):
+    def build_ecflow(self):
         """
         Build ecflow suite parameters based on config file and attributes in flow object
         :param clargs: command line arguments
         :param defs_file: ecflow definition file
         """
-        self.force_exe_setup = clargs.force
 
         toplevel_s = self.defs.add_suite(self.toplevel_suite)
         suite_f = toplevel_s.add_family(self.suitename)
@@ -288,3 +287,7 @@ class ProcessTree(Tree):
         super().__init__(conf)
         # here the next steps which are independent from machines will be listed
         self.add_attr(['task:verdata_retrieve'], 'retrieval:verdata')
+        self.add_attr(['trigger:retrieval==complete'], 'plot')
+        for plotid in conf.plotsets:
+            self.add_attr(['task:plot',
+                           f'variable:PLOTTYPE;{plotid}'], f'plot:{plotid}')

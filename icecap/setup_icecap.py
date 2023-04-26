@@ -5,6 +5,7 @@ create folders. copy scripts etc
 import os
 import shutil
 import ecmwf
+import utils
 
 def create_flow(conf):
     """
@@ -35,12 +36,11 @@ class ExecutionHost:
         self.filename = conf.filename
 
         self.directories_create = [conf.pydir, conf.pydir + '/metrics', conf.pydir + '/contrib',
-                              conf.pydir + '/aux', conf.stagedir, conf.metricdir, conf.plotdir,
-                              conf.stagedir + '/aux', conf.cachedir, conf.tmpdir,
+                              conf.pydir + '/aux', conf.metricdir, conf.plotdir,
+                              conf.cachedir, conf.tmpdir,
                                    self.etcdir]
         self.directories_create_ecflow = [conf.ecffilesdir, conf.ecfincdir, conf.ecfhomeroot]
-        self.directories_wipe = [conf.rundir, conf.datadir, conf.tmpdir,
-                                 ]
+        self.directories_wipe = [conf.rundir, conf.datadir, conf.tmpdir]
         self.directories_wipe_full = [conf.cachedir]
 
     def wipe(self, args):
@@ -52,6 +52,7 @@ class ExecutionHost:
         _directories_wipe = self.directories_wipe
         if args.wipe == 2:
             _directories_wipe += self.directories_wipe_full
+
 
         for directory in _directories_wipe:
             if os.path.exists(directory):
@@ -68,7 +69,7 @@ class ExecutionHost:
         if self.ecflow == 'yes':
             _directories_create += self.directories_create_ecflow
         for directory in _directories_create:
-            make_dir(directory, verbose=args.verbose)
+            utils.make_dir(directory, verbose=args.verbose)
 
         fromdir = self.sourcedir + '/icecap'
         self._copy_python_scripts(fromdir, args)
@@ -168,141 +169,3 @@ class ExecutionHost:
         if args.verbose:
             print('Copying file {} --> {}'.format(sfile, target_dir))
         shutil.copy(sfile, target_dir)
-
-
-def make_dir(directory_name, verbose=False):
-    """
-    routine to create directory on operating system
-    :param directory_name: name of directory to create
-    :param verbose: if verbose is True provide additional output
-    """
-    if not os.path.isdir(directory_name):
-        try:
-            os.makedirs(directory_name)
-        except OSError:
-            raise RuntimeError('OS reported error when trying to create\n'
-                               + directory_name
-                               + '\nIs the path reachable, '
-                                 'and do you have write permission?') from None
-        if verbose:
-            print(f'Created directory {directory_name}')
-
-
-def print_banner(word):
-    """
-    Create printed output as banner
-    (from https://code.activestate.com/recipes/577537-banner/)
-    :param word: word to be printed
-    """
-    letterforms = '''\
-       |       |       |       |       |       |       | |
-  XXX  |  XXX  |  XXX  |   X   |       |  XXX  |  XXX  |!|
-  X  X |  X  X |  X  X |       |       |       |       |"|
-  X X  |  X X  |XXXXXXX|  X X  |XXXXXXX|  X X  |  X X  |#|
- XXXXX |X  X  X|X  X   | XXXXX |   X  X|X  X  X| XXXXX |$|
-XXX   X|X X  X |XXX X  |   X   |  X XXX| X  X X|X   XXX|%|
-  XX   | X  X  |  XX   | XXX   |X   X X|X    X | XXX  X|&|
-  XXX  |  XXX  |   X   |  X    |       |       |       |'|
-   XX  |  X    | X     | X     | X     |  X    |   XX  |(|
-  XX   |    X  |     X |     X |     X |    X  |  XX   |)|
-       | X   X |  X X  |XXXXXXX|  X X  | X   X |       |*|
-       |   X   |   X   | XXXXX |   X   |   X   |       |+|
-       |       |       |  XXX  |  XXX  |   X   |  X    |,|
-       |       |       | XXXXX |       |       |       |-|
-       |       |       |       |  XXX  |  XXX  |  XXX  |.|
-      X|     X |    X  |   X   |  X    | X     |X      |/|
-  XXX  | X   X |X     X|X     X|X     X| X   X |  XXX  |0|
-   X   |  XX   | X X   |   X   |   X   |   X   | XXXXX |1|
- XXXXX |X     X|      X| XXXXX |X      |X      |XXXXXXX|2|
- XXXXX |X     X|      X| XXXXX |      X|X     X| XXXXX |3|
-X      |X    X |X    X |X    X |XXXXXXX|     X |     X |4|
-XXXXXXX|X      |X      |XXXXXX |      X|X     X| XXXXX |5|
- XXXXX |X     X|X      |XXXXXX |X     X|X     X| XXXXX |6|
-XXXXXX |X    X |    X  |   X   |  X    |  X    |  X    |7|
- XXXXX |X     X|X     X| XXXXX |X     X|X     X| XXXXX |8|
- XXXXX |X     X|X     X| XXXXXX|      X|X     X| XXXXX |9|
-   X   |  XXX  |   X   |       |   X   |  XXX  |   X   |:|
-  XXX  |  XXX  |       |  XXX  |  XXX  |   X   |  X    |;|
-    X  |   X   |  X    | X     |  X    |   X   |    X  |<|
-       |       |XXXXXXX|       |XXXXXXX|       |       |=|
-  X    |   X   |    X  |     X |    X  |   X   |  X    |>|
- XXXXX |X     X|      X|   XXX |   X   |       |   X   |?|
- XXXXX |X     X|X XXX X|X XXX X|X XXXX |X      | XXXXX |@|
-   X   |  X X  | X   X |X     X|XXXXXXX|X     X|X     X|A|
-XXXXXX |X     X|X     X|XXXXXX |X     X|X     X|XXXXXX |B|
- XXXXX |X     X|X      |X      |X      |X     X| XXXXX |C|
-XXXXXX |X     X|X     X|X     X|X     X|X     X|XXXXXX |D|
-XXXXXXX|X      |X      |XXXXX  |X      |X      |XXXXXXX|E|
-XXXXXXX|X      |X      |XXXXX  |X      |X      |X      |F|
- XXXXX |X     X|X      |X  XXXX|X     X|X     X| XXXXX |G|
-X     X|X     X|X     X|XXXXXXX|X     X|X     X|X     X|H|
-  XXX  |   X   |   X   |   X   |   X   |   X   |  XXX  |I|
-      X|      X|      X|      X|X     X|X     X| XXXXX |J|
-X    X |X   X  |X  X   |XXX    |X  X   |X   X  |X    X |K|
-X      |X      |X      |X      |X      |X      |XXXXXXX|L|
-X     X|XX   XX|X X X X|X  X  X|X     X|X     X|X     X|M|
-X     X|XX    X|X X   X|X  X  X|X   X X|X    XX|X     X|N|
-XXXXXXX|X     X|X     X|X     X|X     X|X     X|XXXXXXX|O|
-XXXXXX |X     X|X     X|XXXXXX |X      |X      |X      |P|
- XXXXX |X     X|X     X|X     X|X   X X|X    X | XXXX X|Q|
-XXXXXX |X     X|X     X|XXXXXX |X   X  |X    X |X     X|R|
- XXXXX |X     X|X      | XXXXX |      X|X     X| XXXXX |S|
-XXXXXXX|   X   |   X   |   X   |   X   |   X   |   X   |T|
-X     X|X     X|X     X|X     X|X     X|X     X| XXXXX |U|
-X     X|X     X|X     X|X     X| X   X |  X X  |   X   |V|
-X     X|X  X  X|X  X  X|X  X  X|X  X  X|X  X  X| XX XX |W|
-X     X| X   X |  X X  |   X   |  X X  | X   X |X     X|X|
-X     X| X   X |  X X  |   X   |   X   |   X   |   X   |Y|
-XXXXXXX|     X |    X  |   X   |  X    | X     |XXXXXXX|Z|
- XXXXX | X     | X     | X     | X     | X     | XXXXX |[|
-X      | X     |  X    |   X   |    X  |     X |      X|\|
- XXXXX |     X |     X |     X |     X |     X | XXXXX |]|
-   X   |  X X  | X   X |       |       |       |       |^|
-       |       |       |       |       |       |XXXXXXX|_|
-       |  XXX  |  XXX  |   X   |    X  |       |       |`|
-       |   XX  |  X  X | X    X| XXXXXX| X    X| X    X|a|
-       | XXXXX | X    X| XXXXX | X    X| X    X| XXXXX |b|
-       |  XXXX | X    X| X     | X     | X    X|  XXXX |c|
-       | XXXXX | X    X| X    X| X    X| X    X| XXXXX |d|
-       | XXXXXX| X     | XXXXX | X     | X     | XXXXXX|e|
-       | XXXXXX| X     | XXXXX | X     | X     | X     |f|
-       |  XXXX | X    X| X     | X  XXX| X    X|  XXXX |g|
-       | X    X| X    X| XXXXXX| X    X| X    X| X    X|h|
-       |    X  |    X  |    X  |    X  |    X  |    X  |i|
-       |      X|      X|      X|      X| X    X|  XXXX |j|
-       | X    X| X   X | XXXX  | X  X  | X   X | X    X|k|
-       | X     | X     | X     | X     | X     | XXXXXX|l|
-       | X    X| XX  XX| X XX X| X    X| X    X| X    X|m|
-       | X    X| XX   X| X X  X| X  X X| X   XX| X    X|n|
-       |  XXXX | X    X| X    X| X    X| X    X|  XXXX |o|
-       | XXXXX | X    X| X    X| XXXXX | X     | X     |p|
-       |  XXXX | X    X| X    X| X  X X| X   X |  XXX X|q|
-       | XXXXX | X    X| X    X| XXXXX | X   X | X    X|r|
-       |  XXXX | X     |  XXXX |      X| X    X|  XXXX |s|
-       |  XXXXX|    X  |    X  |    X  |    X  |    X  |t|
-       | X    X| X    X| X    X| X    X| X    X|  XXXX |u|
-       | X    X| X    X| X    X| X    X|  X  X |   XX  |v|
-       | X    X| X    X| X    X| X XX X| XX  XX| X    X|w|
-       | X    X|  X  X |   XX  |   XX  |  X  X | X    X|x|
-       |  X   X|   X X |    X  |    X  |    X  |    X  |y|
-       | XXXXXX|     X |    X  |   X   |  X    | XXXXXX|z|
-  XXX  | X     | X     |XX     | X     | X     |  XXX  |{|
-   X   |   X   |   X   |       |   X   |   X   |   X   |||
-  XXX  |     X |     X |     XX|     X |     X |  XXX  |}|
- XX    |X  X  X|    XX |       |       |       |       |~|
-    '''.splitlines()
-
-    table = {}
-    for form in letterforms:
-        if '|' in form:
-            table[form[-2]] = form[:-3].split('|')
-    rows = len(list(table.values())[0])
-
-
-    print("-" * 80)
-    for row in range(rows):
-        space = ' ' * 5
-        text = '  '.join([table[c][row] for c in word])
-        print(space, text.replace('X', '#'))
-
-    print("-" * 80)

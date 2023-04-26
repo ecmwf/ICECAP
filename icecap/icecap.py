@@ -58,6 +58,6 @@ if __name__ == '__main__':
         if args.verbose:
             flow.to_json()
         if conf.ecflow == 'yes':
-            flow.build_ecflow(args)
+            flow.build_ecflow()
             flow.save_defs(force=args.force)
             flow.load_ecflow(force=args.force)

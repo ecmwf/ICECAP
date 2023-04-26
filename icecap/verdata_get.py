@@ -5,7 +5,7 @@ import argparse
 import config
 import clargs
 import verdata
-import setup_icecap
+import utils
 
 os.environ['HDF5_USE_FILE_LOCKING']='FALSE'
 
@@ -25,4 +25,4 @@ if __name__ == '__main__':
 
 
 
-    setup_icecap.print_banner('ALL DONE')
+    utils.print_banner('ALL DONE')

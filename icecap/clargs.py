@@ -23,6 +23,11 @@ def add_staging_mode(parser):
     helpstr = 'experiment mode (hindcast, forecast)'
     parser.add_argument('mode', choices=['fc', 'hc'], help=helpstr)
 
+def add_plotid(parser):
+    """Add to parser a positional argument to specify plotid from config."""
+    helpstr = 'plotid [name followed by plot_* in config]'
+    parser.add_argument('plotid', help=helpstr)
+
 def add_config_option(parser):
     """Add to parser an option to specify config file."""
     parser.add_argument('-c', '--configfile',

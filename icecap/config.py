@@ -6,8 +6,9 @@ is parsed from a user-editable configuration file.
 import argparse
 import configparser
 import os
-import datetime as dt
+
 import numpy as np
+import dataobjects
 
 
 
@@ -73,11 +74,6 @@ config_optnames = {
         }
     }, # end ecflow
     'staging': {
-        'lonlatres': {
-            'printname' : 'longitude/latitude resolution of staged files',
-            'optional' : True,
-            'default_value' : 1.0/1.0,
-        },
         'verdata' : {
             'printname' : 'verifying dataset',
             'optional' : False
@@ -85,6 +81,13 @@ config_optnames = {
         'params':{
             'printname':'variable name',
             'optional' : False
+        },
+        # might be useful for debugging but will not re-calc native if interpolated fields exist
+        'keep_native' : {
+            'printname' : 'store daily mean data in native grid (additionally)',
+            'optional' : True,
+            'default_value' : ["no"],
+            'allowed_values' : ["yes", "no"]
         }
     }, # end staging
     'fc' : {
@@ -104,12 +107,12 @@ config_optnames = {
         },
         'dates':{
             'printname' : 'forecast dates',
-            'optional' : False,
+            'optional' : ['mode:fc'],
         },
         'mode':{
             'printname': 'forcast or hindcast mode',
             'optional' : False,
-            'allowed_values' : ["hc", "fc", "both"]
+            'allowed_values' : ["hc", "fc"]
         },
         'hcrefdate':{
             'printname' : 'hindcast reference date',
@@ -117,11 +120,11 @@ config_optnames = {
         },
         'hcfromdate':{
             'printname' : 'first hindcast year',
-            'optional' : ['mode:hc','mode:both']
+            'optional' : ['mode:hc']
         },
         'hctodate':{
             'printname' : 'first hindcast year',
-            'optional' : ['mode:hc','mode:both'],
+            'optional' : ['mode:hc'],
         },
         'ndays': {
             'printname' : 'number of days to be staged',
@@ -133,9 +136,47 @@ config_optnames = {
             'default_value' : ["no"],
             'allowed_values' : ["yes", "no"]
         }
-    } # end fc
-
-
+    }, # end fc
+    'plot' : {
+        'verif_expname' : {
+            'printname':'experiment name for plotting',
+            'optional' : False,
+        },
+        'plottype' : {
+            'printname':'plot type',
+            'optional' : False,
+            'allowed_values' : ["interp_check"]
+        },
+        'verif_mode':{
+            'printname': 'forcast or hindcast mode for plotting',
+            'optional' : False,
+        },
+        'verif_fromdate':{
+            'printname' : 'first year',
+            'optional' : False,
+        },
+        'verif_todate':{
+            'printname' : 'last year',
+            'optional' : False,
+        },
+        'target':{
+            'printname' : 'target time for plotting',
+            'optional' : False,
+        },
+        'verif_enssize':{
+            'printname' : 'ensemble size used for metrics',
+            'optional' : False
+        },
+        'verif_fcsystem':{
+            'printname' : 'forecast system specification',
+            'optional' : False,
+            'allowed_values' : ["medium-range", "extended-range","long-range"]
+        },
+        'verif_refdate':{
+            'printname' : 'experiment reference date',
+            'optional':False
+        }
+    }
 }
 
 
@@ -149,7 +190,7 @@ class ConfigurationError(Exception):
         if hint is None:
             return message
 
-        return (message + '\nHINT: ' + hint)
+        return message + '\nHINT: ' + hint
 
 class MissingEntry(ConfigurationError):
     """exception to raise if an section is expected but not present"""
@@ -199,89 +240,6 @@ class ConflictingOptions(ConfigurationError):
         hmessage = self.add_hint(message, hint)
         super().__init__(hmessage)
 
-
-
-
-
-class ForecastObject:
-    """A forecast object corresponds to a single numerical experiment."""
-# dates : config dates
-# sdates : string dates
-# dtdates: datetime dates
-
-    def __init__(self, **kwargs):
-        self.fcsystem = kwargs['fcsystem']
-        self.expname = kwargs['expname']
-        self.enssize = kwargs['enssize']
-        self.mode = kwargs['mode']  # hindcast mode (affects start dates)
-        self.dates = kwargs['dates']
-        self.hcrefdate = kwargs['hcrefdate']
-        self.hcfromdate = kwargs['hcfromdate']
-        self.hctodate = kwargs['hctodate']
-        self.ref = kwargs['ref']
-        self.ndays = kwargs['ndays']
-
-
-
-        _dates_list = _dates_to_list(self.dates)
-        self.dtdates = [dt.datetime.strptime(d, '%Y%m%d') for d in _dates_list]
-        self.sdates = [d.strftime('%Y%m%d') for d in self.dtdates]
-        self.dtalldates = _make_days_datelist(self.dtdates, self.ndays)
-
-
-
-        if self.mode in ['hc','both']:
-            _dates_list_ref  = _dates_to_list(self.hcrefdate)
-            self.dthcrefdate = [dt.datetime.strptime(d, '%Y%m%d') for d in _dates_list_ref]
-            self.shcrefdate = [d.strftime('%Y%m%d') for d in self.dthcrefdate]
-
-            _dates_hc_from_list = _dates_to_list(self.hcfromdate)
-            self.dthcfromdate = [dt.datetime.strptime(d, '%Y%m%d') for d in _dates_hc_from_list]
-            _dates_hc_to_list = _dates_to_list(self.hctodate)
-            self.dthctodate = [dt.datetime.strptime(d, '%Y%m%d') for d in _dates_hc_to_list]
-
-            self.hcdates = _make_hc_datelist(self.dthcfromdate, self.dthctodate)
-            self.shcdates = [d.strftime('%Y%m%d') for d in self.hcdates]
-            self.dtalldates += _make_days_datelist(self.hcdates, self.ndays)
-
-        self.salldates = list(dict.fromkeys([d.strftime('%Y%m%d') for d in self.dtalldates]))
-
-def _make_days_datelist(_dates, _ndays):
-    alldates = []
-    for _date in _dates:
-        alldates += [_date + dt.timedelta(days=x) for x in range(_ndays)]
-    return alldates
-
-
-
-def _dates_to_list(_args):
-    """
-    Convert a comma separated string into a list object
-    :param _args:
-    :return: list object of dates
-    """
-    list_whitespace = _args.split(',')
-    list_nospace = [l.strip() for l in list_whitespace]
-
-    return list_nospace
-
-def _make_hc_datelist(fromdates, todates):
-    """
-    Generate hindcast dates from start dand end year
-    :param fromdates: start hindcast date
-    :param todates:  end hindcast date
-    :return: sorted hindcast list
-    """
-    hc_date_list = set()
-    for (hc_from_date, hc_to_date) in zip(fromdates,todates):
-        hc_date_list.update([dt.datetime(d,hc_from_date.month,hc_from_date.day) \
-                             for d in range(hc_from_date.year, hc_to_date.year + 1)])
-
-    return sorted(hc_date_list)
-
-
-
-
 class Configuration():
     """The ICECAP configuration used by every callable script."""
 
@@ -310,6 +268,20 @@ class Configuration():
         self.hcfromdate = None
         self.hctodate = None
         self.ref = None
+        self.ndays = None
+
+        # the following attributes are only temporally allocated
+        # but later saved for each plotID in the config file
+        self.verif_expname = None
+        self.plottype = None
+        self.verif_mode = None
+        self.verif_fromdate = None
+        self.verif_todate = None
+        self.target = None
+        self.verif_enssize = None
+        self.verif_fcsystem = None
+        self.verif_refdate = None
+
 
         conf_parser = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
         self.filename = file
@@ -331,6 +303,7 @@ class Configuration():
         self.pydir = self.rundir + '/py'  # Python scripts
         self.ecffilesdir = self.rundir + '/ecf_files'  # ECF_FILES
         self.ecfincdir = self.ecffilesdir + '/include'  # ECF_INC
+
 
         # set up ecflow variables if needed
         if self.ecflow:
@@ -356,12 +329,12 @@ class Configuration():
             section = 'fc_' + expid
             self._init_config(conf_parser, section, 'fc', init=True)
 
-            # check if hcrefdate given for mode='hc/both' and machine='ecmwf'
-            if self.hcrefdate is None and self.machine in ['ecmwf'] and self.mode in ['hc', 'both']:
+            # check if hcrefdate given for mode='hc' and machine='ecmwf'
+            if self.hcrefdate is None and self.machine in ['ecmwf'] and self.mode in ['hc']:
                 raise 'hcrefdate needs to be defined for hindcast mode on ecmwf'
 
 
-            self.fcsets[self.expname] = ForecastObject(
+            self.fcsets[expid] = dataobjects.ForecastConfigObject(
                 fcsystem = self.fcsystem,
                 expname = self.expname,
                 enssize = self.enssize,
@@ -381,12 +354,32 @@ class Configuration():
             if len(_ref_list) > 1:
                 raise 'More than one experiment labelled with ref = yes in config'
 
-
         # all daily dates as one list (used later for obs retrieval)
         sdates_verif = []
         for fcset in self.fcsets:
             sdates_verif += getattr(self.fcsets[fcset], 'salldates')
         self.salldates = list(dict.fromkeys(sdates_verif))
+
+        # get fc config entries
+        plotsetlist = [section[5:] for section in conf_parser.sections()
+                       if section.startswith('plot_')]
+
+        self.plotsets = dict()
+        for plotid in plotsetlist:
+            section = 'plot_' + plotid
+            self._init_config(conf_parser, section, 'plot', init=True)
+
+            self.plotsets[plotid] = dataobjects.PlotConfigObject(
+                verif_expname=self.verif_expname,
+                plottype =self.plottype,
+                verif_mode = self.verif_mode,
+                verif_fromdate = self.verif_fromdate,
+                verif_todate = self.verif_todate,
+                target = self.target,
+                verif_enssize = self.verif_enssize,
+                verif_fcsystem = self.verif_fcsystem,
+                verif_refdate = self.verif_refdate
+                )
 
 
 
@@ -424,6 +417,15 @@ class Configuration():
             for optname in config_optnames['fc']:
                 if hasattr(self.fcsets[expid], optname):
                     lines.append(f'%s: {getattr(self.fcsets[expid], optname)}'
+                                 % (config_optnames[secname][optname]['printname']))
+
+        lines.append('\n* Plotting')
+        secname = 'plot'
+        for plotid in list(self.plotsets):
+            lines.append(f'{plotid}')
+            for optname in config_optnames['plot']:
+                if hasattr(self.plotsets[plotid], optname):
+                    lines.append(f'%s: {getattr(self.plotsets[plotid], optname)}'
                                  % (config_optnames[secname][optname]['printname']))
 
 
