@@ -2,6 +2,7 @@
 to forecasts and verification data for staging and for config"""
 
 import os
+import glob
 import datetime as dt
 import uuid
 import xesmf as xe
@@ -15,8 +16,6 @@ class DataObject:
 
     def __init__(self, conf):
         self.params = conf.params
-        self.cachedir = None
-        self.ndays = conf.ndays
         self.filelist = None
         self.verif_name = conf.verdata
         self.cacherootdir = conf.cachedir
@@ -27,6 +26,10 @@ class DataObject:
         self.regridder_name = f'weights_{uuid.uuid4().hex}.nc'
         self.grid = self.verif_name
         self.keep_native = conf.keep_native
+        self.files_to_retrieve = []
+        self.tmptargetfile = None
+        self.periodic = None
+        self.ndays = None
 
     def check_cache(self, check_level=2, verbose=False):
         """
@@ -36,7 +39,16 @@ class DataObject:
         :param verbose: switch on debugging output
         """
 
+        # for obs there is one datafile per date, whereas for fc it's one
+        # file per startdate (with ndays timesteps)
+        # thus chekcs for length are only possible for fc data
+        if self.ndays is None and check_level>1:
+            raise ValueError("Class attribute ndays can't be set to None for"
+                             "check_level > 1")
+
         files_to_check = self.make_filelist()
+
+        self.files_to_retrieve = []
         if verbose:
             print(f'files to check {files_to_check}')
 
@@ -44,17 +56,20 @@ class DataObject:
             # quick check if exist
             if not os.path.exists(f'{file}'):
                 if verbose:
-                    print(f'Not all files are found in cache {self.cachedir}/{file}')
-                return False
+                    print(f'Not all files are found in cache {file}')
+                self.files_to_retrieve.append(file)
+            else:
+                if check_level > 1:
+                    ds_in = xr.open_dataset(f'{file}')
+                    if len(ds_in.time) < self.ndays:
+                        if verbose:
+                            print(f'Not all timesteps needed found in {file}')
+                        self.files_to_retrieve.append(file)
 
-        if check_level > 1:
 
-            for file in files_to_check:
-                ds_in = xr.open_dataset(f'{file}')
-                if len(ds_in.time) < self.ndays:
-                    if verbose:
-                        print(f'Not all timesteps needed found in {self.cachedir}/{file}')
-                    return False
+        if self.files_to_retrieve:
+            return False
+
         return True
 
     def make_filelist(self):
@@ -72,6 +87,8 @@ class DataObject:
         :param ds_raw: raw forecast xarray object
         :return: interpolated field as xarray object
         """
+        if self.periodic is None:
+            raise ValueError("Class attribute periodic used in interpolate can't be set to None")
 
         ref_file = f'{self.obscachedir}/' \
                    f'{self._filenaming_convention("verif").format(self.salldates[0],self.params)}'
@@ -79,7 +96,7 @@ class DataObject:
 
         self.regridder = xe.Regridder(ds_raw.rename({'longitude': 'lon', 'latitude': 'lat'}),
                                       ds_ref.rename({'longitude': 'lon', 'latitude': 'lat'}),
-                                      "bilinear", periodic=True, reuse_weights=True,
+                                      "bilinear", periodic=self.periodic, reuse_weights=True,
                                       filename=self.regridder_name)
         ds_out = self.regridder(ds_raw.rename({'longitude': 'lon', 'latitude': 'lat'}))
 
@@ -87,7 +104,27 @@ class DataObject:
         ds_out['xc'] = ds_ref['xc'].values
         ds_out['yc'] = ds_ref['yc'].values
         ds_out.rename({'lon':'longitude','lat':'latitude'})
+
+        # copy projection information if needed
+        for proj_param in ['projection', 'central_longitude', 'central_latitude',
+                           'true_scale_latitude']:
+            if proj_param in ds_ref.attrs:
+                ds_out.attrs[proj_param] = getattr(ds_ref,proj_param)
+
         return ds_out
+
+    def clean_up(self):
+        """ Remove temporary files"""
+        if self.tmptargetfile is not None:
+            os.remove(self.tmptargetfile)
+
+            # check if .idx file has been created and delete if True
+            idx_file = f'{self.tmptargetfile[:self.tmptargetfile.rindex(".")]}.idx'
+            if os.path.isfile(idx_file):
+                os.remove(idx_file)
+
+        if self.regridder:
+            self.regridder.clean_weight_file()
 
 
 
@@ -111,26 +148,133 @@ class ForecastObject(DataObject):
         super().__init__(conf)
 
         self.machine = conf.machine
+        self.startdate = args.startdate
         self.fcast = conf.fcsets[args.expid]
+        self.expname = self.fcast.expname
         self.enssize = self.fcast.enssize
         self.mode = self.fcast.mode
+        self.source = self.fcast.source
+        self.ndays = int(self.fcast.ndays)
+
 
         self.fcsdates = self.fcast.salldates
 
         if self.mode == 'hc':
-            self.refdate = self.fcast.hcrefdate
+            self.refdate = utils.csv_to_list(self.fcast.hcrefdate)
         else:
-            self.refdate = self.fcast.dates
+            self.refdate = utils.csv_to_list(self.fcast.dates)
+
+    def create_folders(self):
+        """ Create forecast directories in cachedir"""
+
+        utils.print_info('Setting up folders for forecast retrieval')
+        directory_list = []
+        for date in self.refdate:
+            self.cycle = self.init_cycle(date)
+            _fccachedir = self.init_cachedir()
+            directory_list.append(_fccachedir)
+
+        for directory in list(set(directory_list)):
+            utils.make_dir(directory)
+
+    def remove_native_files(self):
+        """ Remove native grid files after interpolation checks"""
+        if self.keep_native:
+            utils.print_info('SRemoving native grid files')
+            file_list = []
+            for date in self.refdate:
+                self.cycle = self.init_cycle(date)
+                _fccachedir = self.init_cachedir()
+                files_to_add =  glob.glob(f'{_fccachedir}/*_native.nc')
+                file_list += files_to_add
+
+            for file in file_list:
+                os.remove(file)
+
+    def init_cycle(self, date):
+        """
+        return cycle name
+        :param date: date of forecast
+        :return: cycle as string
+        """
+
+
+        kwargs = {
+            'source': self.source,
+            'fcsystem': self.fcast.fcsystem,
+            'expname': self.expname,
+            'thisdate' : date
+        }
+        return get_cycle(**kwargs)
+
+
+
+
+    def init_cachedir(self):
+        """ create cachedir string """
 
         kwargs = {
             'cacherootdir': self.cacherootdir,
             'fcsystem': self.fcast.fcsystem,
-            'expname': self.fcast.expname,
-            'refdate': self.refdate,
-            'mode': self.mode
+            'expname': self.expname,
+            'source': self.source,
+            'cycle' : self.cycle,
+            'mode' : self.mode
         }
-        self.fccachedir = define_fccachedir(**kwargs)
-        utils.make_dir(self.fccachedir)
+        return define_fccachedir(**kwargs)
+
+
+    def _save_filename(self, number):
+        """
+        Create cache file name
+        :param number: ensemble member number
+        :return: outfile name as string
+        """
+        filename = self._filenaming_convention('fc')
+        _cachedir = self.init_cachedir()
+        return f'{_cachedir}/' + \
+               filename.format(self.startdate,
+                               number,
+                               self.params,
+                               self.grid)
+
+
+def get_cycle(**kwargs):
+
+    """
+    Get information on model version (IFS cycle)
+    For simplicity cycle is only set if operational (0001) stream is used
+    For all others the cycle is either implicitly encoded in the stream or
+    set by the user in their experiment
+    :param thisdate: data as string of current forecast
+    :return: self.cycle (cyc?? for oper and latest else)
+    """
+    thisdate = kwargs['thisdate']
+    cycle = "latest"
+    if kwargs['source'] == 'ecmwf' \
+            and kwargs['fcsystem'] in ['extended-range', 'medium_range'] \
+            and kwargs['expname'] == '0001':
+        cycle_dates = [
+            ('pre41r1', dt.datetime(1975, 1, 1, 0)),
+            ('41r1', dt.datetime(2015, 5, 12, 0)),
+            ('41r2', dt.datetime(2016, 3, 8, 0)),
+            ('43r1', dt.datetime(2016, 11, 22, 0)),
+            ('43r3', dt.datetime(2017, 7, 11, 0)),
+            ('45r1', dt.datetime(2018, 6, 5, 0)),
+            ('46r1', dt.datetime(2019, 6, 11, 0)),
+            ('47r1', dt.datetime(2020, 6, 30, 0)),
+            ('47r2', dt.datetime(2021, 5, 11, 0)),
+            ('47r3', dt.datetime(2021, 10, 12, 0)),
+        ]
+        cycles = [cd[0] for cd in cycle_dates]
+        dates = [cd[1] for cd in cycle_dates]
+        for i in range(len(dates) - 1):
+            if dates[i] <= utils.string_to_datetime(thisdate) < dates[i + 1]:
+                cycle = cycles[i]
+        if utils.string_to_datetime(thisdate) >= dates[-1]:
+            cycle = cycles[-1]
+
+    return cycle
 
 def define_fccachedir(**kwargs):
     """
@@ -141,10 +285,11 @@ def define_fccachedir(**kwargs):
     expname: experiment ID
     refdate: experiment reference date
     mode : hindcast (hc) or forecast (fc)
+    cycle : model version
     :return: cache directory (str) for the specific forecast
     """
-    _fccachedir = f'{kwargs["cacherootdir"]}/{kwargs["fcsystem"]}/' \
-                  f'{kwargs["expname"]}/{kwargs["refdate"]}/{kwargs["mode"]}/'
+    _fccachedir = f'{kwargs["cacherootdir"]}/{kwargs["source"]}/{kwargs["fcsystem"]}/' \
+                  f'{kwargs["expname"]}/{kwargs["cycle"]}/{kwargs["mode"]}'
     return _fccachedir
 
 
@@ -165,6 +310,8 @@ class ForecastConfigObject:
         self.hctodate = kwargs['hctodate']
         self.ref = kwargs['ref']
         self.ndays = kwargs['ndays']
+        self.source = kwargs['source']
+
 
         if self.mode  == 'fc':
             _dates_list = utils.csv_to_list(self.dates)
@@ -203,3 +350,10 @@ class PlotConfigObject:
         self.verif_enssize = kwargs['verif_enssize']
         self.verif_fcsystem = kwargs['verif_fcsystem']
         self.verif_refdate = kwargs['verif_refdate']
+        self.projection = kwargs['projection']
+        self.proj_options = kwargs['proj_options']
+        self.circle_border = kwargs['circle_border']
+        self.plot_extent = kwargs['plot_extent']
+        self.cmap = kwargs['cmap']
+        self.verif_source = kwargs['source']
+        self.verif_dates = kwargs['verif_dates']

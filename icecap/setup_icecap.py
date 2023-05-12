@@ -7,6 +7,7 @@ import shutil
 import ecmwf
 import utils
 
+
 def create_flow(conf):
     """
     returns appropriate object based on local environment
@@ -40,6 +41,7 @@ class ExecutionHost:
                               conf.cachedir, conf.tmpdir,
                                    self.etcdir]
         self.directories_create_ecflow = [conf.ecffilesdir, conf.ecfincdir, conf.ecfhomeroot]
+
         self.directories_wipe = [conf.rundir, conf.datadir, conf.tmpdir]
         self.directories_wipe_full = [conf.cachedir]
 
@@ -68,6 +70,8 @@ class ExecutionHost:
         _directories_create = self.directories_create
         if self.ecflow == 'yes':
             _directories_create += self.directories_create_ecflow
+
+
         for directory in _directories_create:
             utils.make_dir(directory, verbose=args.verbose)
 

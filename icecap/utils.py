@@ -33,9 +33,14 @@ def string_to_datetime(_datestring):
     """ return string as datetime object"""
     return dt.datetime.strptime(_datestring, '%Y%m%d')
 
-def datetime_to_string(_dtdate):
-    """return datetime as string object"""
-    return _dtdate.strftime('%Y%m%d')
+def datetime_to_string(_dtdate, formatting='%Y%m%d'):
+    """return datetime as string object
+    :param _dtdate: datetime object
+    :param formatting: format of string
+    :return: datetime as string
+    """
+
+    return _dtdate.strftime(formatting)
 
 def csv_to_list(_args, sep=','):
     """
@@ -49,6 +54,12 @@ def csv_to_list(_args, sep=','):
     return list_nospace
 
 def make_days_datelist(_dates, _ndays):
+    """
+    Create list of all dates given start date and number of days
+    :param _dates: startdate
+    :param _ndays: number of days
+    :return: list with all dates
+    """
     alldates = []
     for _date in _dates:
         alldates += [_date + dt.timedelta(days=x) for x in range(_ndays)]
@@ -244,3 +255,20 @@ X      | X     |  X    |   X   |    X  |     X |      X|\|
         print(space, text.replace('X', '#'))
 
     print("-" * 120)
+
+def print_info(text):
+    """
+    Print additional information preceded by INFO:
+    :param text: text to be printed
+    """
+    print('*'*120)
+    print(f'INFO: {text}')
+    print('*' * 120)
+
+plot_params ={
+    'sic' : {
+        'shortname':'sic',
+        'longname':'sea ice fraction',
+        'units':'fraction'
+    }
+}

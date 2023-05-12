@@ -22,5 +22,5 @@ if __name__ == '__main__':
     m = metrics.factory.create(args.plotid, conf)
     m.compute()
     m.save()
-    p = map_plot.MapPlot(conf, m)
-    p.plot()
+    p = map_plot.MapPlot(conf, args.plotid,m)
+    p.plot(m, args.verbose)

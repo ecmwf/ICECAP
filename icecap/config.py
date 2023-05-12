@@ -6,180 +6,14 @@ is parsed from a user-editable configuration file.
 import argparse
 import configparser
 import os
-
 import numpy as np
+
+import namelist_entries
 import dataobjects
-
-
-
-
 
 DEFAULT_CONF_NAME = 'icecap.conf'
 
-# this dictionary defines all option names which can be provided through the config file
-# it defines if the option is optional or what values are can be used
-config_optnames = {
-    'environment': {
-        'user': {
-            'printname' : "user name",
-            'optional' : False
-        },
-        'machine': {
-            'printname' : 'machine',
-            'optional' : False,
-            'allowed_values' : ['ecmwf','test']
-        },
-        'ecflow': {
-            'printname' : 'use ecflow',
-            'optional' : True,
-            'allowed_values' : ["yes", "no"]
-        },
-        'suitename': {
-            'printname' : 'name of suite',
-            'optional' : False
-        },
-        'sourcedir': {
-            'printname': 'Directory of source code',
-            'optional' : False
-        },
-        'rundir': {
-            'printname': 'Directory for runtime copy of ecFlow and Python scripts',
-            'optional' : False
-        },
-        'datadir': {
-            'printname': 'Directory for data/metrics/plots',
-            'optional' : False
-        },
-        'tmpdir': {
-            'printname': 'temporary working directory',
-            'optional' : False,
-        },
-        'cachedir':{
-            'printname': 'cache directory',
-            'optional' : False
-        }
-    }, # end environment
-    'ecflow': {
-        'ecfhomeroot': {
-            'printname': 'Root directory for ecFlow-generated files (ECF_HOME)',
-            'optional' : False,
-        },
-        'ecflow_host': {
-            'printname': 'ecflow hostname',
-            'optional' : False
-        },
-        'ecflow_port': {
-            'printname': 'ecflow host port',
-            'optional' : ['ecflow:yes']
-        }
-    }, # end ecflow
-    'staging': {
-        'verdata' : {
-            'printname' : 'verifying dataset',
-            'optional' : False
-        },
-        'params':{
-            'printname':'variable name',
-            'optional' : False
-        },
-        # might be useful for debugging but will not re-calc native if interpolated fields exist
-        'keep_native' : {
-            'printname' : 'store daily mean data in native grid (additionally)',
-            'optional' : True,
-            'default_value' : ["no"],
-            'allowed_values' : ["yes", "no"]
-        }
-    }, # end staging
-    'fc' : {
-        'fcsystem' : {
-            'printname':'forecasting system name',
-            'optional' : False,
-            'allowed_values' : ["medium-range", "extended-range","long-range"]
-        },
-        'expname' : {
-            'printname':'experiment name',
-            'optional' : False,
-        },
-
-        'enssize':{
-            'printname' : 'ensemble size',
-            'optional' : True,
-        },
-        'dates':{
-            'printname' : 'forecast dates',
-            'optional' : ['mode:fc'],
-        },
-        'mode':{
-            'printname': 'forcast or hindcast mode',
-            'optional' : False,
-            'allowed_values' : ["hc", "fc"]
-        },
-        'hcrefdate':{
-            'printname' : 'hindcast reference date',
-            'optional' : True
-        },
-        'hcfromdate':{
-            'printname' : 'first hindcast year',
-            'optional' : ['mode:hc']
-        },
-        'hctodate':{
-            'printname' : 'first hindcast year',
-            'optional' : ['mode:hc'],
-        },
-        'ndays': {
-            'printname' : 'number of days to be staged',
-            'optional' : False
-        },
-        'ref' : {
-            'printname' : 'use this forecast as reference',
-            'optional' : True,
-            'default_value' : ["no"],
-            'allowed_values' : ["yes", "no"]
-        }
-    }, # end fc
-    'plot' : {
-        'verif_expname' : {
-            'printname':'experiment name for plotting',
-            'optional' : False,
-        },
-        'plottype' : {
-            'printname':'plot type',
-            'optional' : False,
-            'allowed_values' : ["interp_check"]
-        },
-        'verif_mode':{
-            'printname': 'forcast or hindcast mode for plotting',
-            'optional' : False,
-        },
-        'verif_fromdate':{
-            'printname' : 'first year',
-            'optional' : False,
-        },
-        'verif_todate':{
-            'printname' : 'last year',
-            'optional' : False,
-        },
-        'target':{
-            'printname' : 'target time for plotting',
-            'optional' : False,
-        },
-        'verif_enssize':{
-            'printname' : 'ensemble size used for metrics',
-            'optional' : False
-        },
-        'verif_fcsystem':{
-            'printname' : 'forecast system specification',
-            'optional' : False,
-            'allowed_values' : ["medium-range", "extended-range","long-range"]
-        },
-        'verif_refdate':{
-            'printname' : 'experiment reference date',
-            'optional':False
-        }
-    }
-}
-
-
+config_optnames = namelist_entries.config_optnames
 
 
 class ConfigurationError(Exception):
@@ -269,6 +103,7 @@ class Configuration():
         self.hctodate = None
         self.ref = None
         self.ndays = None
+        self.source = None
 
         # the following attributes are only temporally allocated
         # but later saved for each plotID in the config file
@@ -281,6 +116,13 @@ class Configuration():
         self.verif_enssize = None
         self.verif_fcsystem = None
         self.verif_refdate = None
+        self.cmap = None
+        self.plot_extent = None
+        self.projection = None
+        self.proj_options = None
+        self.circle_border = None
+        self.verif_dates = None
+
 
 
         conf_parser = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
@@ -333,6 +175,8 @@ class Configuration():
             if self.hcrefdate is None and self.machine in ['ecmwf'] and self.mode in ['hc']:
                 raise 'hcrefdate needs to be defined for hindcast mode on ecmwf'
 
+            if self.source is None:
+                self.source = self.machine
 
             self.fcsets[expid] = dataobjects.ForecastConfigObject(
                 fcsystem = self.fcsystem,
@@ -344,7 +188,8 @@ class Configuration():
                 hcfromdate = self.hcfromdate,
                 hctodate=self.hctodate,
                 ref = self.ref,
-                ndays = int(self.ndays)
+                ndays = int(self.ndays),
+                source = self.source
             )
 
         # check for 'ref' keyword
@@ -369,6 +214,9 @@ class Configuration():
             section = 'plot_' + plotid
             self._init_config(conf_parser, section, 'plot', init=True)
 
+            if self.source is None:
+                self.source = self.machine
+
             self.plotsets[plotid] = dataobjects.PlotConfigObject(
                 verif_expname=self.verif_expname,
                 plottype =self.plottype,
@@ -378,8 +226,17 @@ class Configuration():
                 target = self.target,
                 verif_enssize = self.verif_enssize,
                 verif_fcsystem = self.verif_fcsystem,
-                verif_refdate = self.verif_refdate
+                verif_refdate = self.verif_refdate,
+                projection = self.projection,
+                proj_options = self.proj_options,
+                circle_border=self.circle_border,
+                plot_extent = self.plot_extent,
+                cmap = self.cmap,
+                source = self.source,
+                verif_dates = self.verif_dates
                 )
+
+
 
 
 
@@ -418,6 +275,7 @@ class Configuration():
                 if hasattr(self.fcsets[expid], optname):
                     lines.append(f'%s: {getattr(self.fcsets[expid], optname)}'
                                  % (config_optnames[secname][optname]['printname']))
+            lines.append('')
 
         lines.append('\n* Plotting')
         secname = 'plot'
@@ -427,6 +285,7 @@ class Configuration():
                 if hasattr(self.plotsets[plotid], optname):
                     lines.append(f'%s: {getattr(self.plotsets[plotid], optname)}'
                                  % (config_optnames[secname][optname]['printname']))
+            lines.append('')
 
 
 

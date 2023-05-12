@@ -2,9 +2,11 @@
 This module should contain all ecmwf specific relevant information, e.g.
 mars retrieval, ecmwf retrieval flow
 """
+
 import os
 import subprocess
 import xarray as xr
+
 
 import flow
 import utils
@@ -32,27 +34,40 @@ class EcmwfTree(flow.ProcessTree):
                        'variable:EXEHOST;hpc-batch'], 'global')
 
         for expid in conf.fcsets.keys():
-            self.add_attr([f'variable:EXPID;{expid}',
-                           'trigger:verdata==complete'], f'retrieval:{expid}')
-            if conf.fcsets[expid].mode in ['fc', 'both']:
-                self.add_attr(['variable:MODE;fc',
-                               'repeat:DATES;{}'.format(self.fcsets[expid].sdates)],
+            if conf.fcsets[expid].source == self.machine:
+                if conf.fcsets[expid].mode in ['fc']:
+                    loopdates = self.fcsets[expid].sdates
+                elif conf.fcsets[expid].mode in ['hc']:
+                    loopdates = self.fcsets[expid].shcrefdate
+
+                self.add_attr([f'variable:EXPID;{expid}',
+                               'trigger:verdata==complete'], f'retrieval:{expid}')
+
+                self.add_attr([f'variable:EXPID;{expid}',
+                               'variable:DATES;INIT',
+                               'variable:TYPE;pf',
+                               f'task:{conf.fcsets[expid].source}_retrieve'],
+                              f'retrieval:{expid}:init')
+
+
+
+                self.add_attr(['repeat:DATES;{}'.format(loopdates),
+                               'trigger:init==complete'],
                               f'retrieval:{expid}:fc')
+
                 if conf.fcsets[expid].fcsystem in ['extended-range', 'medium-range']:
                     self.add_attr(['task:ecmwf_retrieve;mars',
                                    'variable:TYPE;cf'], f'retrieval:{expid}:fc:cf')
                     self.add_attr(['task:ecmwf_retrieve;mars',
                                    'variable:TYPE;pf'], f'retrieval:{expid}:fc:pf')
 
-            if conf.fcsets[expid].mode in ['hc', 'both']:
-                self.add_attr(['variable:MODE;hc',
-                               'repeat:DATES;{}'.format(self.fcsets[expid].shcrefdate)],
-                              f'retrieval:{expid}:hc')
-                if conf.fcsets[expid].fcsystem in ['extended-range', 'medium-range']:
-                    self.add_attr(['task:ecmwf_retrieve;mars',
-                                   'variable:TYPE;cf'], f'retrieval:{expid}:hc:cf')
-                    self.add_attr(['task:ecmwf_retrieve;mars',
-                                   'variable:TYPE;pf'], f'retrieval:{expid}:hc:pf')
+                # add wipe family
+                self.add_attr([f'variable:EXPID;{expid}',
+                               'variable:DATES;WIPE',
+                               'variable:TYPE;pf',
+                               f'task:{conf.fcsets[expid].source}_retrieve'], f'clean:{expid}')
+
+
 
 
 class EcmwfRetrieval:
@@ -77,6 +92,7 @@ class EcmwfRetrieval:
         self.kwargs['time'] = "00:00:00"
         self.kwargs['type'] = kwargs['type']
         self.kwargs['target'] = kwargs['tfile']
+        self.kwargs['grid'] = kwargs['grid']
 
 
 
@@ -135,7 +151,9 @@ class _EcmwfExtendedRangeRetrieval(EcmwfRetrieval):
         if self.kwargs['type'] == 'pf':
             self.kwargs['number'] = [ m+1 for m in range(int(kwargs['fcastobj'].enssize)-1) ]
 
-        self.kwargs['grid'] = [1.0,1.0]
+        self.kwargs['grid'] = kwargs['grid']
+
+
 
 class EcmwfData(dataobjects.ForecastObject):
     """ECMWF Data object calling a factory to
@@ -145,74 +163,76 @@ class EcmwfData(dataobjects.ForecastObject):
 
         super().__init__(conf, args)
 
-        # provided by ecflow/env variable
-        self.startdates = args.startdate
-        self.type = args.exptype
-        self.tmptargetfile = f'{conf.tmpdir}/{args.expid}_{args.startdate}_{self.type}_{self.mode}/' \
-                             f'tmp_{args.expid}_{args.startdate}_{self.type}_{self.mode}.grb'
-        utils.make_dir(os.path.dirname(self.tmptargetfile))
 
-        self.ndays = int(self.fcast.ndays)
+        if args.startdate not in ['INIT','WIPE']:
+            self.type = args.exptype
+
+            self.ldmean = False
+            if self.fcast.fcsystem in ['extended-range']:
+                setattr(self, 'ldmean', True)
+
+            self.linterp = True
+            self.grid = self.verif_name
+            self.periodic = True
 
 
+            self.cycle = self.init_cycle(self.startdate)
+            self.fccachedir = self.init_cachedir()
 
-        self.ldmean = False
-        if self.fcast.fcsystem in ['extended-range']:
-            setattr(self, 'ldmean', True)
 
-        self.linterp = True
-        self.grid = self.verif_name
+            if self.fcast.fcsystem in ['extended-range']:
+                retrieval_grid = 'F320'
+            else:
+                raise ValueError(f'No grid for retrieval specified for {self.fcast.fcsystem}')
 
-        factory_args = dict(
-            exptype=args.exptype,
-            date=self.startdates,
-            fcastobj=self.fcast,
-            tfile = self.tmptargetfile,
-            type = self.type,
-            ndays = self.ndays,
-            mode = args.mode,
-            param = self.params
-        )
+            self.tmptargetfile = f'{conf.tmpdir}/{self.source}/{args.expid}_{args.startdate}_{self.type}_{self.mode}/' \
+                                 f'tmp_{args.expid}_{args.startdate}_{self.type}_{self.mode}.grb'
+            utils.make_dir(os.path.dirname(self.tmptargetfile))
 
-        self.retrieval_request = EcmwfRetrieval.factory(factory_args)
+            factory_args = dict(
+                exptype=args.exptype,
+                date=self.startdate,
+                fcastobj=self.fcast,
+                tfile = self.tmptargetfile,
+                type = self.type,
+                ndays = self.ndays,
+                mode = self.mode,
+                param = self.params,
+                grid = retrieval_grid
+            )
+
+            self.retrieval_request = EcmwfRetrieval.factory(factory_args)
+
 
     def get_from_tape(self, dryrun=False):
         """perform the MARS retrievals set up in init"""
         self.retrieval_request.execute(dryrun=dryrun)
 
-    def clean_up(self):
-        """ Remove temporary files"""
-        os.remove(self.tmptargetfile)
-        if self.linterp:
-            self.regridder.clean_weight_file()
-
-
     def make_filelist(self):
         """Generate a list of files which are expected to be staged"""
         filename = self._filenaming_convention('fc')
+        files_list = []
+        date = self.startdate
 
         if self.fcast.fcsystem == 'extended-range':
-            if self.mode == 'hc':
-                if self.type == 'cf':
-                    files = [filename.format(date,member,self.params,self.grid)
-                            for date in self.fcast.shcdates
-                            for member in range(1)]
-                elif self.type == 'pf':
-                    files = [filename.format(date,member,self.params,self.grid)
-                             for date in self.fcast.shcdates
-                             for member in range(int(self.fcast.enssize) - 1)]
-            if self.mode == 'fc':
-                if self.type == 'cf':
-                    files = [filename.format(date,member,self.params,self.grid)
-                             for date in self.fcast.sdates
-                             for member in range(1)]
-                elif self.type == 'pf':
-                    files = [filename.format(date,member,self.params,self.grid)
-                             for date in self.fcast.sdates
-                             for member in range(int(self.fcast.enssize) - 1)]
+            if self.type == 'cf':
+                members = range(1)
+            elif self.type == 'pf':
+                members = range(int(self.fcast.enssize) - 1)
 
-        files_list = [self.fccachedir+'/'+file for file in files]
+
+            files = [filename.format(date, member, self.params, self.grid)
+                     for member in members]
+
+
+            _cachedir = self.fccachedir
+
+            files_list += [_cachedir + '/' + file for file in files]
+
         return files_list
+
+
+
 
     @staticmethod
     def _calc_dmean(da_tmp):
@@ -249,7 +269,6 @@ class EcmwfData(dataobjects.ForecastObject):
         da_in = da_in.transpose('number', 'time', 'step', 'latitude', 'longitude')
         da_in = da_in.rename({'time': 'starttime'})
 
-        da_in.to_netcdf('/home/nedb/transfer/test.nc')
         # split into list of files with one starttime
         files_pp = [da_in.sel(starttime=stime) for stime in da_in['starttime']]
 
@@ -261,9 +280,9 @@ class EcmwfData(dataobjects.ForecastObject):
         if self.keep_native == "yes":
             self.grid = 'native'
             for da_out_save in files_pp:
-                for number in da_out_save['number']:
+                for number in da_out_save['number'].values:
                     da_out_save = da_out_save.isel(time=slice(self.ndays))
-                    ofile = self._save_filename(da_out_save.sel(number=number))
+                    ofile = self._save_filename(number=number)
                     da_out_save.sel(number=number).to_netcdf(ofile)
 
         self.grid = self.verif_name
@@ -272,15 +291,7 @@ class EcmwfData(dataobjects.ForecastObject):
             files_pp = files_pp_interp
 
         for da_out_save in files_pp:
-            for number in da_out_save['number']:
+            for number in da_out_save['number'].values:
                 da_out_save = da_out_save.isel(time=slice(self.ndays))
-                ofile = self._save_filename(da_out_save.sel(number=number))
+                ofile = self._save_filename(number=number)
                 da_out_save.sel(number=number).to_netcdf(ofile)
-
-    def _save_filename(self, da_tmp):
-        filename = self._filenaming_convention('fc')
-        return f'{self.fccachedir}/' + \
-               filename.format(da_tmp.time[0].dt.strftime("%Y%m%d").values,
-                               int(da_tmp["number"]),
-                               da_tmp.name,
-                               self.grid)

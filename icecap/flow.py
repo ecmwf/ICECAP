@@ -7,7 +7,6 @@ import os
 import ecflow
 
 
-
 def _merge_dict(first_dict, second_dict):
     """ Merge two dictionaries
     :param first_dict: first dictionary to be merged
@@ -31,6 +30,7 @@ class Tree:
         self.attrs = []
         self.attrs_parents = []
 
+        self.machine = conf.machine
         self.rundir = conf.rundir
         self.suitename = conf.suitename
         self.ecflow = conf.ecflow
@@ -39,7 +39,6 @@ class Tree:
             self.ecflow_host = conf.ecflow_host
             self.ecflow_port = conf.ecflow_port
             self.name = conf.suitename
-            self.machine = conf.machine
             self.stage_together = conf.stage_sources_together
             self.toplevel_suite = conf.toplevel_suite
             self.suitename = conf.suitename
@@ -91,6 +90,19 @@ class Tree:
         # put retrieval to beginning
         if "retrieval" in out_dict:
             out_dict.move_to_end('retrieval', last=False)
+
+            # sort retrieval of forecasts to be in order
+            for sort_family in ['retrieval', 'clean']:
+                dict_tmp = OrderedDict(out_dict[sort_family])
+                retrieval_families = sorted(list(dict_tmp.keys()))
+                for family in retrieval_families:
+                    dict_tmp.move_to_end(family, last=True)
+                if 'verdata' in retrieval_families:
+                    dict_tmp.move_to_end('verdata', last=False)
+                out_dict[sort_family] = dict_tmp
+
+
+
         return out_dict
 
     def to_json(self, ofile=None):
@@ -131,7 +143,7 @@ class Tree:
         suite_f.add_variable('ECF_FILES', self.ecffilesdir)
         suite_f.add_variable('ECF_HOME', self.ecfhomedir)
         suite_f.add_variable('PYDIR', self.pydir)
-        suite_f.add_variable('ETCDIR', self.rundir+'/etc')
+        suite_f.add_variable('ETCDIR', self.rundir + '/etc')
 
         _todict = self._create_dict_from_tree()
 
@@ -221,7 +233,7 @@ class Tree:
                     _ecflowtask.add_inlimit(_task.split(";")[1])
 
         if name == 'trigger':
-            # expects _list to have 1 or 2 items
+            # expects _list to have 1 item if only one trigger else 2 items
             # example _list = ['retrieval==complete'] or ['retrieval!=aborted;True']
             for _trigger in _list:
                 if len(_trigger.split(';')) == 1:
@@ -229,6 +241,7 @@ class Tree:
                 elif len(_trigger.split(';')) == 2:
                     suite_f.add_part_trigger(_trigger.split(";")[0],
                                              json.loads((_trigger.split(";")[1]).lower()))
+
 
     def _dict_walk(self, flow_dict, suite_level):
         """
@@ -283,11 +296,36 @@ class ProcessTree(Tree):
     Anything needed to be carried out, which is machine independent,
     will be in this flow class
     """
+
     def __init__(self, conf):
         super().__init__(conf)
         # here the next steps which are independent from machines will be listed
+        # metrics_f.add_part_trigger('maps != aborted', True)
+        self.add_attr(['trigger:retrieval != aborted'], 'retrieval')
         self.add_attr(['task:verdata_retrieve'], 'retrieval:verdata')
-        self.add_attr(['trigger:retrieval==complete'], 'plot')
+
+        self.add_attr(['trigger:retrieval==complete',
+                       'trigger:plot != aborted;True'], 'plot')
         for plotid in conf.plotsets:
             self.add_attr(['task:plot',
                            f'variable:PLOTTYPE;{plotid}'], f'plot:{plotid}')
+
+        if conf.keep_native:
+            self.add_attr(['trigger:plot==complete'], 'clean')
+
+        for expid in conf.fcsets.keys():
+            if conf.fcsets[expid].source != self.machine:
+                self.add_attr([f'variable:EXPID;{expid}',
+                               'trigger:verdata==complete'], f'retrieval:{expid}')
+
+                self.add_attr([f'variable:EXPID;{expid}',
+                               'variable:DATES;WIPE',
+                               f'task:{conf.fcsets[expid].source}_retrieve'], f'clean:{expid}')
+
+                if conf.fcsets[expid].mode in ['fc']:
+                    self.add_attr(['variable:DATES;INIT',
+                                   f'task:{conf.fcsets[expid].source}_retrieve'], f'retrieval:{expid}:init')
+                    self.add_attr(['repeat:DATES;{}'.format(self.fcsets[expid].sdates),
+                                   f'task:{conf.fcsets[expid].source}_retrieve',
+                                   'trigger:init==complete'],
+                                  f'retrieval:{expid}:fc')
