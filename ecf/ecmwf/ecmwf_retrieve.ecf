@@ -1,7 +1,7 @@
 %include <head.h>
 
 cd %ETCDIR%
-source ./load_modules python3
+source ./load_modules python3 ecmwf-toolbox
 
 cd %PYDIR%
 
