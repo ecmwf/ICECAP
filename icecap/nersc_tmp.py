@@ -50,7 +50,7 @@ class NerscData(dataobjects.ForecastObject):
         for member in range(self.enssize):
 
             self.grid = self.verif_name
-            ofile = self._save_filename(member)
+            ofile = self._save_filename(date=self.startdate, number=member)
 
             if ofile in self.files_to_retrieve:
 
@@ -73,11 +73,11 @@ class NerscData(dataobjects.ForecastObject):
                     da_out_save = da_out_save.rename({'y':'yc','x':'xc'})
                     da_out_save['yc'] = da_out_save['yc'] *100 *1000
                     da_out_save['xc'] = da_out_save['xc'] * 100 * 1000
-                    ofile = self._save_filename(member)
+                    ofile = self._save_filename(date=self.startdate, number=member)
                     da_out_save.sel(number=member).to_netcdf(ofile)
 
                 self.grid = self.verif_name
                 if self.linterp:
                     da_out_save = self.interpolate(da_in.isel(time=slice(self.ndays)))
-                    ofile = self._save_filename(member)
+                    ofile = self._save_filename(date=self.startdate, number=member)
                     da_out_save.sel(number=member).to_netcdf(ofile)

@@ -24,8 +24,8 @@ class MapPlot:
         self.format = 'png'
         self.verif_expname = metric.verif_expname[0]
         self.verif_enssize = metric.verif_enssize[0]
-        self.verif_fromdate = metric.verif_fromdate[0]
-        self.verif_todate = metric.verif_todate[0]
+        self.verif_fromyear = metric.verif_fromyear
+        self.verif_toyear = metric.verif_toyear
         self.verif_mode = metric.verif_mode[0]
         self.verif_source = metric.verif_source[0]
         self.verif_fcsystem = metric.verif_fcsystem[0]
@@ -84,7 +84,7 @@ class MapPlot:
                 self.proj_options = {}
         else:
             proj_options_list = utils.csv_to_list(self.proj_options)
-            proj_options_dict = dict()
+            proj_options_dict = {}
             for opt in proj_options_list:
                 _opt_tmp = utils.csv_to_list(opt, sep="=")
                 proj_options_dict[_opt_tmp[0]] = float(_opt_tmp[1])
@@ -145,7 +145,7 @@ class MapPlot:
 
                 if 'yc' in _data.dims:
                     _projection =  getattr(_ds_file[_var],'projection')
-                    _proj_options = dict()
+                    _proj_options = {}
                     for proj_param in ['central_longitude', 'central_latitude',
                                        'true_scale_latitude']:
                         if proj_param in _ds_file[_var].attrs:
@@ -157,7 +157,7 @@ class MapPlot:
 
                 elif f'yc_{_var}' in _data.dims:
                     _projection = getattr(_ds_file[_var], 'projection')
-                    _proj_options = dict()
+                    _proj_options = {}
                     for proj_param in ['central_longitude', 'central_latitude',
                                        'true_scale_latitude']:
                         if proj_param in _ds_file[_var].attrs:
@@ -201,8 +201,7 @@ class MapPlot:
                 ax.coastlines(color='grey')
                 cb = plt.colorbar(plot)
                 cb.set_ticks(levels)
-                cblabelstr = '{} {} in {}'.format(self.shortname,
-                                                  metric.legendtext, self.units)
+                cblabelstr = f'{self.shortname} {metric.legendtext} in {self.units}'
                 cb.set_label(cblabelstr, labelpad=10)
 
                 ax.set_title(self._create_title(_step))

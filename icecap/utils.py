@@ -4,6 +4,25 @@ import os
 import datetime as dt
 import numpy as np
 
+def plotdates_to_list(_dates):
+    """ Convert dates for plotting in config to list
+    :param _dates: dates from config
+    :return: dates as list
+    """
+    if "/to/" in _dates:
+        _dates_split = ['2000' + _date for _date in _dates.split('/to/')]
+        _dates_split = [dt.datetime.strptime(_datestring, '%Y%m%d') for _datestring in _dates_split]
+
+        date_list = []
+        start_date = _dates_split[0]
+        while start_date <= _dates_split[1]:
+            date_list.append(start_date.strftime("%Y%m%d").replace('2000', ''))
+            start_date += dt.timedelta(days=1)
+
+        return date_list
+
+    return csv_to_list(_dates)
+
 def to_datetime(date):
     """ https://gist.github.com/blaylockbk/1677b446bc741ee2db3e943ab7e4cabd?permalink_comment_id=3775327
     Converts a numpy datetime64 object to a python datetime object

@@ -19,8 +19,6 @@ class Metric(BaseMetric):
 
     def compute(self):
         """ Compute metric """
-        fc_list = self.load_verif_fc()
-        fc = xr.merge(fc_list)
-        fc_ensmean = fc.mean(dim=('member','date'))
+        da_fc_verif = self.load_verif_fc('verif').mean(dim=('member','date','inidate'))
 
-        self.result = xr.merge([fc_ensmean])
+        self.result = xr.merge([da_fc_verif.rename('sic')])

@@ -5,6 +5,7 @@ from collections import OrderedDict
 import json
 import os
 import ecflow
+import utils
 
 
 def _merge_dict(first_dict, second_dict):
@@ -115,7 +116,7 @@ class Tree:
             ofile = f'{self.rundir}/{self.suitename}.json'
         _todict = self._create_dict_from_tree()
         print(f'Writing flow object to {ofile}')
-        with open(ofile, 'w') as fout:
+        with open(ofile, 'w', encoding="utf-8") as fout:
             json_dumps_str = json.dumps(_todict, indent=4)
             print(json_dumps_str, file=fout)
 
@@ -158,19 +159,17 @@ class Tree:
         client = ecflow.Client(self.ecflow_host, self.ecflow_port)
         client.sync_local()
         defs = client.get_defs()
+
         suitepath = f'/{self.toplevel_suite}/{self.name}'
         suite = defs.find_abs_node(suitepath)
         if suite is None:  # suite not yet loaded on server
-            print('INFO: Loading new suite {} into server {}'.format(
-                self.name, self.ecflow_host))
+            utils.print_info(f'Loading new suite {self.name} into server {self.ecflow_host}')
         else:
             if not force:
-                raise RuntimeError('Suite {} exists on server {}. '.format(
-                    suitepath, self.ecflow_host) +
+                raise RuntimeError(f'Suite {suitepath} exists on server {self.ecflow_host}. '+
                                    '\nUse option --force to re-create it.')
 
-            print('INFO: Replacing existing suite {} on server {}'.format(
-                self.name, self.ecflow_host))
+            utils.print_info(f'Replacing existing suite {self.name} on server {self.ecflow_host}')
         client.replace(suitepath, self.defs_file)
         client.begin_suite('/' + self.toplevel_suite)
 
@@ -188,8 +187,9 @@ class Tree:
         # delete from ecflow server
         if suite is not None:
             ci.delete(abs_path)
-            print('  Deleted suite {} from ecflow server {} at port {}.'.format(
-                suitename.upper(), self.ecflow_host, self.ecflow_port))
+            print(f'  Deleted suite {suitename.upper()} '
+                  f'from ecflow server {self.ecflow_host} '
+                  f'at port {self.ecflow_port}.')
         else:
             print(('  Nothing to do for ecflow server {} at port {}, ' +
                    'suite definition is not loaded.').format(
@@ -304,14 +304,18 @@ class ProcessTree(Tree):
         self.add_attr(['trigger:retrieval != aborted'], 'retrieval')
         self.add_attr(['task:verdata_retrieve'], 'retrieval:verdata')
 
-        self.add_attr(['trigger:retrieval==complete',
-                       'trigger:plot != aborted;True'], 'plot')
+        if bool(conf.plotsets):
+            self.add_attr(['trigger:retrieval==complete',
+                           'trigger:plot != aborted;True'], 'plot')
         for plotid in conf.plotsets:
             self.add_attr(['task:plot',
                            f'variable:PLOTTYPE;{plotid}'], f'plot:{plotid}')
 
         if conf.keep_native:
-            self.add_attr(['trigger:plot==complete'], 'clean')
+            if bool(conf.plotsets):
+                self.add_attr(['trigger:plot==complete'], 'clean')
+            else:
+                self.add_attr(['trigger:retrieval==complete'], 'clean')
 
         for expid in conf.fcsets.keys():
             if conf.fcsets[expid].source != self.machine:
@@ -325,7 +329,7 @@ class ProcessTree(Tree):
                 if conf.fcsets[expid].mode in ['fc']:
                     self.add_attr(['variable:DATES;INIT',
                                    f'task:{conf.fcsets[expid].source}_retrieve'], f'retrieval:{expid}:init')
-                    self.add_attr(['repeat:DATES;{}'.format(self.fcsets[expid].sdates),
+                    self.add_attr([f'repeat:DATES;{self.fcsets[expid].sdates}',
                                    f'task:{conf.fcsets[expid].source}_retrieve',
                                    'trigger:init==complete'],
                                   f'retrieval:{expid}:fc')

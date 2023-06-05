@@ -28,13 +28,35 @@ def add_plotid(parser):
     helpstr = 'plotid [name followed by plot_* in config]'
     parser.add_argument('plotid', help=helpstr)
 
+def add_plot_config_option(parser):
+    """Add to parser an option to specify config file."""
+    parser.add_argument('-p', '--plotconfigfile',
+                        default=False,
+                        help='plot configuration file to use')
+
 def add_config_option(parser):
     """Add to parser an option to specify config file."""
     parser.add_argument('-c', '--configfile',
-                        default='icecap.conf',
+                        default=['icecap.conf'],
                         help='configuration file to use')
 
 def add_verbose_option(parser):
     """Add to parser an option for more debugging output"""
     parser.add_argument('-v', '--verbose', action='store_true', default=False,
                         help='verbose for more debugging output')
+
+def add_force_option(parser):
+    """Add to parser an option to force rebuild"""
+    parser.add_argument('-f', '--force', action='store_true', default=False,
+                        help='force recreation of code and suite. '
+                             + 'WARNING: Using force implies loss of old code '
+                               'and suite definition.')
+
+def add_wipe_option(parser):
+    """Add to parser an option to wipe suite/environment"""
+    parser.add_argument('-w', '--wipe', action='count', default=0,
+                        help='delete data and runtime scripts, '
+                             'and remove ecflow suite from server - '
+                             'use -w for wiping only this suite; '
+                             'use -ww to delete whole icecap from machine'
+                        )

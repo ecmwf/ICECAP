@@ -11,7 +11,7 @@ import numpy as np
 import namelist_entries
 import dataobjects
 
-DEFAULT_CONF_NAME = 'icecap.conf'
+DEFAULT_CONF_NAME = ['icecap.conf']
 
 config_optnames = namelist_entries.config_optnames
 
@@ -29,14 +29,14 @@ class ConfigurationError(Exception):
 class MissingEntry(ConfigurationError):
     """exception to raise if an section is expected but not present"""
     def __init__(self, section, hint=None):
-        message = 'Optname [{}] is not defined in config.py'.format(section)
+        message = f'Optname [{section}] is not defined in config.py'
         hmessage = self.add_hint(message, hint)
         super().__init__(hmessage)
 
 class MissingSection(ConfigurationError):
     """exception to raise if an section is expected but not present"""
     def __init__(self, section, hint=None):
-        message = 'Section [{}] is required for configuration.'.format(section)
+        message = f'Section [{section}] is required for configuration.'
         hmessage = self.add_hint(message, hint)
         super().__init__(hmessage)
 
@@ -52,7 +52,7 @@ class InvalidSection(ConfigurationError):
 class MissingOption(ConfigurationError):
     """exception to raise if an option is expected but not present"""
     def __init__(self, section, option, hint=None):
-        message = 'Missing option [{}] -> {}'.format(section, option)
+        message = f'Missing option [{section}] -> {option}'
         hmessage = self.add_hint(message, hint)
         super().__init__(hmessage)
 
@@ -60,7 +60,7 @@ class MissingOption(ConfigurationError):
 class InvalidOption(ConfigurationError):
     """exception to raise if the value of an option is not recognized"""
     def __init__(self, section, option, hint=None):
-        message = '[{}] -> {}: value not valid.'.format(section, option)
+        message = f'[{section}] -> {option}: value not valid.'
         hmessage = self.add_hint(message, hint)
         super().__init__(hmessage)
 
@@ -69,7 +69,7 @@ class ConflictingOptions(ConfigurationError):
     """exception to raise if there is a conflict within a set of options"""
     def __init__(self, optionlist, hint=None):
         # optionlist is a list of pairs (section, option)
-        opstr = ', '.join(['([{}] -> {})'.format(s,o) for (s,o) in optionlist])
+        opstr = ', '.join([f'([{s}] -> {o})' for (s,o) in optionlist])
         message = 'conflicting options: ' + opstr
         hmessage = self.add_hint(message, hint)
         super().__init__(hmessage)
@@ -110,25 +110,34 @@ class Configuration():
         self.verif_expname = None
         self.plottype = None
         self.verif_mode = None
-        self.verif_fromdate = None
-        self.verif_todate = None
         self.target = None
+        self.verif_dates = None
         self.verif_enssize = None
         self.verif_fcsystem = None
         self.verif_refdate = None
+        self.verif_fromyear = None
+        self.verif_toyear = None
         self.cmap = None
         self.plot_extent = None
         self.projection = None
         self.proj_options = None
         self.circle_border = None
-        self.verif_dates = None
+        self.calib_dates = None
+        self.calib_enssize = None
+        self.calib_fcsystem = None
+        self.calib_refdate = None
+        self.calib_fromyear = None
+        self.calib_toyear = None
+
 
 
 
         conf_parser = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
         self.filename = file
-        if not os.path.isfile(self.filename):
-            raise RuntimeError('Configuration file {} not found.'.format(self.filename))
+
+        for filename in self.filename:
+            if not os.path.isfile(filename):
+                raise RuntimeError(f'Configuration file {self.filename} not found.')
         conf_parser.read(self.filename)
 
         # attributes to beways initialized irrespective of environment or ecflow setting
@@ -166,14 +175,14 @@ class Configuration():
         fcsetlist = [section[3:] for section in conf_parser.sections() if section.startswith('fc_')]
         if len(fcsetlist) == 0:
             raise MissingSection('fc_*', 'At least one forecast section needed.')
-        self.fcsets = dict()
+        self.fcsets = {}
         for expid in fcsetlist:
             section = 'fc_' + expid
             self._init_config(conf_parser, section, 'fc', init=True)
 
             # check if hcrefdate given for mode='hc' and machine='ecmwf'
             if self.hcrefdate is None and self.machine in ['ecmwf'] and self.mode in ['hc']:
-                raise 'hcrefdate needs to be defined for hindcast mode on ecmwf'
+                raise ValueError('hcrefdate needs to be defined for hindcast mode on ecmwf')
 
             if self.source is None:
                 self.source = self.machine
@@ -197,7 +206,7 @@ class Configuration():
         if len(fcsetlist) > 1:
             _ref_list = [i for i in self.fcsets if self.fcsets[i].ref == "yes"]
             if len(_ref_list) > 1:
-                raise 'More than one experiment labelled with ref = yes in config'
+                raise ValueError('More than one experiment labelled with ref = yes in config')
 
         # all daily dates as one list (used later for obs retrieval)
         sdates_verif = []
@@ -209,7 +218,7 @@ class Configuration():
         plotsetlist = [section[5:] for section in conf_parser.sections()
                        if section.startswith('plot_')]
 
-        self.plotsets = dict()
+        self.plotsets = {}
         for plotid in plotsetlist:
             section = 'plot_' + plotid
             self._init_config(conf_parser, section, 'plot', init=True)
@@ -221,8 +230,8 @@ class Configuration():
                 verif_expname=self.verif_expname,
                 plottype =self.plottype,
                 verif_mode = self.verif_mode,
-                verif_fromdate = self.verif_fromdate,
-                verif_todate = self.verif_todate,
+                verif_fromyear = self.verif_fromyear,
+                verif_toyear = self.verif_toyear,
                 target = self.target,
                 verif_enssize = self.verif_enssize,
                 verif_fcsystem = self.verif_fcsystem,
@@ -233,36 +242,35 @@ class Configuration():
                 plot_extent = self.plot_extent,
                 cmap = self.cmap,
                 source = self.source,
-                verif_dates = self.verif_dates
+                verif_dates = self.verif_dates,
+                calib_dates = self.calib_dates,
+                calib_enssize=self.calib_enssize,
+                calib_refdate=self.calib_refdate,
+                calib_fromyear=self.calib_fromyear,
+                calib_toyear=self.calib_toyear,
                 )
-
-
-
-
-
-
 
 
     def __str__(self):
         """Return string representation of configuration for printing"""
-        lines = list()
+        lines = []
         lines.append(f'\nInfo about configuration in {self.filename}:')
 
         secname = 'environment'
-        lines.append('\n* Section [%s]' % (secname))
+        lines.append(f'\n* Section [{secname}]')
         for optname in  config_optnames[secname]:
             lines.append(f'%s: {getattr(self, optname)}'
                          % (config_optnames[secname][optname]['printname']))
 
         if self.ecflow:
             secname = 'ecflow'
-            lines.append('\n* Section [%s]' % (secname))
+            lines.append(f'\n* Section [{secname}]')
             for optname in config_optnames[secname]:
                 lines.append(f'%s: {getattr(self, optname)}'
                              % (config_optnames[secname][optname]['printname']))
 
         secname = 'staging'
-        lines.append('\n* Section [%s]' % (secname))
+        lines.append(f'\n* Section [{secname}]')
         for optname in config_optnames[secname]:
             lines.append(f'%s: {getattr(self, optname)}'
                          % (config_optnames[secname][optname]['printname']))
@@ -307,16 +315,6 @@ class Configuration():
             self._set_config_entry(_conf_parser, secname, optname,
                                    section_config_name, init)
 
-
-
-
-
-
-
-
-
-
-
     def _set_config_entry(self, _conf_parser, section, name,
                           section_config_name, init):
         """
@@ -346,6 +344,7 @@ class Configuration():
                 raise InvalidOption(section, name)
         # else if config entry not specified --> check if optional
         else:
+
             # optional can be True/False but also depend on other config entries
             _optional =  np.atleast_1d(config_optnames[section_config_name][name]['optional']).tolist()
 
@@ -367,7 +366,7 @@ class Configuration():
     def _lookup_config_dict(self, section, name, opt_name):
         """
         function to set object attribute to default value or optional value
-        (migth depend on other config entries)
+        (might depend on other config entries)
         :param section: section name in config_optnames dictionary
         :param name: name of config entry
         :param opt_name: optional or default_value
@@ -375,7 +374,7 @@ class Configuration():
         """
 
         if opt_name not in ['default', 'optional']:
-            raise 'Only default/optional allowed in _lookup_config_dict'
+            raise ValueError('Only default/optional allowed in _lookup_config_dict')
 
         _args = np.atleast_1d(config_optnames[section][name][opt_name]).tolist()
         for _arg in _args:

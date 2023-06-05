@@ -11,6 +11,7 @@ params_verdata = {
     'sic' : {
         'osi-450-a' : 'ice_conc',
         'osi-401-b' : 'ice_conc',
+        'osi-450-a_osi-430-a_mixed' : 'ice_conc',
     }
 }
 
@@ -23,7 +24,8 @@ def VerifData(conf):
     """
     selector = {
         'osi-450-a': _OSIThreddsRetrieval(conf),
-        'osi-401-b': _OSIThreddsRetrieval(conf)
+        'osi-401-b': _OSIThreddsRetrieval(conf),
+        'osi-450-a_osi-430-a_mixed': _OSIThreddsRetrieval(conf)
     }
 
     return selector[conf.verdata]
@@ -54,15 +56,23 @@ class _OSIThreddsRetrieval(VerifyingData):
         super().__init__(conf)
         self.root_server = "https://thredds.met.no/thredds/dodsC/osisaf/met.no/"
         if self.name == 'osi-450-a':
-            self.root_server += "reprocessed/ice/conc_450a_files/"
+            self.server = [self.root_server+"reprocessed/ice/conc_450a_files/"]
+            self.filebase = ["ice_conc_nh_ease2-250_cdr-v3p0_"]
+            self.fileext = ["1200.nc"]
+
+        if self.name == 'osi-401-b':
+            self.server = [self.root_server+"ice/conc/"]
+            self.filebase = ["ice_conc_nh_polstere-100_multi_"]
+            self.fileext = ["1200.nc"]
+
+        if self.name == 'osi-450-a_osi-430-a_mixed':
+            self.server = self.root_server+"reprocessed/ice/conc_450a_files/"
             self.filebase = "ice_conc_nh_ease2-250_cdr-v3p0_"
             self.fileext = "1200.nc"
 
-        if self.name == 'osi-401-b':
-            self.root_server += "ice/conc/"
-            self.filebase = "ice_conc_nh_polstere-100_multi_"
-            self.fileext = "1200.nc"
-
+            self.server = [self.server, self.root_server+"reprocessed/ice/conc_cra_files/"]
+            self.filebase = [self.filebase, "ice_conc_nh_ease2-250_icdr-v3p0_"]
+            self.fileext = [self.fileext, "1200.nc"]
 
     def process(self, verbose):
         """
@@ -75,10 +85,25 @@ class _OSIThreddsRetrieval(VerifyingData):
         for _date in self.salldates:
             _ofile = f'{self.obscachedir}/{filename.format(_date, self.params)}'
             if _ofile in self.files_to_retrieve:
-                file = f'{self.root_server}{_date[:4]}/{_date[4:6]}/{self.filebase}{_date}{self.fileext}'
-                if verbose:
-                    print(f'Processing file {file}')
-                da_in = xr.open_dataset(file)[params_verdata[self.params][self.name]]
+                try:
+                    file = f'{self.server[0]}{_date[:4]}/{_date[4:6]}/{self.filebase[0]}{_date}{self.fileext[0]}'
+                    if verbose:
+                        print(f'Processing file {file}')
+                    da_in = xr.open_dataset(file)[params_verdata[self.params][self.name]]
+
+                except:
+                    if len(self.server) > 1:
+                        try:
+                            file = f'{self.server[1]}{_date[:4]}/{_date[4:6]}/{self.filebase[1]}{_date}{self.fileext[1]}'
+                            if verbose:
+                                print(f'Processing file {file}')
+                            da_in = xr.open_dataset(file)[params_verdata[self.params][self.name]]
+                        except:
+                            raise BaseException(f'Data {file} not found')
+                    else:
+                        raise BaseException(f'Data {file} not found')
+
+
                 da_in = da_in.rename(self.params)
 
                 da_in = da_in/100

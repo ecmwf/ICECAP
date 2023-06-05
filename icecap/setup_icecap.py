@@ -17,7 +17,7 @@ def create_flow(conf):
     if conf.machine == 'ecmwf':
         return ecmwf.EcmwfTree(conf)
 
-    raise RuntimeError('Machine name {} is not allowed. '.format(conf.machine))
+    raise ValueError(f'Machine name {conf.machine} is not allowed. ')
 
 class ExecutionHost:
     """
@@ -90,7 +90,8 @@ class ExecutionHost:
 
 
         # copy config file
-        self._safe_copy(args, self.filename, './', self.pydir)
+        for filename in self.filename:
+            self._safe_copy(args, filename, './', self.pydir)
 
     def _copy_etc_files(self, fromdir, args):
         files = ['load_modules', 'module_versions']
@@ -171,5 +172,5 @@ class ExecutionHost:
                 raise RuntimeError(('File {} exists. ' +
                                     '\nUse option --force to overwrite').format(tfile))
         if args.verbose:
-            print('Copying file {} --> {}'.format(sfile, target_dir))
+            print(f'Copying file {sfile} --> {target_dir}')
         shutil.copy(sfile, target_dir)

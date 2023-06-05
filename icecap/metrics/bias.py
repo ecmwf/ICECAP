@@ -22,15 +22,12 @@ class Metric(BaseMetric):
 
     def compute(self):
         """ Compute metric """
-        fc_list = self.load_verif_fc()
-        verif_list = self.load_verif_data()
+        da_verdata_verif = self.load_verif_data('verif').mean(dim=('member', 'date'))
+        da_fc_verif = self.load_verif_fc('verif').mean(dim=('member', 'date'))
 
-        fc_list = [fc.mean(dim=('member','date')) for fc in fc_list]
-        verif_list = [verif.mean(dim=('member', 'date')) for verif in verif_list]
+        bias = da_fc_verif - da_verdata_verif
 
-        bias_list = [fc_list[i] - verif_list[i] for i in range(len(fc_list))]
-
-        bias_ltmean = xr.concat(bias_list, dim='date').mean(dim='date')
+        bias_ltmean = bias.mean(dim='inidate')
 
 
-        self.result = xr.merge([bias_ltmean])
+        self.result = xr.merge([bias_ltmean.rename('sic')])

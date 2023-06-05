@@ -95,14 +95,14 @@ config_optnames = {
             'printname' : 'ensemble size',
             'optional' : True,
         },
-        'dates':{
-            'printname' : 'forecast dates',
-            'optional' : ['mode:fc'],
-        },
         'mode':{
             'printname': 'forcast or hindcast mode',
             'optional' : False,
             'allowed_values' : ["hc", "fc"]
+        },
+        'dates':{
+            'printname' : 'forecast dates',
+            'optional' : ['mode:fc'],
         },
         'hcrefdate':{
             'printname' : 'hindcast reference date',
@@ -135,17 +135,17 @@ config_optnames = {
         'plottype' : {
             'printname':'plot type',
             'optional' : False,
-            'allowed_values' : ["interp_check","ensmean","bias"]
+            'allowed_values' : ["interp_check","ensmean","bias","bias_corrected_map"]
         },
         'verif_mode':{
             'printname': 'forcast or hindcast mode for plotting',
             'optional' : False,
         },
-        'verif_fromdate':{
+        'verif_fromyear':{
             'printname' : 'first year',
             'optional' : ['mode:hc']
         },
-        'verif_todate':{
+        'verif_toyear':{
             'printname' : 'last year',
             'optional' : ['mode:hc']
         },
@@ -164,11 +164,11 @@ config_optnames = {
         },
         'verif_dates' : {
             'printname' : 'experiment forecast dates only for mode=fc',
-            'optional':['mode:fc']
+            'optional':['verif_mode:fc']
         },
         'verif_refdate':{
             'printname' : 'experiment reference date',
-            'optional': ['mode:hc']
+            'optional': ['verif_mode:hc']
         },
         'projection' :{
             'printname' : 'map projection',
@@ -195,6 +195,30 @@ config_optnames = {
         'source': {
             'printname' : 'source of forecast system',
             'optional' : True
-        }
+        },
+        'calib_mode' : {
+            'printname' : 'mode (hc/fc) of calibration system',
+            'optional' : True
+        },
+        'calib_dates' : {
+            'printname' : 'dates used for calibration',
+            'optional' : True
+        },
+        'calib_refdate' : {
+            'printname' : 'reference date used for calibration',
+            'optional': ['calib_mode:hc']
+        },
+        'calib_fromyear' : {
+            'printname' : 'start year used for calibration',
+            'optional' : True
+        },
+        'calib_toyear' : {
+            'printname' : 'start year used for calibration',
+            'optional' : True
+        },
+        'calib_enssize' : {
+            'printname' : 'ensemble size used for calibration',
+            'optional' : True
+        },
     }
 }

@@ -9,4 +9,4 @@ cdo=1.9.10
 ecmwf-toolbox=2021.08.1.0
 ecflow=5.7.0
 nco=4.9.7
-python3=3.8.8-01
+python3=3.10.10-01

@@ -4,6 +4,7 @@ to forecasts and verification data for staging and for config"""
 import os
 import glob
 import datetime as dt
+import shutil
 import uuid
 import xesmf as xe
 import xarray as xr
@@ -94,10 +95,16 @@ class DataObject:
                    f'{self._filenaming_convention("verif").format(self.salldates[0],self.params)}'
         ds_ref = xr.open_dataarray(ref_file)
 
+        reuse_weights = True
+        if not os.path.isfile(self.regridder_name):
+            reuse_weights = False
+            utils.print_info(f'Computing weights {self.regridder_name}')
+
         self.regridder = xe.Regridder(ds_raw.rename({'longitude': 'lon', 'latitude': 'lat'}),
                                       ds_ref.rename({'longitude': 'lon', 'latitude': 'lat'}),
-                                      "bilinear", periodic=self.periodic, reuse_weights=True,
+                                      "bilinear", periodic=self.periodic, reuse_weights=reuse_weights,
                                       filename=self.regridder_name)
+
         ds_out = self.regridder(ds_raw.rename({'longitude': 'lon', 'latitude': 'lat'}))
 
         # make sure interpolated fields have same xc and yc values as ref
@@ -116,15 +123,7 @@ class DataObject:
     def clean_up(self):
         """ Remove temporary files"""
         if self.tmptargetfile is not None:
-            os.remove(self.tmptargetfile)
-
-            # check if .idx file has been created and delete if True
-            idx_file = f'{self.tmptargetfile[:self.tmptargetfile.rindex(".")]}.idx'
-            if os.path.isfile(idx_file):
-                os.remove(idx_file)
-
-        if self.regridder:
-            self.regridder.clean_weight_file()
+            shutil.rmtree(os.path.dirname(self.tmptargetfile))
 
 
 
@@ -224,7 +223,7 @@ class ForecastObject(DataObject):
         return define_fccachedir(**kwargs)
 
 
-    def _save_filename(self, number):
+    def _save_filename(self, date, number):
         """
         Create cache file name
         :param number: ensemble member number
@@ -233,7 +232,7 @@ class ForecastObject(DataObject):
         filename = self._filenaming_convention('fc')
         _cachedir = self.init_cachedir()
         return f'{_cachedir}/' + \
-               filename.format(self.startdate,
+               filename.format(date,
                                number,
                                self.params,
                                self.grid)
@@ -344,8 +343,8 @@ class PlotConfigObject:
         self.verif_expname = kwargs['verif_expname']
         self.plottype = kwargs['plottype']
         self.verif_mode = kwargs['verif_mode']
-        self.verif_fromdate = kwargs['verif_fromdate']
-        self.verif_todate = kwargs['verif_todate']
+        self.verif_fromyear = kwargs['verif_fromyear']
+        self.verif_toyear = kwargs['verif_toyear']
         self.target = kwargs['target']
         self.verif_enssize = kwargs['verif_enssize']
         self.verif_fcsystem = kwargs['verif_fcsystem']
@@ -357,3 +356,8 @@ class PlotConfigObject:
         self.cmap = kwargs['cmap']
         self.verif_source = kwargs['source']
         self.verif_dates = kwargs['verif_dates']
+        self.calib_dates = kwargs['calib_dates']
+        self.calib_fromyear = kwargs['calib_fromyear']
+        self.calib_toyear = kwargs['calib_toyear']
+        self.calib_refdate = kwargs['calib_refdate']
+        self.calib_enssize = kwargs['calib_enssize']
