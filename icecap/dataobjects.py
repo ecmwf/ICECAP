@@ -251,7 +251,7 @@ def get_cycle(**kwargs):
     thisdate = kwargs['thisdate']
     cycle = "latest"
     if kwargs['source'] == 'ecmwf' \
-            and kwargs['fcsystem'] in ['extended-range', 'medium_range'] \
+            and kwargs['fcsystem'] in ['extended-range', 'medium-range'] \
             and kwargs['expname'] == '0001':
         cycle_dates = [
             ('pre41r1', dt.datetime(1975, 1, 1, 0)),
@@ -357,7 +357,12 @@ class PlotConfigObject:
         self.verif_source = kwargs['source']
         self.verif_dates = kwargs['verif_dates']
         self.calib_dates = kwargs['calib_dates']
+        self.calib_mode = kwargs['calib_mode']
         self.calib_fromyear = kwargs['calib_fromyear']
         self.calib_toyear = kwargs['calib_toyear']
         self.calib_refdate = kwargs['calib_refdate']
         self.calib_enssize = kwargs['calib_enssize']
+        self.ofile = kwargs['ofile']
+        self.points = kwargs['points']
+        self.add_verdata = kwargs['add_verdata']
+

@@ -62,10 +62,11 @@ class EcmwfTree(flow.ProcessTree):
                                    'variable:TYPE;pf'], f'retrieval:{expid}:fc:pf')
 
                 # add wipe family
-                self.add_attr([f'variable:EXPID;{expid}',
-                               'variable:DATES;WIPE',
-                               'variable:TYPE;pf',
-                               f'task:{conf.fcsets[expid].source}_retrieve'], f'clean:{expid}')
+                if conf.keep_native == 'yes':
+                    self.add_attr([f'variable:EXPID;{expid}',
+                                   'variable:DATES;WIPE',
+                                   'variable:TYPE;pf',
+                                   f'task:{conf.fcsets[expid].source}_retrieve'], f'clean:{expid}')
 
 
 
@@ -180,8 +181,9 @@ class EcmwfData(dataobjects.ForecastObject):
             self.cycle = self.init_cycle(self.startdate)
             self.fccachedir = self.init_cachedir()
 
-
-            if self.fcast.fcsystem in ['extended-range']:
+            if self.fcast.fcsystem in ['medium-range']:
+                retrieval_grid = 'F640'
+            elif self.fcast.fcsystem in ['extended-range']:
                 retrieval_grid = 'F320'
             else:
                 raise ValueError(f'No grid for retrieval specified for {self.fcast.fcsystem}')
@@ -231,9 +233,9 @@ class EcmwfData(dataobjects.ForecastObject):
             if self.type == 'pf':
                 number = [ m+1 for m in range(int(self.enssize)-1) ]
                 _files = []
-                for n in number:
+                for num in number:
                     for _date in self.fcast.shcdates:
-                        _files.append(self.tmptargetfile.replace('[HDATE]', _date).replace('[NUMBER]', str(n)))
+                        _files.append(self.tmptargetfile.replace('[HDATE]', _date).replace('[NUMBER]', str(num)))
             else:
                 _files = [self.tmptargetfile.replace('[HDATE]', str(_date)) for _date in self.fcast.shcdates]
         else:

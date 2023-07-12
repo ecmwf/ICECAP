@@ -12,9 +12,10 @@ class Metric(BaseMetric):
     def __init__(self, name, conf):
         super().__init__(name, conf)
         self.use_metric_name = True
-        self.plottext = f'bias-corrected wrt {self.verif_name}'
+        self.plottext = f'wrt {self.verif_name}'
         self.legendtext = 'bias-corrected'
         self.levels = np.arange(0, 1.1, .1)
+        self.clip = True
 
 
     def compute(self):

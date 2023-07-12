@@ -27,9 +27,18 @@ if __name__ == '__main__':
     utils.print_banner(conf.plotsets[args.plotid].plottype)
 
     m = metrics.factory.create(args.plotid, conf)
+
     m.compute()
     m.save()
-    p = map_plot.MapPlot(conf, args.plotid,m)
+    if m.gettype() == 'map':
+        p = map_plot.MapPlot(conf, args.plotid,m)
+    elif m.gettype() == 'ts':
+        print('ts')
+        p = map_plot.TsPlot(m)
+
+
+
+    print('plotting')
     p.plot(m, args.verbose)
     current, peak = tracemalloc.get_traced_memory()
     print(f"Current memory usage is {current / 10 ** 6}MB; Peak was {peak / 10 ** 6}MB")

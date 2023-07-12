@@ -1,7 +1,11 @@
 """ Create 2-D filled contour plots """
 
 import os
+import datetime as dt
 from matplotlib import pyplot as plt
+import matplotlib
+from mpl_toolkits.axes_grid1.inset_locator import InsetPosition
+import numpy as np
 import cartopy
 import cartopy.crs as ccrs
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
@@ -13,6 +17,108 @@ import cmocean
 
 import utils
 
+class TsPlot:
+    """ Timeseries plot class """
+    def __init__(self, metric):
+        self.data = None
+        self.load(metric)
+        self.ofile = metric.ofile
+        self.clip = metric.clip
+        self.levels = metric.levels
+        self.points = metric.points
+
+
+    def load(self, metric):
+        """ load metric file
+        :param metric: metric object
+        """
+
+        fname = metric.get_filename_metric()
+        ds_file = xr.open_dataset(fname)
+        self.xr_file = ds_file
+
+    def plot(self, metric, verbose=False):
+        """ plot timeseries
+        :param verbose: verbosity on or off
+        """
+
+        thisfig = plt.figure(figsize=(8,6))
+        ax = plt.axes()
+
+        _ds_file = self.xr_file
+        var_list = list(_ds_file.data_vars)
+        for _var in var_list:
+            _ds_file = self.xr_file[_var].dropna(dim='member').copy()
+            if self.clip:
+                _ds_file = _ds_file.clip(self.levels[0], self.levels[-1])
+            if len(_ds_file['member']) > 1:
+                perc = [5, 25, 33]  # ,1/3*100]
+                shading = (np.linspace(0.2,1,len(perc)+1)**3)[1:]
+                for pi, p in enumerate(perc):
+                    ax.fill_between(_ds_file.time, _ds_file.quantile(p/100, dim='member'),
+                                     _ds_file.quantile(1-p/100, dim='member'),
+                                     color='teal', alpha=shading[pi],
+                                    label=f'probability: {p}-{100 - p}%')
+                #ax.plot(_ds_file.time, _ds_file.mean(dim='member').values,
+                #        color='blue', alpha=1, linewidth=2)
+                #ax.plot(_ds_file.time, _ds_file.median(dim='member').values,
+                #        color='r', alpha=1, linewidth=2)
+            for m in _ds_file['member'].values:
+                if _var == 'obs':
+                    ax.plot(_ds_file.time, _ds_file.sel(member=m).values,
+                            color='k', alpha=1, linewidth=2)
+                elif _var == 'obs-hc':
+                    ax.plot(_ds_file.time, _ds_file.sel(member=m).mean(dim='date').values,
+                            color='red', alpha=1, linewidth=2,
+                            zorder=200)
+                else:
+                    ax.plot(_ds_file.time, _ds_file.sel(member=m).values, alpha=.1, linewidth=1,
+                             color='blue')
+                    # ax.plot(_ds_file.time, _ds_file.sel(member=m).values, linewidth=1,
+                    #         label=m)  # , color='blue'
+
+
+
+            ax.set_ylabel('distance to ice edge [km]')
+            #ax.set_ylim([-10,500])
+            ax.set_xlim([0,_ds_file.time.max()+1])
+
+
+            ax2 = plt.axes([0, 0, 1, 1],
+                           projection=ccrs.NorthPolarStereo())
+            ip = InsetPosition(ax, [0.62, 0.62, 0.45, 0.35])
+            ax2.set_axes_locator(ip)
+            ax2.set_extent([-180, 180, 50, 90], ccrs.PlateCarree())
+            #ax2.set_axis_off()
+
+            theta = np.linspace(0, 2 * np.pi, 100)
+            center, radius = [0.5, 0.5], 0.5
+            verts = np.vstack([np.sin(theta), np.cos(theta)]).T
+            circle = mpath.Path(verts * radius + center)
+
+            ax2.set_boundary(circle, transform=ax2.transAxes)
+
+            # plt.plot(ds_clim_pmax_am.lon.values, ds_clim_pmax_am.lat.values, marker='*')
+            ax2.coastlines(color='grey')
+
+            if len(self.points) == 1:
+                ax2.scatter(self.points[0][0],self.points[0][1], color='red',s=15,
+                            transform=ccrs.PlateCarree())
+            else:
+                norm = matplotlib.colors.Normalize(vmin=0, vmax=len(self.points))
+
+                for pi, point in enumerate(self.points):
+                    rgba_color = matplotlib.cm.jet(norm(pi))
+                    ax2.scatter(point[0], point[1], color=rgba_color, s=15,
+                                transform=ccrs.PlateCarree())
+                    ax.scatter(_ds_file.time[pi], -15,
+                               color=rgba_color, s=25, clip_on=False)
+
+            ax.legend() #loc='lower left')
+
+            thisfig.savefig(self.ofile)
+            plt.close(thisfig)
+
 
 class MapPlot:
     """ Plotting object for 2D maps """
@@ -22,8 +128,11 @@ class MapPlot:
         self.param = conf.params
         self.metric = metric
         self.format = 'png'
+        self.verif_name = metric.verif_name
         self.verif_expname = metric.verif_expname[0]
         self.verif_enssize = metric.verif_enssize[0]
+        self.verif_dates = metric.verif_dates
+        self.conf_verif_dates = metric.conf_verif_dates
         self.verif_fromyear = metric.verif_fromyear
         self.verif_toyear = metric.verif_toyear
         self.verif_mode = metric.verif_mode[0]
@@ -37,6 +146,14 @@ class MapPlot:
         self.cmap = conf.plotsets[secname].cmap
         self.units = ''
         self.shortname = ''
+        self.calib = metric.calib
+        if self.calib:
+            self.calib = True
+            self.conf_calib_dates = metric.conf_calib_dates
+            self.calib_fromyear = metric.calib_fromyear
+            self.calib_toyear = metric.calib_toyear
+
+
 
 
         if self.cmap is None:
@@ -49,6 +166,11 @@ class MapPlot:
         self.levels = None
         if self.levels is None:
             self.levels = metric.levels
+
+        self.clip = metric.clip
+        self.ofile = metric.ofile
+
+
 
         self._init_proj()
         self.load(metric)
@@ -107,7 +229,7 @@ class MapPlot:
         """ plot all steps in file """
         _ds_file = self.xr_file
         var_list = [i for i in _ds_file.data_vars]
-        for _var in var_list:
+        for _vi, _var in enumerate(var_list):
             _steps = utils.convert_to_list(_ds_file[_var]['time'].values)
 
             for _step in _steps:
@@ -127,7 +249,7 @@ class MapPlot:
 
                 polar_projs = ['LambertAzimuthalEqualArea']
                 if self.circle_border == "yes" and self.projection in polar_projs:
-                    lat_end = 90-30
+                    lat_end = 90-60
                     ax.set_extent([-lat_end * 111000,
                                    lat_end * 111000,
                                    -lat_end * 111000,
@@ -179,10 +301,20 @@ class MapPlot:
                 levels = self.levels
                 cmap = plt.get_cmap(self.cmap)
 
+                extend = 'both'
+                if self.clip:
+                    _data = _data.clip(levels[0], levels[-1])
+                    extend = 'neither'
 
 
                 plot = ax.contourf(x_dim, y_dim, _data, levels, transform=trans_grid,
-                                   cmap=cmap, extend='both')
+                                   cmap=cmap, extend=extend, vmin=levels[0])
+
+
+                # only GA (needs to be removed or made more flexible)
+                #plot_contour = ax.contour(x_dim, y_dim, _data, levels=[0.15], transform=trans_grid,
+                #                          colors='cyan', linewidths=2)
+                #ax.scatter(146.5, 76.8, color='red', s=20, transform=ccrs.PlateCarree())
 
                 ax.add_feature(cartopy.feature.LAND,
                                zorder=1, edgecolor='k',
@@ -204,23 +336,50 @@ class MapPlot:
                 cblabelstr = f'{self.shortname} {metric.legendtext} in {self.units}'
                 cb.set_label(cblabelstr, labelpad=10)
 
-                ax.set_title(self._create_title(_step))
-                ofile = self.get_filename_plot(varname=_var, time=_step,
-                                       plotformat=self.format)
+                ax.set_title(self._create_title(_step, _var))
+                if self.ofile is None:
+                    ofile = self.get_filename_plot(varname=_var, time=_step,
+                                           plotformat=self.format)
+                else:
+                    ofile = utils.csv_to_list(self.ofile)[_vi]
                 print(ofile)
                 thisfig.savefig(ofile)
+                plt.close(thisfig)
 
 
-    def _create_title(self, _step):
-        _title = f'{self.metric_plottext} {self.param} \n {self.verif_source} ' \
-                 f'{self.verif_fcsystem} {self.verif_expname} ({self.verif_enssize})'
+    def _create_title(self, _step, _var):
+        if _var == 'obs':
+            _title = f'{self.verif_name} \n'
+        else:
+            _title = f'{self.verif_source} {self.verif_fcsystem} ' \
+                     f'{self.verif_expname} {self.verif_mode} (enssize = {self.verif_enssize}) \n'
 
-        #if self.verif_mode == 'fc':
-        #    _fcdate = utils.string_to_datetime(self.verif_refdate)+ dt.timedelta(days=int(_step))
-        #    _title += f' {utils.datetime_to_string(_fcdate, "%Y-%m-%d")}'
+
+
+        if len(self.verif_dates) == 1 and self.verif_fromyear == self.verif_toyear:
+            _fcdate = utils.string_to_datetime(self.verif_fromyear+self.verif_dates[0]) \
+                      + dt.timedelta(days=int(_step))
+            _title += f' {utils.datetime_to_string(_fcdate, "%Y-%m-%d")}'
+        elif len(self.verif_dates) == 1 and self.verif_fromyear != self.verif_toyear:
+            _title += f' {self.verif_dates[0]} averaged from ' \
+                      f'{self.verif_fromyear} to {self.verif_toyear}'
+        elif len(self.verif_dates) != 1:
+            _title += f' combined dates {self.conf_verif_dates} averaged from ' \
+                     f'{self.verif_fromyear} to {self.verif_toyear}'
+        else:
+            raise ValueError('create title function failed')
+
+        if _var != 'obs':
+            _title += f' (leadtime: {_step+1} days)'
+
+        if self.calib:
+            _title += f'\n calibrated using {self.conf_calib_dates} averaged from ' \
+                     f'{self.calib_fromyear} to {self.calib_toyear}'
+
+        _title += f' {self.metric_plottext}'
 
         return _title
-        #sic ecmwf extended-range 0001 date enssize
+
 
     def get_filename_plot(self, **kwargs):
         """
@@ -232,7 +391,7 @@ class MapPlot:
         :return: output filename as string
         """
         _ofile = f'{self.plotdir}/{self.metric.metricname}/' \
-                   f'{kwargs["varname"]}_{kwargs["time"]}.' \
+                   f'{kwargs["varname"]}_{kwargs["time"]:03d}.' \
                    f'{kwargs["plotformat"]}'
         utils.make_dir(os.path.dirname(_ofile))
         return _ofile

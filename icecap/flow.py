@@ -94,13 +94,14 @@ class Tree:
 
             # sort retrieval of forecasts to be in order
             for sort_family in ['retrieval', 'clean']:
-                dict_tmp = OrderedDict(out_dict[sort_family])
-                retrieval_families = sorted(list(dict_tmp.keys()))
-                for family in retrieval_families:
-                    dict_tmp.move_to_end(family, last=True)
-                if 'verdata' in retrieval_families:
-                    dict_tmp.move_to_end('verdata', last=False)
-                out_dict[sort_family] = dict_tmp
+                if sort_family in out_dict:
+                    dict_tmp = OrderedDict(out_dict[sort_family])
+                    retrieval_families = sorted(list(dict_tmp.keys()))
+                    for family in retrieval_families:
+                        dict_tmp.move_to_end(family, last=True)
+                    if 'verdata' in retrieval_families:
+                        dict_tmp.move_to_end('verdata', last=False)
+                    out_dict[sort_family] = dict_tmp
 
 
 
@@ -311,7 +312,7 @@ class ProcessTree(Tree):
             self.add_attr(['task:plot',
                            f'variable:PLOTTYPE;{plotid}'], f'plot:{plotid}')
 
-        if conf.keep_native:
+        if conf.keep_native == 'yes':
             if bool(conf.plotsets):
                 self.add_attr(['trigger:plot==complete'], 'clean')
             else:

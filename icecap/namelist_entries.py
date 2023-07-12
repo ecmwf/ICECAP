@@ -135,7 +135,8 @@ config_optnames = {
         'plottype' : {
             'printname':'plot type',
             'optional' : False,
-            'allowed_values' : ["interp_check","ensmean","bias","bias_corrected_map"]
+            'allowed_values' : ["interp_check","ensmean","bias","bias_corrected_map",
+                                "ice_distance"]
         },
         'verif_mode':{
             'printname': 'forcast or hindcast mode for plotting',
@@ -220,5 +221,19 @@ config_optnames = {
             'printname' : 'ensemble size used for calibration',
             'optional' : True
         },
+        'ofile' : {
+            'printname' : 'output file name',
+            'optional' : True
+        },
+        'add_verdata' : {
+            'printname' : 'add observations to plot (only ice distance currently)',
+            'optional' : True,
+            'default_value' : ["no"],
+            'allowed_values' : ["yes", "no"]
+        },
+        'points' : {
+            'printname' : 'points to be used for ice distance calculation',
+            'optional' : ['plottype:ice_distance']
+        }
     }
 }

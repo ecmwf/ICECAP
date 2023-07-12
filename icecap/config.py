@@ -123,11 +123,15 @@ class Configuration():
         self.proj_options = None
         self.circle_border = None
         self.calib_dates = None
+        self.calib_mode = None
         self.calib_enssize = None
         self.calib_fcsystem = None
         self.calib_refdate = None
         self.calib_fromyear = None
         self.calib_toyear = None
+        self.points = None
+        self.add_verdata = None
+        self.ofile = None
 
 
 
@@ -243,11 +247,15 @@ class Configuration():
                 cmap = self.cmap,
                 source = self.source,
                 verif_dates = self.verif_dates,
+                calib_mode = self.calib_mode,
                 calib_dates = self.calib_dates,
                 calib_enssize=self.calib_enssize,
                 calib_refdate=self.calib_refdate,
                 calib_fromyear=self.calib_fromyear,
                 calib_toyear=self.calib_toyear,
+                ofile=self.ofile,
+                add_verdata=self.add_verdata,
+                points=self.points
                 )
 
 

@@ -112,6 +112,7 @@ def create_list_target_verif(_target, _dates=None, as_list=False):
     else:
         raise f'Target description {_target_des} not implemented yet'
 
+
     if as_list:
         return _target_val
 
