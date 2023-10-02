@@ -67,6 +67,8 @@ def csv_to_list(_args, sep=','):
     :param _args:
     :return: list object of dates
     """
+    if _args is None:
+        return [None]
     list_whitespace = _args.split(sep)
     list_nospace = [l.strip() for l in list_whitespace]
 

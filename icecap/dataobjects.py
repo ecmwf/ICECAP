@@ -5,11 +5,12 @@ import os
 import glob
 import datetime as dt
 import shutil
-import uuid
+
 import xesmf as xe
 import xarray as xr
 
 import utils
+import forecast_info
 
 class DataObject:
     """ Parent data object, with attributes valid
@@ -20,12 +21,11 @@ class DataObject:
         self.filelist = None
         self.verif_name = conf.verdata
         self.cacherootdir = conf.cachedir
-        self.obscachedir = f'{conf.cachedir}/{conf.verdata}/'
+        self.obscachedir = f'{conf.cachedir}/{conf.verdata.replace("-grid","")}/'
         self.salldates = conf.salldates
         self.linterp = False
         self.regridder = None
-        self.regridder_name = f'weights_{uuid.uuid4().hex}.nc'
-        self.grid = self.verif_name
+        self.grid = self.verif_name.replace("-grid","")
         self.keep_native = conf.keep_native
         self.files_to_retrieve = []
         self.tmptargetfile = None
@@ -91,19 +91,19 @@ class DataObject:
         if self.periodic is None:
             raise ValueError("Class attribute periodic used in interpolate can't be set to None")
 
-        ref_file = f'{self.obscachedir}/' \
-                   f'{self._filenaming_convention("verif").format(self.salldates[0],self.params)}'
+        if 'grid' in self.verif_name:
+            ref_file = f'{self.obscachedir}/{self.verif_name}.nc'
+        else:
+            ref_file = f'{self.obscachedir}/' \
+                       f'{self._filenaming_convention("verif").format(self.salldates[0],self.params)}'
         ds_ref = xr.open_dataarray(ref_file)
 
-        reuse_weights = True
-        if not os.path.isfile(self.regridder_name):
-            reuse_weights = False
-            utils.print_info(f'Computing weights {self.regridder_name}')
+        if self.regridder is None:
+            utils.print_info('Computing weights')
+            self.regridder = xe.Regridder(ds_raw.rename({'longitude': 'lon', 'latitude': 'lat'}),
+                                          ds_ref.rename({'longitude': 'lon', 'latitude': 'lat'}),
+                                          "bilinear", periodic=self.periodic)
 
-        self.regridder = xe.Regridder(ds_raw.rename({'longitude': 'lon', 'latitude': 'lat'}),
-                                      ds_ref.rename({'longitude': 'lon', 'latitude': 'lat'}),
-                                      "bilinear", periodic=self.periodic, reuse_weights=reuse_weights,
-                                      filename=self.regridder_name)
 
         ds_out = self.regridder(ds_raw.rename({'longitude': 'lon', 'latitude': 'lat'}))
 
@@ -117,6 +117,7 @@ class DataObject:
                            'true_scale_latitude']:
             if proj_param in ds_ref.attrs:
                 ds_out.attrs[proj_param] = getattr(ds_ref,proj_param)
+        ds_ref.close()
 
         return ds_out
 
@@ -154,6 +155,7 @@ class ForecastObject(DataObject):
         self.mode = self.fcast.mode
         self.source = self.fcast.source
         self.ndays = int(self.fcast.ndays)
+        self.modelname = self.fcast.modelname
 
 
         self.fcsdates = self.fcast.salldates
@@ -202,9 +204,11 @@ class ForecastObject(DataObject):
             'source': self.source,
             'fcsystem': self.fcast.fcsystem,
             'expname': self.expname,
+            'modelname' : self.modelname,
+            'mode' : self.mode,
             'thisdate' : date
         }
-        return get_cycle(**kwargs)
+        return forecast_info.get_cycle(**kwargs)
 
 
 
@@ -218,62 +222,43 @@ class ForecastObject(DataObject):
             'expname': self.expname,
             'source': self.source,
             'cycle' : self.cycle,
-            'mode' : self.mode
+            'mode' : self.mode,
+            'modelname':self.modelname
         }
         return define_fccachedir(**kwargs)
 
 
-    def _save_filename(self, date, number):
+    def _save_filename(self, date, number, grid):
         """
         Create cache file name
+        :param date: date of forecast
         :param number: ensemble member number
+        :param grid: grid information)
         :return: outfile name as string
         """
+
         filename = self._filenaming_convention('fc')
         _cachedir = self.init_cachedir()
         return f'{_cachedir}/' + \
                filename.format(date,
                                number,
                                self.params,
-                               self.grid)
+                               grid)
 
+    @staticmethod
+    def get_cycle(date):
+        """
+        Gets cycle information. This is usually set to latest but
+        can be overriden for specific forecast objects, as done for e.g.
+        ecmwf forecasts which need cycle information depending on the date of the forecast
+        at ECMWF, cycle only depends on date, which might be similar for other centres so it is kept also
+        in this generic function of get_cycle
+        :param kwargs: can be anything
+        :return: cycle information as string
+        """
+        cycle = "latest"
+        return cycle
 
-def get_cycle(**kwargs):
-
-    """
-    Get information on model version (IFS cycle)
-    For simplicity cycle is only set if operational (0001) stream is used
-    For all others the cycle is either implicitly encoded in the stream or
-    set by the user in their experiment
-    :param thisdate: data as string of current forecast
-    :return: self.cycle (cyc?? for oper and latest else)
-    """
-    thisdate = kwargs['thisdate']
-    cycle = "latest"
-    if kwargs['source'] == 'ecmwf' \
-            and kwargs['fcsystem'] in ['extended-range', 'medium-range'] \
-            and kwargs['expname'] == '0001':
-        cycle_dates = [
-            ('pre41r1', dt.datetime(1975, 1, 1, 0)),
-            ('41r1', dt.datetime(2015, 5, 12, 0)),
-            ('41r2', dt.datetime(2016, 3, 8, 0)),
-            ('43r1', dt.datetime(2016, 11, 22, 0)),
-            ('43r3', dt.datetime(2017, 7, 11, 0)),
-            ('45r1', dt.datetime(2018, 6, 5, 0)),
-            ('46r1', dt.datetime(2019, 6, 11, 0)),
-            ('47r1', dt.datetime(2020, 6, 30, 0)),
-            ('47r2', dt.datetime(2021, 5, 11, 0)),
-            ('47r3', dt.datetime(2021, 10, 12, 0)),
-        ]
-        cycles = [cd[0] for cd in cycle_dates]
-        dates = [cd[1] for cd in cycle_dates]
-        for i in range(len(dates) - 1):
-            if dates[i] <= utils.string_to_datetime(thisdate) < dates[i + 1]:
-                cycle = cycles[i]
-        if utils.string_to_datetime(thisdate) >= dates[-1]:
-            cycle = cycles[-1]
-
-    return cycle
 
 def define_fccachedir(**kwargs):
     """
@@ -287,8 +272,11 @@ def define_fccachedir(**kwargs):
     cycle : model version
     :return: cache directory (str) for the specific forecast
     """
+    if kwargs["modelname"] is None:
+        kwargs["modelname"] = kwargs["source"]
+
     _fccachedir = f'{kwargs["cacherootdir"]}/{kwargs["source"]}/{kwargs["fcsystem"]}/' \
-                  f'{kwargs["expname"]}/{kwargs["cycle"]}/{kwargs["mode"]}'
+                  f'{kwargs["modelname"]}/{kwargs["expname"]}/{kwargs["cycle"]}/{kwargs["mode"]}'
     return _fccachedir
 
 
@@ -310,6 +298,7 @@ class ForecastConfigObject:
         self.ref = kwargs['ref']
         self.ndays = kwargs['ndays']
         self.source = kwargs['source']
+        self.modelname = kwargs['modelname']
 
 
         if self.mode  == 'fc':
@@ -324,6 +313,7 @@ class ForecastConfigObject:
             _dates_list_ref  = utils.csv_to_list(self.hcrefdate)
             self.dthcrefdate = [dt.datetime.strptime(d, '%Y%m%d') for d in _dates_list_ref]
             self.shcrefdate = [d.strftime('%Y%m%d') for d in self.dthcrefdate]
+
 
             _dates_hc_from_list = utils.csv_to_list(self.hcfromdate)
             self.dthcfromdate = [dt.datetime.strptime(d, '%Y%m%d') for d in _dates_hc_from_list]
@@ -365,4 +355,4 @@ class PlotConfigObject:
         self.ofile = kwargs['ofile']
         self.points = kwargs['points']
         self.add_verdata = kwargs['add_verdata']
-
+        self.modelname = kwargs['modelname']

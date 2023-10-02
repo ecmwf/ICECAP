@@ -14,6 +14,7 @@ import xarray as xr
 
 import dataobjects
 import utils
+import forecast_info
 
 class BaseMetric(dataobjects.DataObject):
     """Generic Metric Object inherited by each specific metric"""
@@ -27,6 +28,7 @@ class BaseMetric(dataobjects.DataObject):
 
 
         #initialise verification attributes
+        self.verif_modelname = utils.csv_to_list(conf.plotsets[name].modelname)
         self.verif_expname = utils.csv_to_list(conf.plotsets[name].verif_expname)
         self.verif_mode = utils.csv_to_list(conf.plotsets[name].verif_mode)
 
@@ -54,6 +56,7 @@ class BaseMetric(dataobjects.DataObject):
         self.calib = False
         if conf.plotsets[name].calib_dates is not None:
             self.calib = True
+            self.calib_modelname = self.verif_modelname
             self.calib_expname = self.verif_expname
             self.calib_mode = utils.csv_to_list(conf.plotsets[name].calib_mode)
             self.calib_source = self.verif_source
@@ -104,16 +107,24 @@ class BaseMetric(dataobjects.DataObject):
             fcsets[date]['sdates'] = [d.strftime('%Y%m%d') for d in _dates]
 
             cycledate = getattr(self,f'{name}_fromyear') + date
+
+            # for hc refdate can be either a YYYY string or YYYYMMDD string
+            # for the former add MMDD from date variable
             if 'hc' in getattr(self,f'{name}_mode'):
-                cycledate = getattr(self,f'{name}_refyear') + date
+                cycledate = getattr(self,f'{name}_refyear')
+                if len(cycledate) == 4:
+                    cycledate += date
+
 
             kwargs = {
                 'source': getattr(self,f'{name}_source')[0],
                 'fcsystem': getattr(self,f'{name}_fcsystem')[0],
                 'expname': getattr(self,f'{name}_expname')[0],
+                'modelname': getattr(self,f'{name}_modelname')[0],
+                'mode': getattr(self,f'{name}_mode')[0],
                 'thisdate': cycledate
             }
-            cycle = dataobjects.get_cycle(**kwargs)
+            cycle = forecast_info.get_cycle(**kwargs)
 
             kwargs = {
                 'cacherootdir': self.cacherootdir,
@@ -122,6 +133,7 @@ class BaseMetric(dataobjects.DataObject):
                 'refdate': date,
                 'source': getattr(self,f'{name}_source')[0],
                 'mode': getattr(self,f'{name}_mode')[0],
+                'modelname': getattr(self, f'{name}_modelname')[0],
                 'cycle': cycle
             }
 
@@ -243,6 +255,7 @@ class BaseMetric(dataobjects.DataObject):
             oname = f'{self.metricname}.nc'
             return f'{self.metricdir}/{self.metricname}/{oname}'
         raise ValueError('Only use_metric_name = True implemented so far')
+
 
     def save(self):
         """ Save metric to metricdir """

@@ -4,8 +4,11 @@ import numpy as np
 import xarray as xr
 import cartopy.crs as ccrs
 from scipy import ndimage
+from dask.distributed import Client
+
 from .metric import BaseMetric
 
+client=Client(threads_per_worker=1)
 xr.set_options(keep_attrs=True)
 os.environ['HDF5_USE_FILE_LOCKING']='FALSE'
 
@@ -158,13 +161,15 @@ class Metric(BaseMetric):
         """ Compute metric """
         # ice-regions with less than min_size grid cells will be removed
         # (to avoid distance being calculated to small ice areas, e.g. at the coasts)
-        min_size = 15
+        min_size = 255
         datalist = []
         data_names = []
 
 
         if self.add_verdata == "yes":
             da_obs_verif = self.load_verif_data('verif')
+
+
             list_obs = []
             for idate in da_obs_verif['date'].values:
                 da_obs_verif_tmp = da_obs_verif.sel(date=idate).isel(inidate=0)

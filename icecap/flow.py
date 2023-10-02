@@ -303,6 +303,7 @@ class ProcessTree(Tree):
         # here the next steps which are independent from machines will be listed
         # metrics_f.add_part_trigger('maps != aborted', True)
         self.add_attr(['trigger:retrieval != aborted'], 'retrieval')
+
         self.add_attr(['task:verdata_retrieve'], 'retrieval:verdata')
 
         if bool(conf.plotsets):
@@ -311,6 +312,7 @@ class ProcessTree(Tree):
         for plotid in conf.plotsets:
             self.add_attr(['task:plot',
                            f'variable:PLOTTYPE;{plotid}'], f'plot:{plotid}')
+
 
         if conf.keep_native == 'yes':
             if bool(conf.plotsets):
@@ -323,9 +325,10 @@ class ProcessTree(Tree):
                 self.add_attr([f'variable:EXPID;{expid}',
                                'trigger:verdata==complete'], f'retrieval:{expid}')
 
-                self.add_attr([f'variable:EXPID;{expid}',
-                               'variable:DATES;WIPE',
-                               f'task:{conf.fcsets[expid].source}_retrieve'], f'clean:{expid}')
+                if conf.keep_native == 'yes':
+                    self.add_attr([f'variable:EXPID;{expid}',
+                                   'variable:DATES;WIPE',
+                                   f'task:{conf.fcsets[expid].source}_retrieve'], f'clean:{expid}')
 
                 if conf.fcsets[expid].mode in ['fc']:
                     self.add_attr(['variable:DATES;INIT',

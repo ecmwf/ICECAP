@@ -19,11 +19,13 @@ class Metric(BaseMetric):
 
     def compute(self):
         """ Compute metric """
+
         da_fc_verif = self.load_verif_fc('verif')
-        da_fc_verif.to_netcdf('/home/nedb/transfer/xx.nc')
         da_fc_verif = da_fc_verif.mean(dim=('member','date','inidate'))
-        da_verdata_verif = self.load_verif_data('verif')
-        da_verdata_verif.to_netcdf('/home/nedb/transfer/yy.nc')
-        da_verdata_verif = da_verdata_verif.mean(dim=('member', 'date','inidate'))
-        self.result = xr.merge([da_fc_verif.rename('model'),
-                                da_verdata_verif.rename('obs')])
+        data = [da_fc_verif.rename('model')]
+        if self.add_verdata == "yes":
+            da_verdata_verif = self.load_verif_data('verif')
+            da_verdata_verif = da_verdata_verif.mean(dim=('member', 'date','inidate'))
+            data.append(da_verdata_verif.rename('obs'))
+
+        self.result = xr.merge(data)

@@ -104,6 +104,7 @@ class Configuration():
         self.ref = None
         self.ndays = None
         self.source = None
+        self.modelname = None
 
         # the following attributes are only temporally allocated
         # but later saved for each plotID in the config file
@@ -132,6 +133,7 @@ class Configuration():
         self.points = None
         self.add_verdata = None
         self.ofile = None
+        self.modelname = None
 
 
 
@@ -202,7 +204,8 @@ class Configuration():
                 hctodate=self.hctodate,
                 ref = self.ref,
                 ndays = int(self.ndays),
-                source = self.source
+                source = self.source,
+                modelname = self.modelname
             )
 
         # check for 'ref' keyword
@@ -226,6 +229,7 @@ class Configuration():
         for plotid in plotsetlist:
             section = 'plot_' + plotid
             self._init_config(conf_parser, section, 'plot', init=True)
+
 
             if self.source is None:
                 self.source = self.machine
@@ -255,7 +259,8 @@ class Configuration():
                 calib_toyear=self.calib_toyear,
                 ofile=self.ofile,
                 add_verdata=self.add_verdata,
-                points=self.points
+                points=self.points,
+                modelname=self.modelname
                 )
 
 
@@ -322,6 +327,7 @@ class Configuration():
         for optname in config_optnames[section_config_name]:
             self._set_config_entry(_conf_parser, secname, optname,
                                    section_config_name, init)
+
 
     def _set_config_entry(self, _conf_parser, section, name,
                           section_config_name, init):

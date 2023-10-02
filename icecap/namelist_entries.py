@@ -84,7 +84,12 @@ config_optnames = {
         'fcsystem' : {
             'printname':'forecasting system name',
             'optional' : False,
-            'allowed_values' : ["medium-range", "extended-range","long-range"]
+            'allowed_values' : ["medium-range", "extended-range",
+                                "long-range", "s2s"]
+        },
+        'modelname' : {
+            'printname':'model name (for S2S)',
+            'optional' : ['fcsystem:s2s', 'fcsystem:long-range'],
         },
         'expname' : {
             'printname':'experiment name',
@@ -161,7 +166,7 @@ config_optnames = {
         'verif_fcsystem':{
             'printname' : 'forecast system specification',
             'optional' : False,
-            'allowed_values' : ["medium-range", "extended-range","long-range"]
+            'allowed_values' : ["medium-range", "extended-range","long-range", 's2s']
         },
         'verif_dates' : {
             'printname' : 'experiment forecast dates only for mode=fc',
@@ -234,6 +239,10 @@ config_optnames = {
         'points' : {
             'printname' : 'points to be used for ice distance calculation',
             'optional' : ['plottype:ice_distance']
-        }
+        },
+        'modelname' : {
+            'printname':'model name (for S2S)',
+            'optional' : ['verif_fcsystem:s2s', 'verif_fcsystem:long-range'],
+        },
     }
 }

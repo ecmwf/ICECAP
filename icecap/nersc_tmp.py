@@ -25,7 +25,7 @@ class NerscData(dataobjects.ForecastObject):
             self.linterp = True
             self.periodic = False
 
-            self.root_server = "https://thredds.met.no/thredds/dodsC/metusers/arildb/ACCIBERGdemo/"
+            self.root_server = "https://thredds.met.no/thredds/dodsC/metusers/arildb/ACCIBERGupdated/"
             self.fileformat = f'{self.expname}''_mem{:03d}_b{}T00.ncml'
 
 
@@ -34,6 +34,7 @@ class NerscData(dataobjects.ForecastObject):
 
         files = [filename.format(self.startdate, member, self.params, self.grid)
                  for member in range(self.enssize)]
+        files_list = [self.fccachedir + '/' + file for file in files]
         files_list = [self.fccachedir + '/' + file for file in files]
 
         return files_list
@@ -49,8 +50,7 @@ class NerscData(dataobjects.ForecastObject):
 
         for member in range(self.enssize):
 
-            self.grid = self.verif_name
-            ofile = self._save_filename(date=self.startdate, number=member)
+            ofile = self._save_filename(date=self.startdate, number=member, grid=self.grid)
 
             if ofile in self.files_to_retrieve:
 
@@ -61,7 +61,6 @@ class NerscData(dataobjects.ForecastObject):
                 da_in = da_in.transpose('number','time', 'y', 'x')
 
                 if self.keep_native == "yes":
-                    self.grid = 'native'
                     da_out_save = da_in.isel(time=slice(self.ndays))
 
                     # save projection details as attributes
@@ -73,11 +72,11 @@ class NerscData(dataobjects.ForecastObject):
                     da_out_save = da_out_save.rename({'y':'yc','x':'xc'})
                     da_out_save['yc'] = da_out_save['yc'] *100 *1000
                     da_out_save['xc'] = da_out_save['xc'] * 100 * 1000
-                    ofile = self._save_filename(date=self.startdate, number=member)
+                    ofile = self._save_filename(date=self.startdate, number=member, grid='native')
                     da_out_save.sel(number=member).to_netcdf(ofile)
 
-                self.grid = self.verif_name
+
                 if self.linterp:
                     da_out_save = self.interpolate(da_in.isel(time=slice(self.ndays)))
-                    ofile = self._save_filename(date=self.startdate, number=member)
+                    ofile = self._save_filename(date=self.startdate, number=member, grid=self.grid)
                     da_out_save.sel(number=member).to_netcdf(ofile)

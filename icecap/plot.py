@@ -1,16 +1,14 @@
 """ Script for metric calculation and plotting """
 import argparse
-import tracemalloc
 
 import clargs
 import config
 import metrics
 import utils
-import map_plot
+import plottypes
 
 
 if __name__ == '__main__':
-    tracemalloc.start()
     des = 'Plot a metric from staged data files'
     parser = argparse.ArgumentParser(description=des,
                                      formatter_class=argparse.ArgumentDefaultsHelpFormatter)
@@ -31,15 +29,12 @@ if __name__ == '__main__':
     m.compute()
     m.save()
     if m.gettype() == 'map':
-        p = map_plot.MapPlot(conf, args.plotid,m)
+        p = plottypes.MapPlot(conf, args.plotid,m)
     elif m.gettype() == 'ts':
         print('ts')
-        p = map_plot.TsPlot(m)
+        p = plottypes.TsPlot(conf,m)
 
 
 
     print('plotting')
-    p.plot(m, args.verbose)
-    current, peak = tracemalloc.get_traced_memory()
-    print(f"Current memory usage is {current / 10 ** 6}MB; Peak was {peak / 10 ** 6}MB")
-    tracemalloc.stop()
+    p.plot(m)

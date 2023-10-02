@@ -11,7 +11,9 @@ params_verdata = {
     'sic' : {
         'osi-450-a' : 'ice_conc',
         'osi-401-b' : 'ice_conc',
-        'osi-450-a_osi-430-a_mixed' : 'ice_conc',
+        'osi-401-b-grid' : 'ice_conc',
+        'osi-cdr' : 'ice_conc',
+        'osi-cdr-grid' : 'ice_conc',
     }
 }
 
@@ -25,7 +27,9 @@ def VerifData(conf):
     selector = {
         'osi-450-a': _OSIThreddsRetrieval(conf),
         'osi-401-b': _OSIThreddsRetrieval(conf),
-        'osi-450-a_osi-430-a_mixed': _OSIThreddsRetrieval(conf)
+        'osi-cdr': _OSIThreddsRetrieval(conf), # was osi-450-a_osi-430-a_mixed'
+        'osi-401-b-grid': _OSIThreddsRetrieval(conf),
+        'osi-cdr-grid': _OSIThreddsRetrieval(conf),
     }
 
     return selector[conf.verdata]
@@ -36,17 +40,9 @@ class VerifyingData(dataobjects.DataObject):
     """ Verification parent class object """
     def __init__(self, conf):
         super().__init__(conf)
-        self.name = conf.verdata
+        self.loop_dates = self.salldates
 
 
-
-
-    def make_filelist(self):
-        """Generate a list of files which are expected to be staged"""
-        filename = self._filenaming_convention('verif')
-        files = [self.obscachedir+'/'+filename.format(date, self.params)
-                 for date in self.salldates]
-        return files
 
 
 
@@ -54,18 +50,19 @@ class VerifyingData(dataobjects.DataObject):
 class _OSIThreddsRetrieval(VerifyingData):
     def __init__(self, conf):
         super().__init__(conf)
+
         self.root_server = "https://thredds.met.no/thredds/dodsC/osisaf/met.no/"
-        if self.name == 'osi-450-a':
+        if self.verif_name == 'osi-450-a':
             self.server = [self.root_server+"reprocessed/ice/conc_450a_files/"]
             self.filebase = ["ice_conc_nh_ease2-250_cdr-v3p0_"]
             self.fileext = ["1200.nc"]
 
-        if self.name == 'osi-401-b':
+        if self.verif_name == 'osi-401-b':
             self.server = [self.root_server+"ice/conc/"]
             self.filebase = ["ice_conc_nh_polstere-100_multi_"]
             self.fileext = ["1200.nc"]
 
-        if self.name == 'osi-450-a_osi-430-a_mixed':
+        if self.verif_name == 'osi-cdr':
             self.server = self.root_server+"reprocessed/ice/conc_450a_files/"
             self.filebase = "ice_conc_nh_ease2-250_cdr-v3p0_"
             self.fileext = "1200.nc"
@@ -73,6 +70,30 @@ class _OSIThreddsRetrieval(VerifyingData):
             self.server = [self.server, self.root_server+"reprocessed/ice/conc_cra_files/"]
             self.filebase = [self.filebase, "ice_conc_nh_ease2-250_icdr-v3p0_"]
             self.fileext = [self.fileext, "1200.nc"]
+
+        if self.verif_name == 'osi-401-b-grid':
+            self.loop_dates = ['20171130']
+            self.server = [self.root_server + "ice/conc/"]
+            self.filebase = ["ice_conc_nh_polstere-100_multi_"]
+            self.fileext = ["1200.nc"]
+
+        if self.verif_name == 'osi-cdr-grid':
+            self.loop_dates = ['20171130']
+            self.server = [self.root_server + "reprocessed/ice/conc_450a_files/"]
+            self.filebase = ["ice_conc_nh_ease2-250_cdr-v3p0_"]
+            self.fileext = ["1200.nc"]
+
+
+
+    def make_filelist(self):
+        """Generate a list of files which are expected to be staged"""
+        if 'grid' in self.verif_name:
+            files = [f'{self.obscachedir}/{self.verif_name}.nc']
+        else:
+            filename = self._filenaming_convention('verif')
+            files = [self.obscachedir+'/'+filename.format(date, self.params)
+                     for date in self.loop_dates]
+        return files
 
     def process(self, verbose):
         """
@@ -82,14 +103,18 @@ class _OSIThreddsRetrieval(VerifyingData):
         filename = self._filenaming_convention('verif')
         utils.make_dir(self.obscachedir)
 
-        for _date in self.salldates:
+        for _date in self.loop_dates:
             _ofile = f'{self.obscachedir}/{filename.format(_date, self.params)}'
+
+            if 'grid' in self.verif_name:
+                _ofile = f'{self.obscachedir}/{self.verif_name}.nc'
+
             if _ofile in self.files_to_retrieve:
                 try:
                     file = f'{self.server[0]}{_date[:4]}/{_date[4:6]}/{self.filebase[0]}{_date}{self.fileext[0]}'
                     if verbose:
                         print(f'Processing file {file}')
-                    da_in = xr.open_dataset(file)[params_verdata[self.params][self.name]]
+                    da_in = xr.open_dataset(file)[params_verdata[self.params][self.verif_name]]
 
                 except:
                     if len(self.server) > 1:
@@ -97,7 +122,7 @@ class _OSIThreddsRetrieval(VerifyingData):
                             file = f'{self.server[1]}{_date[:4]}/{_date[4:6]}/{self.filebase[1]}{_date}{self.fileext[1]}'
                             if verbose:
                                 print(f'Processing file {file}')
-                            da_in = xr.open_dataset(file)[params_verdata[self.params][self.name]]
+                            da_in = xr.open_dataset(file)[params_verdata[self.params][self.verif_name]]
                         except:
                             raise BaseException(f'Data {file} not found')
                     else:

@@ -11,22 +11,42 @@ import cartopy.crs as ccrs
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 from cartopy.util import add_cyclic_point
 import xarray as xr
-import matplotlib.path as mpath
 import cmocean
 
 
 import utils
 
-class TsPlot:
-    """ Timeseries plot class """
-    def __init__(self, metric):
-        self.data = None
+class GenericPlot:
+    """" Generic plot class """
+    def __init__(self, conf, metric):
         self.load(metric)
+        self.verif_name = metric.verif_name
+        self.metric = metric
         self.ofile = metric.ofile
         self.clip = metric.clip
+        self.levels = None
         self.levels = metric.levels
-        self.points = metric.points
+        self.format = 'png'
+        self.plotdir = conf.plotdir
 
+    def get_filename_plot(self, **kwargs):
+        """
+        Create plotting directory and define output filename
+        :param kwargs: Necessary keywords
+        varname : variable name
+        time: timestep
+        plotformat: png/pdf/...
+        :return: output filename as string
+        """
+        if kwargs["time"] is not None:
+            time_name = f'_{kwargs["time"]:03d}'
+        else:
+            time_name = ''
+        _ofile = f'{self.plotdir}/{self.metric.metricname}/' \
+                   f'{kwargs["varname"]}{time_name}.' \
+                   f'{kwargs["plotformat"]}'
+        utils.make_dir(os.path.dirname(_ofile))
+        return _ofile
 
     def load(self, metric):
         """ load metric file
@@ -37,16 +57,26 @@ class TsPlot:
         ds_file = xr.open_dataset(fname)
         self.xr_file = ds_file
 
+
+class TsPlot(GenericPlot):
+    """ Timeseries plot class """
+    def __init__(self, conf, metric):
+        super().__init__(conf, metric)
+        self.points = metric.points
+
     def plot(self, metric, verbose=False):
         """ plot timeseries
         :param verbose: verbosity on or off
         """
-
-        thisfig = plt.figure(figsize=(8,6))
-        ax = plt.axes()
-
+        ofile = self.ofile
+        if self.ofile is None:
+            ofile = self.get_filename_plot(varname='model', time=None,
+                                           plotformat=self.format)
         _ds_file = self.xr_file
         var_list = list(_ds_file.data_vars)
+
+        thisfig = plt.figure(figsize=(8, 6))
+        ax = plt.axes()
         for _var in var_list:
             _ds_file = self.xr_file[_var].dropna(dim='member').copy()
             if self.clip:
@@ -59,14 +89,10 @@ class TsPlot:
                                      _ds_file.quantile(1-p/100, dim='member'),
                                      color='teal', alpha=shading[pi],
                                     label=f'probability: {p}-{100 - p}%')
-                #ax.plot(_ds_file.time, _ds_file.mean(dim='member').values,
-                #        color='blue', alpha=1, linewidth=2)
-                #ax.plot(_ds_file.time, _ds_file.median(dim='member').values,
-                #        color='r', alpha=1, linewidth=2)
             for m in _ds_file['member'].values:
                 if _var == 'obs':
                     ax.plot(_ds_file.time, _ds_file.sel(member=m).values,
-                            color='k', alpha=1, linewidth=2)
+                            color='k', alpha=1, linewidth=2, label=self.verif_name)
                 elif _var == 'obs-hc':
                     ax.plot(_ds_file.time, _ds_file.sel(member=m).mean(dim='date').values,
                             color='red', alpha=1, linewidth=2,
@@ -74,27 +100,18 @@ class TsPlot:
                 else:
                     ax.plot(_ds_file.time, _ds_file.sel(member=m).values, alpha=.1, linewidth=1,
                              color='blue')
-                    # ax.plot(_ds_file.time, _ds_file.sel(member=m).values, linewidth=1,
-                    #         label=m)  # , color='blue'
 
-
-
-            ax.set_ylabel('distance to ice edge [km]')
-            #ax.set_ylim([-10,500])
-            ax.set_xlim([0,_ds_file.time.max()+1])
-
-
+        if self.points is not None:
             ax2 = plt.axes([0, 0, 1, 1],
                            projection=ccrs.NorthPolarStereo())
-            ip = InsetPosition(ax, [0.62, 0.62, 0.45, 0.35])
+            ip = InsetPosition(ax, [0.72, 0.67, 0.3, 0.3])
             ax2.set_axes_locator(ip)
-            ax2.set_extent([-180, 180, 50, 90], ccrs.PlateCarree())
-            #ax2.set_axis_off()
+            ax2.set_extent([-180, 180, 60, 90], ccrs.PlateCarree())
 
             theta = np.linspace(0, 2 * np.pi, 100)
             center, radius = [0.5, 0.5], 0.5
             verts = np.vstack([np.sin(theta), np.cos(theta)]).T
-            circle = mpath.Path(verts * radius + center)
+            circle = matplotlib.path.Path(verts * radius + center)
 
             ax2.set_boundary(circle, transform=ax2.transAxes)
 
@@ -114,20 +131,22 @@ class TsPlot:
                     ax.scatter(_ds_file.time[pi], -15,
                                color=rgba_color, s=25, clip_on=False)
 
-            ax.legend() #loc='lower left')
+        ax.legend(loc='lower right', ncol=1,
+                  bbox_to_anchor=(.95,.1)) #loc='lower left')
+        ax.set_ylabel('distance to ice edge [km]')
 
-            thisfig.savefig(self.ofile)
-            plt.close(thisfig)
+        ax.set_xlim([0, _ds_file.time.max() + 1])
+        ax.set_xlabel('forecast time [days]')
+        thisfig.savefig(ofile)
+        print(ofile)
 
 
-class MapPlot:
+
+class MapPlot(GenericPlot):
     """ Plotting object for 2D maps """
     def __init__(self, conf, secname, metric):
-        self.data = None
-        self.plotdir = conf.plotdir
+        super().__init__(conf, metric)
         self.param = conf.params
-        self.metric = metric
-        self.format = 'png'
         self.verif_name = metric.verif_name
         self.verif_expname = metric.verif_expname[0]
         self.verif_enssize = metric.verif_enssize[0]
@@ -162,18 +181,7 @@ class MapPlot:
             else:
                 self.cmap = metric.default_cmap
 
-        # levels will probably be a config entry at some point
-        self.levels = None
-        if self.levels is None:
-            self.levels = metric.levels
-
-        self.clip = metric.clip
-        self.ofile = metric.ofile
-
-
-
         self._init_proj()
-        self.load(metric)
 
 
         if self.plot_extent is None:
@@ -218,13 +226,6 @@ class MapPlot:
 
 
 
-    def load(self, metric):
-        """ load metric file """
-        fname = metric.get_filename_metric()
-        ds_file = xr.open_dataset(fname)
-        self.xr_file = ds_file
-
-
     def plot(self, metric, verbose=False):
         """ plot all steps in file """
         _ds_file = self.xr_file
@@ -257,8 +258,8 @@ class MapPlot:
                                   crs=proj)
 
                     r_limit = 1 * (lat_end) * 111 * 1000
-                    circle_path = mpath.Path.unit_circle()
-                    circle_path = mpath.Path(circle_path.vertices.copy() * r_limit,
+                    circle_path = matplotlib.path.Path.unit_circle()
+                    circle_path = matplotlib.path.Path(circle_path.vertices.copy() * r_limit,
                                              circle_path.codes.copy())
                     ax.set_boundary(circle_path)
 
@@ -379,19 +380,3 @@ class MapPlot:
         _title += f' {self.metric_plottext}'
 
         return _title
-
-
-    def get_filename_plot(self, **kwargs):
-        """
-        Create plotting directory and define output filename
-        :param kwargs: Necessary keywords
-        varname : variable name
-        time: timestep
-        plotformat: png/pdf/...
-        :return: output filename as string
-        """
-        _ofile = f'{self.plotdir}/{self.metric.metricname}/' \
-                   f'{kwargs["varname"]}_{kwargs["time"]:03d}.' \
-                   f'{kwargs["plotformat"]}'
-        utils.make_dir(os.path.dirname(_ofile))
-        return _ofile
