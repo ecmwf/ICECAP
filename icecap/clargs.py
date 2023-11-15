@@ -16,7 +16,7 @@ def add_staging_startdate(parser, allow_multiple=False):
 def add_staging_exptype(parser):
     """Add to parser a positional argument to specify type of experiment to stage."""
     helpstr = 'experiment type (pf, cf, fc)'
-    parser.add_argument('exptype', choices=['pf', 'cf','fc'], help=helpstr)
+    parser.add_argument('exptype', choices=['pf', 'cf','fc','INIT','WIPE'], help=helpstr)
 
 def add_staging_mode(parser):
     """Add to parser a positional argument to specify type of experiment to stage."""

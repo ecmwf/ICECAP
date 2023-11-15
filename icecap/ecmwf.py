@@ -13,14 +13,6 @@ import utils
 import dataobjects
 from cds import convert_step2time
 
-params_ecmwf = {
-    'sic' : {
-        'grib_code' : '31.128',
-        'xr_code' : 'siconc'
-    }
-}
-
-
 
 class EcmwfTree(flow.ProcessTree):
     """
@@ -40,14 +32,14 @@ class EcmwfTree(flow.ProcessTree):
                 if conf.fcsets[expid].mode in ['fc']:
                     loopdates = self.fcsets[expid].sdates
                 elif conf.fcsets[expid].mode in ['hc']:
-                    loopdates = self.fcsets[expid].shcrefdate
+                    loopdates = self.fcsets[expid].shcrefdate_loop
 
                 self.add_attr([f'variable:EXPID;{expid}',
                                'trigger:verdata==complete'], f'retrieval:{expid}')
 
                 self.add_attr([f'variable:EXPID;{expid}',
-                               'variable:DATES;INIT',
-                               'variable:TYPE;pf',
+                               f'variable:DATES;{loopdates[0]}',
+                               'variable:TYPE;INIT',
                                f'task:{conf.fcsets[expid].source}_retrieve'],
                               f'retrieval:{expid}:init')
 
@@ -60,8 +52,9 @@ class EcmwfTree(flow.ProcessTree):
                 if conf.fcsets[expid].fcsystem in ['extended-range', 'medium-range', 's2s']:
                     self.add_attr(['task:ecmwf_retrieve;mars',
                                    'variable:TYPE;cf'], f'retrieval:{expid}:fc:cf')
-                    self.add_attr(['task:ecmwf_retrieve;mars',
-                                   'variable:TYPE;pf'], f'retrieval:{expid}:fc:pf')
+                    if conf.fcsets[expid].enssize > 1:
+                        self.add_attr(['task:ecmwf_retrieve;mars',
+                                       'variable:TYPE;pf'], f'retrieval:{expid}:fc:pf')
 
                 if conf.fcsets[expid].fcsystem in ['long-range']:
                     self.add_attr(['task:ecmwf_retrieve;mars',
@@ -72,7 +65,7 @@ class EcmwfTree(flow.ProcessTree):
                 if conf.keep_native == 'yes':
                     self.add_attr([f'variable:EXPID;{expid}',
                                    'variable:DATES;WIPE',
-                                   'variable:TYPE;pf',
+                                   'variable:TYPE;WIPE',
                                    f'task:{conf.fcsets[expid].source}_retrieve'], f'clean:{expid}')
 
 
@@ -85,13 +78,13 @@ class EcmwfRetrieval:
     def factory(kwargs):
         """return appropriate MarsRetrieval subclass"""
 
-        if kwargs['fcastobj'].fcsystem == 'long-range':
+        if kwargs['fcsystem'] == 'long-range':
             return _EcmwfLongRangeRetrieval(kwargs)
-        if kwargs['fcastobj'].fcsystem == 'extended-range':
+        if kwargs['fcsystem'] == 'extended-range':
             return _EcmwfExtendedRangeRetrieval(kwargs)
-        if kwargs['fcastobj'].fcsystem == 'medium-range':
+        if kwargs['fcsystem'] == 'medium-range':
             return _EcmwfMediumRangeRetrieval(kwargs)
-        if kwargs['fcastobj'].fcsystem == 's2s':
+        if kwargs['fcsystem'] == 's2s':
             return _EcmwfS2sRetrieval(kwargs)
 
 
@@ -100,13 +93,19 @@ class EcmwfRetrieval:
     def __init__(self, kwargs):
         self.kwargs = {}
         self.kwargs['date'] = kwargs['date']
-        self.kwargs['expver'] = kwargs['fcastobj'].expname
+        self.kwargs['expver'] = kwargs['expname']
         self.kwargs['levtype'] = 'sfc'
-        self.kwargs['param'] = params_ecmwf[kwargs['param']]['grib_code']
+        if kwargs['exptype'] == 'INIT':
+            self.kwargs['param'] = '172.128'
+        else:
+            self.kwargs['param'] = '31.128'
         self.kwargs['time'] = "00:00:00"
         self.kwargs['target'] = kwargs['tfile']
         if kwargs['grid'] is not None:
             self.kwargs['grid'] = kwargs['grid']
+
+        if kwargs['mode'] == 'hc':
+            self.kwargs['hdate'] = kwargs['shcdates'][kwargs['loopvalue']]
 
 
 
@@ -152,7 +151,7 @@ class _EcmwfS2sRetrieval(EcmwfRetrieval):
     """Defines MARS retrieval of step data for S2S forecast"""
     def __init__(self, kwargs):
         super().__init__(kwargs)
-        self.kwargs['type'] = kwargs['type']
+        self.kwargs['type'] = kwargs['exptype']
         self.kwargs['origin'] = kwargs['origin']
 
 
@@ -160,17 +159,17 @@ class _EcmwfS2sRetrieval(EcmwfRetrieval):
         step_offset = 0
         if self.kwargs['origin'] in ['rjtd'] and kwargs['mode'] == 'fc':
             step_offset = 12
+            self.kwargs['time'] = "12:00:00"
         self.kwargs['step'] = [f'{n * stepsize + step_offset}-{(n + 1) * stepsize + step_offset}'
                                for n in range(int(kwargs['ndays']))]
 
         if kwargs['mode'] == 'hc':
-            self.kwargs['hdate'] = kwargs['fcastobj'].shcdates
             self.kwargs['stream'] = 'enfh'
         else:
             self.kwargs['stream'] = 'enfo'
 
         if self.kwargs['type'] == 'pf':
-            self.kwargs['number'] = [ m+1 for m in range(int(kwargs['fcastobj'].enssize)-1)]
+            self.kwargs['number'] = [ m+1 for m in range(int(kwargs['enssize'])-1)]
 
         self.kwargs['origin'] = kwargs['origin']
         self.kwargs['class'] = 's2'
@@ -182,20 +181,26 @@ class _EcmwfMediumRangeRetrieval(EcmwfRetrieval):
     # stream, time, type, target
     def __init__(self, kwargs):
         super().__init__(kwargs)
-        self.kwargs['type'] = kwargs['type']
         self.kwargs['class'] = 'od'
         stepsize = 6
         self.kwargs['step'] = [0, 'to', int(kwargs['ndays'])*24, 'by', stepsize ]
 
 
         if kwargs['mode'] == 'hc':
-            self.kwargs['hdate'] = kwargs['fcastobj'].shcdates
             self.kwargs['stream'] = 'enfh'
         else:
             self.kwargs['stream'] = 'enfo'
 
+        if kwargs['exptype'] =='INIT':
+            self.kwargs['type'] = 'cf'
+            self.kwargs['step'] = self.kwargs['step'][0]
+            if kwargs['mode'] == 'hc':
+                self.kwargs['hdate'] = self.kwargs['hdate'][0]
+        else:
+            self.kwargs['type'] = kwargs['exptype']
+
         if self.kwargs['type'] == 'pf':
-            self.kwargs['number'] = [ m+1 for m in range(int(kwargs['fcastobj'].enssize)-1) ]
+            self.kwargs['number'] = [ m+1 for m in range(int(kwargs['enssize'])-1) ]
 
 
 
@@ -205,26 +210,31 @@ class _EcmwfExtendedRangeRetrieval(EcmwfRetrieval):
     # stream, time, type, target
     def __init__(self, kwargs):
         super().__init__(kwargs)
-        self.kwargs['type'] = kwargs['type']
         self.kwargs['class'] = 'od'
         stepsize = 6
         self.kwargs['step'] = [0, 'to', int(kwargs['ndays'])*24, 'by', stepsize ]
 
         if int(kwargs['cycle'][:2]) >= 48:
             if kwargs['mode'] == 'hc':
-                self.kwargs['hdate'] = kwargs['fcastobj'].shcdates
                 self.kwargs['stream'] = 'eefh'
             else:
                 self.kwargs['stream'] = 'eefo'
         else:
             if kwargs['mode'] == 'hc':
-                self.kwargs['hdate'] = kwargs['fcastobj'].shcdates
                 self.kwargs['stream'] = 'enfh'
             else:
                 self.kwargs['stream'] = 'enfo'
 
+        if kwargs['exptype'] =='INIT':
+            self.kwargs['type'] = 'cf'
+            self.kwargs['step'] = self.kwargs['step'][0]
+            if kwargs['mode'] == 'hc':
+                self.kwargs['hdate'] = self.kwargs['hdate'][0]
+        else:
+            self.kwargs['type'] = kwargs['exptype']
+
         if self.kwargs['type'] == 'pf':
-            self.kwargs['number'] = [ m+1 for m in range(int(kwargs['fcastobj'].enssize)-1) ]
+            self.kwargs['number'] = [ m+1 for m in range(int(kwargs['enssize'])-1) ]
 
 
 class _EcmwfLongRangeRetrieval(EcmwfRetrieval):
@@ -239,7 +249,7 @@ class _EcmwfLongRangeRetrieval(EcmwfRetrieval):
 
 
 
-        self.kwargs['number'] = [ m for m in range(int(kwargs['fcastobj'].enssize)) ]
+        self.kwargs['number'] = list(range(int(kwargs['enssize'])))
 
         if kwargs['origin'] != 'ecmwf':
             raise ValueError('Only ecmwf is allowed for source=ecmwf and fcsystem=long-range')
@@ -247,13 +257,17 @@ class _EcmwfLongRangeRetrieval(EcmwfRetrieval):
 
         self.kwargs['method'] = '1'
         self.kwargs['stream'] = 'mmsf'
-        self.kwargs['type'] = kwargs['type']
+        self.kwargs['type'] = kwargs['exptype']
 
         # for SEAS5 we need to set system variable
         if self.kwargs['expver'] == 'SEAS5':
             self.kwargs['expver'] = '0001'
             self.kwargs['system'] = '5'
             self.kwargs['class'] = 'od'
+
+        if kwargs['exptype'] =='INIT':
+            self.kwargs['type'] = 'fc'
+            self.kwargs['step'] = self.kwargs['step'][0]
 
 
 class EcmwfData(dataobjects.ForecastObject):
@@ -263,12 +277,19 @@ class EcmwfData(dataobjects.ForecastObject):
     def __init__(self, conf, args):
         super().__init__(conf, args)
 
-        if args.startdate not in ['INIT','WIPE']:
+        if args.exptype not in ['WIPE']:
             self.type = args.exptype
-
             self.ldmean = False
-            if self.fcast.fcsystem in ['extended-range', 'medium-range']:
-                setattr(self, 'ldmean', True)
+            if self.fcsystem in ['extended-range', 'medium-range']:
+                self.ldmean = True
+
+            self.lsm = False
+            if self.fcsystem not in ['s2s']:
+                self.lsm = True
+
+            self.offset = 0
+            if self.fcsystem in ['s2s','long-range']:
+                self.offset = 12
 
             self.linterp = True
             self.periodic = True
@@ -277,45 +298,55 @@ class EcmwfData(dataobjects.ForecastObject):
             self.cycle = self.init_cycle(self.startdate)
             self.fccachedir = self.init_cachedir()
 
-            if self.fcast.fcsystem in ['medium-range']:
+            if self.fcsystem in ['medium-range']:
                 retrieval_grid = 'F640'
-            elif self.fcast.fcsystem in ['extended-range', 'long-range']:
+            elif self.fcsystem in ['extended-range', 'long-range']:
                 retrieval_grid = 'F320'
-            elif self.fcast.fcsystem in ['s2s']:
+            elif self.fcsystem in ['s2s']:
                 retrieval_grid = None
             else:
-                raise ValueError(f'No grid for retrieval specified for {self.fcast.fcsystem}')
+                raise ValueError(f'No grid for retrieval specified for {self.fcsystem}')
 
-            self.tmptargetfile = f'{conf.tmpdir}/{self.source}/{self.modelname}/{args.expid}_{args.startdate}_{self.type}_{self.mode}/' \
+
+
+            self.tmptargetfile = f'{conf.tmpdir}/{self.source}/{self.modelname}/' \
+                                 f'{args.expid}_{args.startdate}_{self.type}_{self.mode}/' \
                                  f'tmp_{args.expid}_{args.startdate}_{self.type}_{self.mode}'
 
-            if self.mode == 'hc':
-                if self.type == 'pf':
-                    self.tmptargetfile += '_[NUMBER]_[HDATE].grb'
-                else:
-                    self.tmptargetfile += '_[HDATE].grb'
+
+            if self.type == 'INIT':
+                self.tmptargetfile += '.grb'
             else:
-                if self.type in ['pf','fc']:
-                    self.tmptargetfile += '_[NUMBER].grb'
+                if self.mode == 'hc':
+                    if self.type == 'pf':
+                        self.tmptargetfile += '_[NUMBER]_[HDATE].grb'
+                    else:
+                        self.tmptargetfile += '_[HDATE].grb'
                 else:
-                    self.tmptargetfile += '.grb'
+                    if self.type in ['pf','fc']:
+                        self.tmptargetfile += '_[NUMBER].grb'
+                    else:
+                        self.tmptargetfile += '.grb'
 
             utils.make_dir(os.path.dirname(self.tmptargetfile))
 
 
 
             factory_args = dict(
+                loopvalue=args.startdate,
                 exptype=args.exptype,
                 date=self.startdate,
-                fcastobj=self.fcast,
+                expname=self.expname,
+                fcsystem=self.fcsystem,
                 tfile = self.tmptargetfile,
-                type = self.type,
                 ndays = self.ndays,
                 mode = self.mode,
                 param = self.params,
                 grid = retrieval_grid,
                 cycle = self.cycle,
-                origin = self.modelname
+                origin = self.modelname,
+                shcdates = self.shcdates,
+                enssize = self.enssize
             )
 
             self.retrieval_request = EcmwfRetrieval.factory(factory_args)
@@ -329,7 +360,7 @@ class EcmwfData(dataobjects.ForecastObject):
         :return: list of filenames of downloaded files
         """
 
-        if self.fcast.fcsystem == 'long-range':
+        if self.fcsystem == 'long-range':
             number = list(range(int(self.enssize)))
             _files = [self.tmptargetfile.replace('[NUMBER]', str(n)) for n in number]
         else:
@@ -338,10 +369,11 @@ class EcmwfData(dataobjects.ForecastObject):
                     number = [ m+1 for m in range(int(self.enssize)-1) ]
                     _files = []
                     for num in number:
-                        for _date in self.fcast.shcdates:
+                        for _date in self.shcdates[self.loopvalue]:
                             _files.append(self.tmptargetfile.replace('[HDATE]', _date).replace('[NUMBER]', str(num)))
                 else:
-                    _files = [self.tmptargetfile.replace('[HDATE]', str(_date)) for _date in self.fcast.shcdates]
+                    _files = [self.tmptargetfile.replace('[HDATE]', str(_date))
+                              for _date in self.shcdates[self.loopvalue]]
             else:
                 if self.type == 'pf':
                     number = [m + 1 for m in range(int(self.enssize) - 1)]
@@ -366,17 +398,17 @@ class EcmwfData(dataobjects.ForecastObject):
 
         dates = [self.startdate]
         if self.mode == 'hc':
-            dates = self.fcast.shcdates
+            dates = self.shcdates[self.loopvalue]
 
 
-        if self.fcast.fcsystem in ['extended-range', 'medium-range','s2s']:
+        if self.fcsystem in ['extended-range', 'medium-range','s2s']:
             if self.type == 'cf':
                 members = range(1)
             elif self.type == 'pf':
-                members = range(int(self.fcast.enssize) - 1)
+                members = range(int(self.enssize) - 1)
 
-        if self.fcast.fcsystem in ['long-range']:
-            members = range(int(self.fcast.enssize))
+        if self.fcsystem in ['long-range']:
+            members = range(int(self.enssize))
 
         files = [filename.format(date, member, self.params, self.grid)
                  for date in dates
@@ -389,19 +421,46 @@ class EcmwfData(dataobjects.ForecastObject):
 
         return files_list
 
+    def process_lsm(self, dryrun=False):
+        """
+        Retrieve land-sea-mask from tape if masking necessary for this dataset and save to disk
+        :param dryrun: only sho mars request
+        """
+        if self.lsm and not os.path.isfile(f'{self.fccachedir}/lsm.nc'):
+            self.retrieval_request.execute(dryrun=dryrun)
+            if not dryrun:
+                file = self.tmptargetfile
+                ds_in = xr.open_dataset(file, engine='cfgrib')
+                ds_lsm = xr.where(ds_in==0,0,1)
+                ds_lsm.to_netcdf(f'{self.fccachedir}/lsm.nc')
+                print(f'{self.fccachedir}/lsm.nc')
+
 
     def process(self):
         """Process retrieved ECMWF data and write to cache"""
 
+        xr.set_options(keep_attrs=True)
 
-
-        iname = 'siconc'
         for file in self._make_download_filelist():
-
             print(file)
+
             ds_in = xr.open_dataset(file, engine='cfgrib')
+            if len(list(ds_in.data_vars))>1:
+                raise ValueError(f'More than one variable detected in file {file}')
+            iname = list(ds_in.data_vars)[0]
 
             da_in = ds_in[iname].rename(self.params)
+
+
+
+            # mask using the land-sea mask (if necessary for the respective dataset)
+            if self.lsm:
+                da_lsm = xr.open_dataarray(f'{self.fccachedir}/lsm.nc')
+                # drop coords not in dims as otherwise time is deleted from da_in after where command
+                da_lsm = da_lsm.drop([i for i in da_lsm.coords if i not in da_lsm.dims])
+                da_in = da_in.where(da_lsm==0)
+                da_in = da_in.astype(dtype=da_in.dtype, order='C')
+
 
             is_number = 'number' in da_in.dims
             is_step = 'step' in da_in.dims
@@ -425,33 +484,29 @@ class EcmwfData(dataobjects.ForecastObject):
                 raise ValueError(f'More than one startdate in file {file}')
             startdate = startdate[0]
 
-            # split into list of files with one starttime
-            files_pp = [da_in.sel(starttime=stime) for stime in da_in.starttime.values]
+
+
+            da_out = da_in.sel(starttime=startdate)
+
 
             # convert step to time
-            files_pp = [convert_step2time(file) for file in files_pp]
+            da_out = convert_step2time(da_out, offset_hour=self.offset)
 
             if self.ldmean:
-                files_pp = [file.resample(time='1D').mean() for file in files_pp]
-
+                da_out = da_out.resample(time='1D').mean()
 
 
             if self.keep_native == "yes":
-                for da_out_save in files_pp:
-                    for number in da_out_save['number'].values:
-                        da_out_save = da_out_save.isel(time=slice(self.ndays))
-                        ofile = self._save_filename(date=startdate, number=number, grid='native')
-                        da_out_save.sel(number=number).to_netcdf(ofile)
-
-
-
-            if self.linterp:
-                files_pp_interp = [self.interpolate(file) for file in files_pp]
-                files_pp = files_pp_interp
-
-
-            for da_out_save in files_pp:
-                for number in da_out_save['number'].values:
-                    da_out_save = da_out_save.isel(time=slice(self.ndays))
-                    ofile = self._save_filename(date=startdate, number=number, grid=self.grid)
+                for number in da_out['number'].values:
+                    da_out_save = da_out.isel(time=slice(self.ndays))
+                    ofile = self._save_filename(date=startdate, number=number, grid='native')
                     da_out_save.sel(number=number).to_netcdf(ofile)
+
+            # save interpolated files if interpolation is necessary
+            for number in da_out['number'].values:
+                if self.linterp:
+                    da_out_save = self.interpolate(da_out.sel(number=[number]))
+                else:
+                    da_out_save = da_out.sel(number=number)
+                ofile = self._save_filename(date=startdate, number=number, grid=self.grid)
+                da_out_save.sel(number=number).to_netcdf(ofile)

@@ -3,6 +3,7 @@
 import os
 import datetime as dt
 import numpy as np
+from dateutil.relativedelta import relativedelta
 
 def plotdates_to_list(_dates):
     """ Convert dates for plotting in config to list
@@ -60,6 +61,38 @@ def datetime_to_string(_dtdate, formatting='%Y%m%d'):
     """
 
     return _dtdate.strftime(formatting)
+
+def retrievedates_to_list(_dates):
+    """ Convert dates in config into list
+    :param _dates: either one string separated by /to/ (and optinally /by/) or
+    a string with dates separated by comma
+    :return:
+    """
+
+    if "/to/" in _dates:
+        if not "/by/" in _dates:
+            raise ValueError('/by/ needs to be defined if /to/ is used in dates')
+
+        by_tmp = _dates.split('/by/')[1]
+        by_unit = by_tmp[-1]
+        by_value = by_tmp[:-1]
+        _dates_split = _dates.split('/by/')[0].split('/to/')
+        _dates_split = [dt.datetime.strptime(_datestring, '%Y%m%d') for _datestring in _dates_split]
+
+        date_list = []
+        start_date = _dates_split[0]
+        while start_date <= _dates_split[1]:
+            date_list.append(start_date.strftime("%Y%m%d"))
+            if by_unit == 'd':
+                start_date += dt.timedelta(days=int(by_value))
+            elif by_unit == 'm':
+                start_date += relativedelta(months=int(by_value))
+            elif by_unit == 'y':
+                start_date += relativedelta(years=int(by_value))
+    else:
+        date_list = csv_to_list(_dates)
+
+    return date_list
 
 def csv_to_list(_args, sep=','):
     """
@@ -140,6 +173,26 @@ def make_hc_datelist(fromdates, todates):
                              for d in range(hc_from_date.year, hc_to_date.year + 1)])
 
     return sorted(hc_date_list)
+
+def make_hc_datelist_new(refdates, fromdates, todates):
+    """
+    Generate hindcast dates from start dand end year
+    :param fromdates: start hindcast date
+    :param todates:  end hindcast date
+    :return: sorted hindcast list
+    """
+    hc_date_list = dict()
+    shc_date_list = dict()
+    alldates = []
+    for (hc_refdate, hc_from_date, hc_to_date) in zip(refdates, fromdates,todates):
+        dt_dates = [dt.datetime(d,hc_from_date.month,hc_from_date.day) \
+                             for d in range(hc_from_date.year, hc_to_date.year + 1)]
+        hc_date_list.update({hc_refdate: dt_dates})
+        shc_date_list.update({hc_refdate: [d.strftime('%Y%m%d') for d in dt_dates]})
+        alldates.append(dt_dates)
+
+
+    return hc_date_list, shc_date_list, [num for sublist in alldates for num in sublist]
 
 def make_dir(directory_name, verbose=False):
     """

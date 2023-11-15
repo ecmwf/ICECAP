@@ -7,18 +7,21 @@ Only tested with seasonal data so far
 import os
 import cdsapi
 import xarray as xr
+import numpy as np
 
 import utils
 import dataobjects
 
 
-def convert_step2time(_da_tmp):
+def convert_step2time(_da_tmp, offset_hour=0):
     """ Convert step variable in grib file from MARS to time
     :param _da_tmp: xarray dataset
+    :param offset_hour: correction factor, needed e.g. for seasonal data with step=24 hours
+    In those cases xarray will assign averaged sic conditions for day n to day n+1
     :return: xarray dataset with time variable
     """
     da_in_tmp = _da_tmp.copy()
-    da_in_tmp['step'] = da_in_tmp.step + da_in_tmp['starttime']
+    da_in_tmp['step'] = da_in_tmp.step + (da_in_tmp['starttime'] - np.timedelta64(offset_hour,'h'))
     da_in_tmp = da_in_tmp.rename({'step': 'time'})
 
     return da_in_tmp
@@ -30,7 +33,7 @@ class CdsRetrieval:
     @staticmethod
     def factory(kwargs):
         """return appropriate CDS retrieval  subclass"""
-        if kwargs['fcastobj'].fcsystem == 'long-range':
+        if kwargs['fcsystem'] == 'long-range':
             return _CdsSeasonalRetrieval(kwargs)
 
         raise NotImplementedError
@@ -38,9 +41,12 @@ class CdsRetrieval:
     def __init__(self, kwargs):
         self.kwargs = {}
         self.kwargs['format'] = 'grib'
-        self.kwargs['variable'] = 'sea_ice_cover'
+        if kwargs['exptype'] == 'INIT':
+            self.kwargs['variable'] = 'land_sea_mask'
+        else:
+            self.kwargs['variable'] = 'sea_ice_cover'
         self.kwargs['originating_centre'] = kwargs['origin']
-        self.kwargs['system'] = kwargs['fcastobj'].expname
+        self.kwargs['system'] = kwargs['expname']
         self.target = kwargs['tfile']
         self.data = None
 
@@ -87,9 +93,9 @@ class _CdsSeasonalRetrieval(CdsRetrieval):
         self.kwargs['month'] = kwargs['date'][4:6]
         self.kwargs['day'] = kwargs['date'][6:8]
 
-
         self.kwargs['leadtime_hour'] = [24*(n+1) for n in range(int(kwargs['ndays']))]
-
+        if kwargs['exptype'] == 'INIT':
+            self.kwargs['leadtime_hour'] = [0]
 
 class CdsData(dataobjects.ForecastObject):
     """ Class for CDS data for retrieval and processing """
@@ -97,24 +103,27 @@ class CdsData(dataobjects.ForecastObject):
     def __init__(self, conf, args):
         super().__init__(conf, args)
 
-        if args.startdate not in ['INIT', 'WIPE']:
+        if args.exptype not in ['WIPE']:
             self.cycle = self.init_cycle(self.startdate)
             self.fccachedir = self.init_cachedir()
             self.ldmean = False
             self.linterp = True
             self.periodic = True
+            self.lsm = True
 
             self.tmptargetfile = f'{conf.tmpdir}/{self.source}/{self.modelname}/' \
-                                 f'{args.expid}_{args.startdate}_{self.mode}/' \
+                                 f'{args.expid}_{args.startdate}_{args.exptype}_{self.mode}/' \
                                  f'tmp_{args.expid}_{args.startdate}_{self.mode}.grb'
             utils.make_dir(os.path.dirname(self.tmptargetfile))
 
             factory_args = dict(
-                date=self.startdate,
-                fcastobj=self.fcast,
+                date=args.startdate,
+                exptype=args.exptype,
+                fcsystem=self.fcsystem,
+                expname=self.expname,
                 tfile=self.tmptargetfile,
                 ndays=self.ndays,
-                origin=self.modelname
+                origin=self.modelname,
             )
 
             self.retrieval_request = CdsRetrieval.factory(factory_args)
@@ -130,11 +139,11 @@ class CdsData(dataobjects.ForecastObject):
 
         dates = [self.startdate]
         if self.mode == 'hc':
-            dates = self.fcast.shcdates
+            dates = self.shcdates
 
 
 
-        members = range(int(self.fcast.enssize))
+        members = range(int(self.enssize))
 
 
         files = [filename.format(date, member, self.params, self.grid)
@@ -148,6 +157,20 @@ class CdsData(dataobjects.ForecastObject):
 
         return files_list
 
+    def process_lsm(self, dryrun=False):
+        """
+        Retrieve land-sea-mask from tape if masking necessary for this dataset and save to disk
+        :param dryrun: only sho mars request
+        """
+        if self.lsm and not os.path.isfile(f'{self.fccachedir}/lsm.nc'):
+            self.retrieval_request.execute(dryrun=dryrun)
+            if not dryrun:
+                file = self.tmptargetfile
+                ds_in = xr.open_dataset(file, engine='cfgrib')
+                ds_lsm = xr.where(ds_in==0,0,1)
+                ds_lsm.to_netcdf(f'{self.fccachedir}/lsm.nc')
+                print(f'{self.fccachedir}/lsm.nc')
+
     def process(self):
         """Process retrieved CDS data and write to cache"""
 
@@ -156,8 +179,16 @@ class CdsData(dataobjects.ForecastObject):
 
             print(file)
             ds_in = xr.open_dataset(file, engine='cfgrib')
-
             da_in = ds_in[iname].rename(self.params)
+
+            # mask using the land-sea mask (if necessary for the respective dataset)
+            if self.lsm:
+                da_lsm = xr.open_dataarray(f'{self.fccachedir}/lsm.nc')
+                # drop coords not in dims as otherwise time is deleted from da_in after where command
+                da_lsm = da_lsm.drop([i for i in da_lsm.coords if i not in da_lsm.dims])
+                da_in = da_in.where(da_lsm == 0)
+                da_in = da_in.astype(dtype=da_in.dtype, order='C')
+
 
             is_number = 'number' in da_in.dims
             is_step = 'step' in da_in.dims
@@ -180,34 +211,28 @@ class CdsData(dataobjects.ForecastObject):
             if len(startdate) > 1:
                 raise ValueError(f'More than one startdate in file {file}')
             startdate = startdate[0]
-
-            # split into list of files with one starttime
-            files_pp = [da_in.sel(starttime=stime) for stime in da_in.starttime.values]
+            da_out = da_in.sel(starttime=startdate)
 
             # convert step to time
-            files_pp = [convert_step2time(file) for file in files_pp]
+            da_out = convert_step2time(da_out, offset_hour=12)
 
             if self.ldmean:
-                files_pp = [file.resample(time='1D').mean() for file in files_pp]
-
+                da_out = da_out.resample(time='1D').mean()
 
 
             if self.keep_native == "yes":
-                for da_out_save in files_pp:
-                    for number in da_out_save['number'].values:
-                        da_out_save = da_out_save.isel(time=slice(self.ndays))
-                        ofile = self._save_filename(date=startdate, number=number, grid='native')
-                        da_out_save.sel(number=number).to_netcdf(ofile)
-
-
-
-            if self.linterp:
-                files_pp_interp = [self.interpolate(file) for file in files_pp]
-                files_pp = files_pp_interp
-
-
-            for da_out_save in files_pp:
-                for number in da_out_save['number'].values:
-                    da_out_save = da_out_save.isel(time=slice(self.ndays))
-                    ofile = self._save_filename(date=startdate, number=number, grid=self.grid)
+                for number in da_out['number'].values:
+                    da_out_save = da_out.isel(time=slice(self.ndays))
+                    ofile = self._save_filename(date=startdate, number=number, grid='native')
                     da_out_save.sel(number=number).to_netcdf(ofile)
+
+
+            # save interpolated files if interpolation is necessary
+            for number in da_out['number'].values:
+                if self.linterp:
+                    da_out_save = self.interpolate(da_out.sel(number=number))
+                else:
+                    da_out_save = da_out.sel(number=number)
+
+                ofile = self._save_filename(date=startdate, number=number, grid=self.grid)
+                da_out_save.to_netcdf(ofile)

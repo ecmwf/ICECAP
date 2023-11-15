@@ -100,12 +100,14 @@ class DataObject:
 
         if self.regridder is None:
             utils.print_info('Computing weights')
+
             self.regridder = xe.Regridder(ds_raw.rename({'longitude': 'lon', 'latitude': 'lat'}),
                                           ds_ref.rename({'longitude': 'lon', 'latitude': 'lat'}),
-                                          "bilinear", periodic=self.periodic)
-
+                                          "bilinear", periodic=self.periodic,
+                                          unmapped_to_nan=True)
 
         ds_out = self.regridder(ds_raw.rename({'longitude': 'lon', 'latitude': 'lat'}))
+
 
         # make sure interpolated fields have same xc and yc values as ref
         ds_out['xc'] = ds_ref['xc'].values
@@ -142,28 +144,41 @@ class DataObject:
         raise f'Argument {args} not supported'
 
 class ForecastObject(DataObject):
-    """ Generic ForecastObject used for staging """
+    """ Generic ForecastObject used for staging
+    A ForecastObject holds the variables of one specific ForecastConfigObject
+    plus some more geenral config settings"""
 
     def __init__(self, conf, args):
+        """
+        :param conf: config object
+        :param args: expid (config entry after fc_),
+        startdate (loopvalue used internally to retrive efficiently)
+        """
         super().__init__(conf)
 
         self.machine = conf.machine
-        self.startdate = args.startdate
-        self.fcast = conf.fcsets[args.expid]
-        self.expname = self.fcast.expname
-        self.enssize = self.fcast.enssize
-        self.mode = self.fcast.mode
-        self.source = self.fcast.source
-        self.ndays = int(self.fcast.ndays)
-        self.modelname = self.fcast.modelname
+        self.loopvalue = args.startdate
+        self.startdate = args.startdate.split('-')[0]
 
 
-        self.fcsdates = self.fcast.salldates
+        fcast = conf.fcsets[args.expid]
+        self.fcsystem = fcast.fcsystem
+        self.expname = fcast.expname
+        self.enssize = fcast.enssize
+        self.mode = fcast.mode
+        self.source = fcast.source
+        self.ndays = int(fcast.ndays)
+        self.modelname = fcast.modelname
+
+
+        self.fcsdates = fcast.salldates
 
         if self.mode == 'hc':
-            self.refdate = utils.csv_to_list(self.fcast.hcrefdate)
+            self.shcdates = fcast.shcdates
+            self.refdate = fcast.shcrefdate
         else:
-            self.refdate = utils.csv_to_list(self.fcast.dates)
+            self.shcdates = None
+            self.refdate = fcast.sdates
 
     def create_folders(self):
         """ Create forecast directories in cachedir"""
@@ -202,7 +217,7 @@ class ForecastObject(DataObject):
 
         kwargs = {
             'source': self.source,
-            'fcsystem': self.fcast.fcsystem,
+            'fcsystem': self.fcsystem,
             'expname': self.expname,
             'modelname' : self.modelname,
             'mode' : self.mode,
@@ -218,7 +233,7 @@ class ForecastObject(DataObject):
 
         kwargs = {
             'cacherootdir': self.cacherootdir,
-            'fcsystem': self.fcast.fcsystem,
+            'fcsystem': self.fcsystem,
             'expname': self.expname,
             'source': self.source,
             'cycle' : self.cycle,
@@ -302,7 +317,8 @@ class ForecastConfigObject:
 
 
         if self.mode  == 'fc':
-            _dates_list = utils.csv_to_list(self.dates)
+            _dates_list = utils.retrievedates_to_list(self.dates)
+            #_dates_list = utils.csv_to_list(self.dates)
             self.dtdates = [dt.datetime.strptime(d, '%Y%m%d') for d in _dates_list]
             self.sdates = [d.strftime('%Y%m%d') for d in self.dtdates]
             self.dtalldates = utils.make_days_datelist(self.dtdates, self.ndays)
@@ -310,22 +326,23 @@ class ForecastConfigObject:
 
 
         elif self.mode == 'hc':
-            _dates_list_ref  = utils.csv_to_list(self.hcrefdate)
+            _dates_list_ref = utils.retrievedates_to_list(self.hcrefdate)
             self.dthcrefdate = [dt.datetime.strptime(d, '%Y%m%d') for d in _dates_list_ref]
             self.shcrefdate = [d.strftime('%Y%m%d') for d in self.dthcrefdate]
 
-
-            _dates_hc_from_list = utils.csv_to_list(self.hcfromdate)
+            _dates_hc_from_list = utils.retrievedates_to_list(self.hcfromdate)
             self.dthcfromdate = [dt.datetime.strptime(d, '%Y%m%d') for d in _dates_hc_from_list]
-            _dates_hc_to_list = utils.csv_to_list(self.hctodate)
+            _dates_hc_to_list = utils.retrievedates_to_list(self.hctodate)
             self.dthctodate = [dt.datetime.strptime(d, '%Y%m%d') for d in _dates_hc_to_list]
-
             self.hcdates = utils.make_hc_datelist(self.dthcfromdate, self.dthctodate)
-            self.shcdates = [d.strftime('%Y%m%d') for d in self.hcdates]
-            self.dtalldates = utils.make_days_datelist(self.hcdates, self.ndays)
+
+            self.shcrefdate_loop = [f'{self.shcrefdate[i]}-{i+1}' for i in range(len(self.shcrefdate))]
+            self.hcdates, self.shcdates, hcalldates = utils.make_hc_datelist_new(self.shcrefdate_loop, self.dthcfromdate, self.dthctodate)
+            self.dtalldates = utils.make_days_datelist(hcalldates, self.ndays)
 
         self.salldates = sorted(list(dict.fromkeys([d.strftime('%Y%m%d')
                                                     for d in self.dtalldates])))
+
 
 class PlotConfigObject:
     """A plot config object corresponds to a single numerical plotID (used in config.py)."""
@@ -356,3 +373,4 @@ class PlotConfigObject:
         self.points = kwargs['points']
         self.add_verdata = kwargs['add_verdata']
         self.modelname = kwargs['modelname']
+        self.area_mean = kwargs['area_mean']

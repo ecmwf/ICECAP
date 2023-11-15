@@ -25,8 +25,20 @@ class NerscData(dataobjects.ForecastObject):
             self.linterp = True
             self.periodic = False
 
-            self.root_server = "https://thredds.met.no/thredds/dodsC/metusers/arildb/ACCIBERGupdated/"
-            self.fileformat = f'{self.expname}''_mem{:03d}_b{}T00.ncml'
+
+            if self.expname == 'topaz4':
+                server_ext = 't42'
+                self.varname = 'fice'
+            elif self.expname == 'topaz5':
+                server_ext = 't5'
+                self.varname = 'siconc'
+            else:
+                raise ValueError(f'Retrieval for expname {self.expname} not implemented')
+
+            self.root_server = f"https://thredds.met.no/thredds/dodsC/acciberg{server_ext}/bulletins/"
+            # format is YYYY/MM/topaz?_mem???_bYYYY-MM-DDT00.ncml
+            self.fileformat = '{}/'f'{self.expname}''_mem{:03d}_b{}T00.ncml'
+
 
 
     def make_filelist(self):
@@ -35,18 +47,13 @@ class NerscData(dataobjects.ForecastObject):
         files = [filename.format(self.startdate, member, self.params, self.grid)
                  for member in range(self.enssize)]
         files_list = [self.fccachedir + '/' + file for file in files]
-        files_list = [self.fccachedir + '/' + file for file in files]
 
         return files_list
 
     def process(self):
         """ Download and stage data """
-
-        if self.expname not in ['topaz4']:
-            raise ValueError(f'Retrieval for expname {self.expname} not implemented')
-
-        startdatestring = utils.datetime_to_string(utils.string_to_datetime(self.startdate),'%Y-%m-%d')
-        iname = 'fice'
+        startdatedt = utils.string_to_datetime(self.startdate)
+        startdatestring = utils.datetime_to_string(startdatedt,'%Y-%m-%d')
 
         for member in range(self.enssize):
 
@@ -54,9 +61,11 @@ class NerscData(dataobjects.ForecastObject):
 
             if ofile in self.files_to_retrieve:
 
-                file_tmp = self.root_server+self.fileformat.format(member+1,startdatestring)
+                file_tmp = self.root_server+self.fileformat.format(startdatedt.strftime('%Y/%m'),
+                                                                   member+1,startdatestring)
+
                 ds_in = xr.open_dataset(file_tmp)
-                da_in = ds_in[iname].rename(self.params)
+                da_in = ds_in[self.varname].rename(self.params)
                 da_in = da_in.expand_dims({'number': [member]})
                 da_in = da_in.transpose('number','time', 'y', 'x')
 

@@ -19,7 +19,7 @@ if __name__ == '__main__':
     clargs.add_staging_expid(parser)
 
     clargs.add_staging_startdate(parser, allow_multiple=False)
-
+    clargs.add_staging_exptype(parser)
     clargs.add_verbose_option(parser)
 
     args = parser.parse_args()
@@ -28,9 +28,10 @@ if __name__ == '__main__':
 
     data = cds.CdsData(conf, args)
 
-    if args.startdate == 'INIT':
+    if args.exptype == 'INIT':
         data.create_folders()
-    elif args.startdate == 'WIPE':
+        data.process_lsm()
+    elif args.exptype == 'WIPE':
         data.remove_native_files()
     else:
 

@@ -10,6 +10,7 @@ addition of new metrics as easy as possible.
 import os.path
 import datetime as dt
 import xarray as xr
+import numpy as np
 
 
 import dataobjects
@@ -89,6 +90,8 @@ class BaseMetric(dataobjects.DataObject):
 
         self.add_verdata = conf.plotsets[name].add_verdata
 
+        self.area_mean = conf.plotsets[name].area_mean
+
 
 
     def _init_fc(self, name):
@@ -144,6 +147,11 @@ class BaseMetric(dataobjects.DataObject):
 
 
 
+    def _load_verif_dummy(self):
+        _filename = f'{self.obscachedir}/{self.verif_name}.nc'
+        da = xr.open_dataarray(_filename, chunks='auto')
+        da = da.expand_dims(dim={"member": 1, "date":1, "inidate":1})
+        return da
 
     def _load_verif(self, fcset):
         """ load verification data """
@@ -191,8 +199,6 @@ class BaseMetric(dataobjects.DataObject):
         _init_dim = xr.DataArray(_inits, dims='inidate', name='inidate')
         da_init = xr.concat(_all_list, dim=_init_dim)
 
-        # set nan values to zero in obs files
-        da_init = da_init.where(~da_init.isnull(), 0)
 
         return da_init
 
@@ -202,6 +208,8 @@ class BaseMetric(dataobjects.DataObject):
 
     def load_verif_data(self, name):
         """ load verification data """
+        if 'grid' in self.verif_name:
+            return self._load_verif_dummy()
         return self._load_verif(getattr(self,f'fc{name}sets'))
 
     def _load_forecasts(self, fcset, grid=None,):
@@ -226,12 +234,13 @@ class BaseMetric(dataobjects.DataObject):
 
                     _filename = f"{fcset[fcname]['cachedir']}/" \
                                 f"{filename.format(_date, _member, self.params,grid)}"
-                    #print(_filename)
+
                     _dtdate = [utils.string_to_datetime(_date)]
                     _dtseldates = utils.create_list_target_verif(self.target,_dtdate)
                     _seldates = [utils.datetime_to_string(dtdate) for dtdate in _dtseldates]
 
                     _da_file = self.load_data(_filename, _seldates)
+
                     _da_file = self.convert_time_to_lead(_da_file)
 
                     _da_ensmem_list.append(_da_file)
@@ -296,3 +305,64 @@ class BaseMetric(dataobjects.DataObject):
         else:
             _da_file = xr.open_dataarray(_file)
         return _da_file.sel(time=_da_file.time.dt.strftime("%Y%m%d").isin(_seldate))
+
+
+    def calc_area_statistics(self, datalist, minimum_value=0, statistic='mean'):
+        """
+        Calculate area statistics (mean/sum) for verif and fc using a combined land-sea-mask from both datasets
+        :param datalist: list of xarray objects for verif and fc
+        :param minimum_value: only count grid cells with sea-ice larger than this value
+        :param statistic: derive mean or sum
+        :return: list of xarray objects (verif and fc) for which statistic has been applied to
+        """
+        if len(datalist) > 2:
+            raise ValueError('Datalist can only be length of 2 (fc, verif)')
+        ds_mask = self._create_combined_mask(datalist[0],
+                                            datalist[1])
+        ds_mask.to_netcdf('lsm.nc')
+
+        datalist_mask = [d.where(ds_mask) for d in datalist]
+        datalist_mask = [xr.where(d>minimum_value,1,float("nan")) for d in datalist_mask]
+
+
+        if statistic == 'mean':
+            datalist_out = [d.mean(dim=('xc', 'yc'), skipna=True) for d in datalist_mask]
+        elif statistic == 'sum':
+            xdiff = np.unique(np.diff(datalist_mask[0]['xc'].values))
+            ydiff = np.unique(np.diff(datalist_mask[0]['yc'].values))
+            if len(xdiff) > 1 or len(ydiff) > 1:
+                raise ValueError('XC or YC coordinates are not evenly spaced')
+
+            xdiff = np.abs(xdiff[0] / 1000)
+            ydiff = np.abs(ydiff[0] / 1000)
+            cell_area = xdiff * ydiff
+            print(cell_area)
+
+            datalist_out = [d.sum(dim=('xc', 'yc'), skipna=True)*cell_area for d in datalist_mask]
+        else:
+            raise ValueError(f'statistic can be either mean or sum not {statistic}')
+
+
+
+        return datalist_out
+
+
+    @staticmethod
+    def _create_combined_mask(_ds_verif, _ds_fc):
+        """
+        Create a mask for cells which are set to NaN in verification or forecast data
+        :param _ds_verif: verification xarray dataarray
+        :param _ds_fc: forecast xarray dataarray
+        :return: combined mask as xarray (boolean array)
+        """
+
+
+        _ds_verif_tmp = xr.where(np.isnan(_ds_verif), 1, 0)
+        _ds_verif_mask = xr.where(_ds_verif_tmp.sum(dim='time') == 0, True, False)
+
+        _ds_fc_tmp = xr.where(np.isnan(_ds_fc), 1, 0)
+        _ds_fc_mask = xr.where(_ds_fc_tmp.sum(dim='time') == 0, True, False)
+
+        combined_mask = np.logical_and(_ds_verif_mask == 1, _ds_fc_mask == 1)
+
+        return combined_mask

@@ -131,8 +131,17 @@ class TsPlot(GenericPlot):
                     ax.scatter(_ds_file.time[pi], -15,
                                color=rgba_color, s=25, clip_on=False)
 
-        ax.legend(loc='lower right', ncol=1,
-                  bbox_to_anchor=(.95,.1)) #loc='lower left')
+        11
+
+        handles, labels = ax.get_legend_handles_labels()
+        handle_list, label_list = [], []
+        for handle, label in zip(handles, labels):
+            if label not in label_list:
+                handle_list.append(handle)
+                label_list.append(label)
+        plt.legend(handle_list, label_list)
+#        ax.legend(loc='lower right', ncol=1,
+#                  bbox_to_anchor=(.95,.1)) #loc='lower left')
         ax.set_ylabel('distance to ice edge [km]')
 
         ax.set_xlim([0, _ds_file.time.max() + 1])
@@ -235,6 +244,8 @@ class MapPlot(GenericPlot):
 
             for _step in _steps:
                 _data = _ds_file[_var].sel(time=_step)
+                if 'member' in _data.dims:
+                    _data = _data.mean(dim='member')
 
 
                 thisfig = plt.figure(figsize=(11.69, 8.27))  # A4 figure size

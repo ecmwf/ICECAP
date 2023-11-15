@@ -306,6 +306,7 @@ class ProcessTree(Tree):
 
         self.add_attr(['task:verdata_retrieve'], 'retrieval:verdata')
 
+
         if bool(conf.plotsets):
             self.add_attr(['trigger:retrieval==complete',
                            'trigger:plot != aborted;True'], 'plot')
@@ -330,10 +331,26 @@ class ProcessTree(Tree):
                                    'variable:DATES;WIPE',
                                    f'task:{conf.fcsets[expid].source}_retrieve'], f'clean:{expid}')
 
-                if conf.fcsets[expid].mode in ['fc']:
+                if conf.fcsets[expid].mode in ['fc'] and conf.fcsets[expid].source not in ['cds']:
                     self.add_attr(['variable:DATES;INIT',
                                    f'task:{conf.fcsets[expid].source}_retrieve'], f'retrieval:{expid}:init')
                     self.add_attr([f'repeat:DATES;{self.fcsets[expid].sdates}',
                                    f'task:{conf.fcsets[expid].source}_retrieve',
                                    'trigger:init==complete'],
                                   f'retrieval:{expid}:fc')
+
+                if conf.fcsets[expid].source in ['cds']:
+                    if conf.fcsets[expid].mode in ['hc']:
+                        loopdates = self.fcsets[expid].shcdates
+                    else:
+                        loopdates = self.fcsets[expid].sdates
+
+
+                    self.add_attr([f'variable:DATES;{loopdates[0]}',
+                                    'variable:TYPE;INIT',
+                                   f'task:{conf.fcsets[expid].source}_retrieve'], f'retrieval:{expid}:init')
+                    self.add_attr([f'repeat:DATES;{loopdates}',
+                                   'variable:TYPE;fc',
+                                   f'task:{conf.fcsets[expid].source}_retrieve',
+                                   'trigger:init==complete'],
+                                  f'retrieval:{expid}:{conf.fcsets[expid].mode}')

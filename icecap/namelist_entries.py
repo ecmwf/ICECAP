@@ -141,7 +141,7 @@ config_optnames = {
             'printname':'plot type',
             'optional' : False,
             'allowed_values' : ["interp_check","ensmean","bias","bias_corrected_map",
-                                "ice_distance"]
+                                "ice_distance", "area_mean_ts"]
         },
         'verif_mode':{
             'printname': 'forcast or hindcast mode for plotting',
@@ -244,5 +244,10 @@ config_optnames = {
             'printname':'model name (for S2S)',
             'optional' : ['verif_fcsystem:s2s', 'verif_fcsystem:long-range'],
         },
+        'area_mean' : {
+            'printname':'area average',
+            'optional' : True,
+            'allowed_values' : ["data", "score"]
+        }
     }
 }

@@ -31,9 +31,13 @@ if __name__ == '__main__':
 
     data = ecmwf.EcmwfData(conf, args)
 
-    if args.startdate == 'INIT':
+
+    if args.exptype == 'INIT':
         data.create_folders()
-    elif args.startdate == 'WIPE':
+        data.process_lsm()
+
+
+    elif args.exptype == 'WIPE':
         data.remove_native_files()
     else:
         if not data.check_cache(verbose=args.verbose):

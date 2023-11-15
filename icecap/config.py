@@ -134,6 +134,7 @@ class Configuration():
         self.add_verdata = None
         self.ofile = None
         self.modelname = None
+        self.area_mean = None
 
 
 
@@ -187,7 +188,7 @@ class Configuration():
             self._init_config(conf_parser, section, 'fc', init=True)
 
             # check if hcrefdate given for mode='hc' and machine='ecmwf'
-            if self.hcrefdate is None and self.machine in ['ecmwf'] and self.mode in ['hc']:
+            if self.hcrefdate is None and self.source in ['ecmwf'] and self.mode in ['hc']:
                 raise ValueError('hcrefdate needs to be defined for hindcast mode on ecmwf')
 
             if self.source is None:
@@ -260,8 +261,10 @@ class Configuration():
                 ofile=self.ofile,
                 add_verdata=self.add_verdata,
                 points=self.points,
-                modelname=self.modelname
+                modelname=self.modelname,
+                area_mean = self.area_mean
                 )
+
 
 
     def __str__(self):

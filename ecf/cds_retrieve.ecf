@@ -5,6 +5,6 @@ source ./load_modules python3
 
 cd %PYDIR%
 
-python3 cds_get.py %EXPID% %DATES%
+python3 cds_get.py %EXPID% %DATES% %TYPE%
 
 %include <tail.h>
