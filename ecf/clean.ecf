@@ -1,7 +1,6 @@
 %include <head.h>
 
 cd %PYDIR%
-
-$ECF_PYTHON cds_get.py %EXPID% %DATES% %TYPE%
+$ECF_PYTHON clean.py
 
 %include <tail.h>

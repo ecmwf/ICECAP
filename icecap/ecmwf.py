@@ -277,6 +277,7 @@ class EcmwfData(dataobjects.ForecastObject):
     def __init__(self, conf, args):
         super().__init__(conf, args)
 
+
         if args.exptype not in ['WIPE']:
             self.type = args.exptype
             self.ldmean = False
@@ -298,6 +299,8 @@ class EcmwfData(dataobjects.ForecastObject):
             self.cycle = self.init_cycle(self.startdate)
             self.fccachedir = self.init_cachedir()
 
+
+
             if self.fcsystem in ['medium-range']:
                 retrieval_grid = 'F640'
             elif self.fcsystem in ['extended-range', 'long-range']:
@@ -316,6 +319,16 @@ class EcmwfData(dataobjects.ForecastObject):
 
             if self.type == 'INIT':
                 self.tmptargetfile += '.grb'
+                cycles_alldates = [self.init_cycle(d) for d in self.sdates]
+                cycles = list(dict.fromkeys(cycles_alldates))
+                cycle_firstdate = [self.sdates[cycles_alldates.index(_cycle)] for _cycle in cycles]
+                cycle_info = [f'{cycles[i]}:{cycle_firstdate[i]}' for i in range(len(cycles))]
+                if len(cycles) > 1:
+                    raise ValueError(f'Retrieval of forceast data from different model cycles in one config'
+                                     f'section not possible --> please create one [fc_expID] entry for '
+                                     f' forecast data from each cycle. First dates of cycles in your selection are '
+                                     f'{"/ ".join(cycle_info)}')
+
             else:
                 if self.mode == 'hc':
                     if self.type == 'pf':

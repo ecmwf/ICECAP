@@ -1,6 +1,9 @@
 """Module containing verification classes"""
 
+import datetime as dt
 import xarray as xr
+from dateutil.relativedelta import relativedelta
+import numpy as np
 
 import dataobjects
 import utils
@@ -40,7 +43,15 @@ class VerifyingData(dataobjects.DataObject):
     """ Verification parent class object """
     def __init__(self, conf):
         super().__init__(conf)
-        self.loop_dates = self.salldates
+        # there is a 16 day delay for osi data, so retrieval of dates after 16 days before today are removed from list
+        dt_loopdates = np.asarray([utils.string_to_datetime(_date) for _date in self.salldates])
+        last_date = utils.datetime_to_string(dt.datetime.now() -  relativedelta(days=int(16)))
+        last_date = utils.string_to_datetime(last_date)
+        mask = dt_loopdates <= last_date
+        dt_loopdates = dt_loopdates[mask].tolist()
+        self.loopdates = [utils.datetime_to_string(_date) for _date in dt_loopdates]
+
+
 
 
 
@@ -72,13 +83,13 @@ class _OSIThreddsRetrieval(VerifyingData):
             self.fileext = [self.fileext, "1200.nc"]
 
         if self.verif_name == 'osi-401-b-grid':
-            self.loop_dates = ['20171130']
+            self.loopdates = ['20171130']
             self.server = [self.root_server + "ice/conc/"]
             self.filebase = ["ice_conc_nh_polstere-100_multi_"]
             self.fileext = ["1200.nc"]
 
         if self.verif_name == 'osi-cdr-grid':
-            self.loop_dates = ['20171130']
+            self.loopdates = ['20171130']
             self.server = [self.root_server + "reprocessed/ice/conc_450a_files/"]
             self.filebase = ["ice_conc_nh_ease2-250_cdr-v3p0_"]
             self.fileext = ["1200.nc"]
@@ -91,8 +102,8 @@ class _OSIThreddsRetrieval(VerifyingData):
             files = [f'{self.obscachedir}/{self.verif_name}.nc']
         else:
             filename = self._filenaming_convention('verif')
-            files = [self.obscachedir+'/'+filename.format(date, self.params)
-                     for date in self.loop_dates]
+            files = [self.obscachedir +'/' + filename.format(date, self.params)
+                     for date in self.loopdates]
         return files
 
     def process(self, verbose):
@@ -103,7 +114,7 @@ class _OSIThreddsRetrieval(VerifyingData):
         filename = self._filenaming_convention('verif')
         utils.make_dir(self.obscachedir)
 
-        for _date in self.loop_dates:
+        for _date in self.loopdates:
             _ofile = f'{self.obscachedir}/{filename.format(_date, self.params)}'
 
             if 'grid' in self.verif_name:

@@ -171,7 +171,7 @@ class ForecastObject(DataObject):
         self.modelname = fcast.modelname
 
 
-        self.fcsdates = fcast.salldates
+        self.sdates = fcast.sdates
 
         if self.mode == 'hc':
             self.shcdates = fcast.shcdates
@@ -196,7 +196,7 @@ class ForecastObject(DataObject):
     def remove_native_files(self):
         """ Remove native grid files after interpolation checks"""
         if self.keep_native:
-            utils.print_info('SRemoving native grid files')
+            utils.print_info('Removing native grid files')
             file_list = []
             for date in self.refdate:
                 self.cycle = self.init_cycle(date)
@@ -314,34 +314,83 @@ class ForecastConfigObject:
         self.ndays = kwargs['ndays']
         self.source = kwargs['source']
         self.modelname = kwargs['modelname']
+        self.fromyear = kwargs['fromyear']
+        self.toyear = kwargs['toyear']
 
+        _dates_list = utils.confdates_to_list(self.dates)
 
-        if self.mode  == 'fc':
-            _dates_list = utils.retrievedates_to_list(self.dates)
-            #_dates_list = utils.csv_to_list(self.dates)
-            self.dtdates = [dt.datetime.strptime(d, '%Y%m%d') for d in _dates_list]
-            self.sdates = [d.strftime('%Y%m%d') for d in self.dtdates]
-            self.dtalldates = utils.make_days_datelist(self.dtdates, self.ndays)
+        # dates are given as YYYYMMDD
+        if len(_dates_list[0]) == 8:
+            self.sdates = _dates_list
+            self.dtdates = [utils.string_to_datetime(d) for d in self.sdates ]
 
+        # for hindcast mode dates need to be given in MMDD format
+        # for hc we need hc reference dates as well as
+        # a loop variable, as the reference date might be equivalent for different forecasts dates, e.g. for S2S
+        if self.mode == 'hc':
+            if len(_dates_list[0]) != 4:
+                raise ValueError('Dates need to be spcified in MMDD format together '
+                                 'with fromyear and toyear if mode = hc')
 
+            _dates_list_ref = utils.confdates_to_list(self.hcrefdate)
+            if len(_dates_list_ref[0]) != 8:
+                raise ValueError('hcrefdate needs to be in the format YYYYMMDD')
+            if len(_dates_list_ref) == 1:
+                _dates_list_ref = [_dates_list_ref[0] for _d in range(len(self.dates))]
+            elif len(_dates_list_ref) != len(_dates_list):
+                raise ValueError('hcrefdate must have length 1 or the same length '
+                                 'as dates')
 
-        elif self.mode == 'hc':
-            _dates_list_ref = utils.retrievedates_to_list(self.hcrefdate)
             self.dthcrefdate = [dt.datetime.strptime(d, '%Y%m%d') for d in _dates_list_ref]
             self.shcrefdate = [d.strftime('%Y%m%d') for d in self.dthcrefdate]
+            self.shcrefdate_loop = [f'{self.shcrefdate[i]}-{i + 1}'
+                                    for i in range(len(self.shcrefdate))]
 
-            _dates_hc_from_list = utils.retrievedates_to_list(self.hcfromdate)
-            self.dthcfromdate = [dt.datetime.strptime(d, '%Y%m%d') for d in _dates_hc_from_list]
-            _dates_hc_to_list = utils.retrievedates_to_list(self.hctodate)
-            self.dthctodate = [dt.datetime.strptime(d, '%Y%m%d') for d in _dates_hc_to_list]
-            self.hcdates = utils.make_hc_datelist(self.dthcfromdate, self.dthctodate)
+        # dates given in MMDD format + fromyear/toyear
+        if len(_dates_list[0]) == 4:
+            if not self.fromyear or not self.toyear:
+                raise ValueError('fromyear and toyear need to be specified if date is given as MMDD')
 
-            self.shcrefdate_loop = [f'{self.shcrefdate[i]}-{i+1}' for i in range(len(self.shcrefdate))]
-            self.hcdates, self.shcdates, hcalldates = utils.make_hc_datelist_new(self.shcrefdate_loop, self.dthcfromdate, self.dthctodate)
-            self.dtalldates = utils.make_days_datelist(hcalldates, self.ndays)
+            # for hindcast mode wen need to store hindcast dates as dt and string dictionaries
+            # this is as the keys of these dictionary are defined bu the loopvariable created earlier
+            if self.mode == 'hc':
+                hc_date_dict = {}
+                shc_date_dict = {}
 
+            _dates_list_yyyymmdd = []
+            for di, date in enumerate(_dates_list):
+                _dates_tmp = [f'{_year}{date}' for _year in range(int(getattr(self, f'fromyear')),
+                                                                  int(getattr(self, f'toyear')) + 1)]
+
+                # remove dates which are not defined, e.g. 29.2 for non-leap years
+                _dates = []
+                for d in _dates_tmp:
+                    try:
+                        _dates.append(dt.datetime.strptime(d, '%Y%m%d'))
+                    except:
+                        pass
+                if _dates:
+                    _dates_list_yyyymmdd += _dates
+                    if self.mode == 'hc':
+                        hc_date_dict[self.shcrefdate_loop[di]] = _dates
+                        shc_date_dict[self.shcrefdate_loop[di]] = [d.strftime('%Y%m%d') for d in _dates]
+
+                else:
+                    utils.print_info(f'No forecasts for Date {date}')
+
+            self.dtdates = _dates_list_yyyymmdd
+            self.sdates = [d.strftime('%Y%m%d') for d in self.dtdates]
+
+            if self.mode == 'hc':
+                self.hcdates = hc_date_dict
+                self.shcdates = shc_date_dict
+
+        # all forecast days calculated from init-day + ndays parameter
+        self.dtalldates = utils.make_days_datelist(self.dtdates, self.ndays)
         self.salldates = sorted(list(dict.fromkeys([d.strftime('%Y%m%d')
                                                     for d in self.dtalldates])))
+
+
 
 
 class PlotConfigObject:

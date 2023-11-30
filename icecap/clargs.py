@@ -37,7 +37,7 @@ def add_plot_config_option(parser):
 def add_config_option(parser):
     """Add to parser an option to specify config file."""
     parser.add_argument('-c', '--configfile',
-                        default=['icecap.conf'],
+                        default='icecap.conf',
                         help='configuration file to use')
 
 def add_verbose_option(parser):

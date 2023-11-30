@@ -5,6 +5,7 @@
 #SBATCH --output=%ECF_JOBOUT%
 #SBATCH --error=%ECF_JOBOUT%
 
+
 # Define an error handler
 ERROR() {
    # clear -x flag, we do not echo script lines from in here
@@ -51,6 +52,11 @@ export ECF_TRYNO=%ECF_TRYNO%  # Current try number of the task
 export ECF_RID=${SLURM_JOB_ID:-$$}
 
 module load ecflow/%ECF_VERSION%
+
+cd %ETCDIR%
+source ./load_modules python3
+export ECF_PYTHON=python3
+
 
 # Tell ecFlow we have started
 ecflow_client --init=$ECF_RID

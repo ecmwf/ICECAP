@@ -4,6 +4,7 @@ which is later translated into an ecflow suiate or batch mode """
 from collections import OrderedDict
 import json
 import os
+import subprocess
 import ecflow
 import utils
 
@@ -97,10 +98,13 @@ class Tree:
                 if sort_family in out_dict:
                     dict_tmp = OrderedDict(out_dict[sort_family])
                     retrieval_families = sorted(list(dict_tmp.keys()))
+
                     for family in retrieval_families:
                         dict_tmp.move_to_end(family, last=True)
                     if 'verdata' in retrieval_families:
                         dict_tmp.move_to_end('verdata', last=False)
+                    if 'clean' in retrieval_families:
+                        dict_tmp.move_to_end('clean', last=False)
                     out_dict[sort_family] = dict_tmp
 
 
@@ -141,6 +145,7 @@ class Tree:
         toplevel_s.add_limit('proc', 8)  # limit total number of active tasks
 
         # add suite variables
+        suite_f.add_variable('ECF_PYTHON', subprocess.check_output('which python3', shell=True).strip())
         suite_f.add_variable('ECF_INCLUDE', self.ecfincdir)
         suite_f.add_variable('ECF_FILES', self.ecffilesdir)
         suite_f.add_variable('ECF_HOME', self.ecfhomedir)
@@ -301,9 +306,7 @@ class ProcessTree(Tree):
     def __init__(self, conf):
         super().__init__(conf)
         # here the next steps which are independent from machines will be listed
-        # metrics_f.add_part_trigger('maps != aborted', True)
         self.add_attr(['trigger:retrieval != aborted'], 'retrieval')
-
         self.add_attr(['task:verdata_retrieve'], 'retrieval:verdata')
 
 
@@ -314,12 +317,17 @@ class ProcessTree(Tree):
             self.add_attr(['task:plot',
                            f'variable:PLOTTYPE;{plotid}'], f'plot:{plotid}')
 
-
+        finish_trigger = 'retrieval'
         if conf.keep_native == 'yes':
+            clean_trigger = 'retrieval'
+            finish_trigger = 'clean'
             if bool(conf.plotsets):
-                self.add_attr(['trigger:plot==complete'], 'clean')
-            else:
-                self.add_attr(['trigger:retrieval==complete'], 'clean')
+                clean_trigger = 'plot'
+            self.add_attr([f'trigger:{clean_trigger}==complete'], 'clean')
+
+
+        self.add_attr([f'trigger:{finish_trigger}==complete','task:clean'], 'finish')
+
 
         for expid in conf.fcsets.keys():
             if conf.fcsets[expid].source != self.machine:
@@ -331,15 +339,15 @@ class ProcessTree(Tree):
                                    'variable:DATES;WIPE',
                                    f'task:{conf.fcsets[expid].source}_retrieve'], f'clean:{expid}')
 
-                if conf.fcsets[expid].mode in ['fc'] and conf.fcsets[expid].source not in ['cds']:
+                if conf.fcsets[expid].source in ['nersc_tmp']:
                     self.add_attr(['variable:DATES;INIT',
                                    f'task:{conf.fcsets[expid].source}_retrieve'], f'retrieval:{expid}:init')
                     self.add_attr([f'repeat:DATES;{self.fcsets[expid].sdates}',
                                    f'task:{conf.fcsets[expid].source}_retrieve',
                                    'trigger:init==complete'],
-                                  f'retrieval:{expid}:fc')
+                                  f'retrieval:{expid}:{conf.fcsets[expid].mode}')
 
-                if conf.fcsets[expid].source in ['cds']:
+                elif conf.fcsets[expid].source in ['cds']:
                     if conf.fcsets[expid].mode in ['hc']:
                         loopdates = self.fcsets[expid].shcdates
                     else:
@@ -354,3 +362,5 @@ class ProcessTree(Tree):
                                    f'task:{conf.fcsets[expid].source}_retrieve',
                                    'trigger:init==complete'],
                                   f'retrieval:{expid}:{conf.fcsets[expid].mode}')
+                else:
+                    raise ValueError(f'Retrieval for {conf.fcsets[expid].source} not implemented')

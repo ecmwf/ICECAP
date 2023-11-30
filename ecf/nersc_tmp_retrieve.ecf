@@ -1,10 +1,7 @@
 %include <head.h>
 
-cd %ETCDIR%
-source ./load_modules python3
-
 cd %PYDIR%
 
-python3 nersc_tmp_get.py %EXPID% %DATES%
+$ECF_PYTHON nersc_tmp_get.py %EXPID% %DATES%
 
 %include <tail.h>

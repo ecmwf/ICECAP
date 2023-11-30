@@ -1,9 +1,6 @@
 %include <head.h>
 
-cd %ETCDIR%
-source ./load_modules python3
-
 cd %PYDIR%
-python3 plot.py %PLOTTYPE%
+$ECF_PYTHON plot.py %PLOTTYPE%
 
 %include <tail.h>

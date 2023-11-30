@@ -5,12 +5,33 @@ import datetime as dt
 import numpy as np
 from dateutil.relativedelta import relativedelta
 
-def plotdates_to_list(_dates):
+def confdates_to_list(_dates):
     """ Convert dates for plotting in config to list
     :param _dates: dates from config
     :return: dates as list
     """
-    if "/to/" in _dates:
+
+    if '/to/' not in _dates:
+        return csv_to_list(_dates)
+
+    if "/by/" in _dates:
+        by_tmp = _dates.split('/by/')[1]
+        by_unit = by_tmp[-1]
+        by_value = by_tmp[:-1]
+        _dates = _dates.split('/by/')[0]
+    else:
+        raise ValueError('by needs to be specified')
+
+
+    _dates_split = _dates.split('/to/')
+
+    _dates_split_len = list({len(d) for d in _dates.split('/to/')})
+    if len(_dates_split_len) != 1:
+        raise ValueError(f'LENGTH ERROR {_dates_split_len} Date config entry is not in right format '
+                         f'(either MM/DD or YYYY/MM/DD')
+
+
+    if _dates_split_len[0] == 4:
         _dates_split = ['2000' + _date for _date in _dates.split('/to/')]
         _dates_split = [dt.datetime.strptime(_datestring, '%Y%m%d') for _datestring in _dates_split]
 
@@ -18,11 +39,30 @@ def plotdates_to_list(_dates):
         start_date = _dates_split[0]
         while start_date <= _dates_split[1]:
             date_list.append(start_date.strftime("%Y%m%d").replace('2000', ''))
-            start_date += dt.timedelta(days=1)
+            if by_unit == 'd':
+                start_date += dt.timedelta(days=int(by_value))
+            elif by_unit == 'm':
+                start_date += relativedelta(months=int(by_value))
+            elif by_unit == 'y':
+                start_date += relativedelta(years=int(by_value))
 
-        return date_list
+    elif _dates_split_len[0] == 8:
+        date_list = []
+        start_date = dt.datetime.strptime(str(_dates_split[0]), '%Y%m%d')
+        while start_date <= dt.datetime.strptime(str(_dates_split[1]), '%Y%m%d'):
+            date_list.append(start_date.strftime("%Y%m%d"))
+            if by_unit == 'd':
+                start_date += dt.timedelta(days=int(by_value))
+            elif by_unit == 'm':
+                start_date += relativedelta(months=int(by_value))
+            elif by_unit == 'y':
+                start_date += relativedelta(years=int(by_value))
+    else:
+        raise ValueError(f'Date config entry is not in right format '
+                         f'(either MM/DD or YYYY/MM/DD')
 
-    return csv_to_list(_dates)
+    return date_list
+
 
 def to_datetime(date):
     """ https://gist.github.com/blaylockbk/1677b446bc741ee2db3e943ab7e4cabd?permalink_comment_id=3775327
@@ -61,38 +101,6 @@ def datetime_to_string(_dtdate, formatting='%Y%m%d'):
     """
 
     return _dtdate.strftime(formatting)
-
-def retrievedates_to_list(_dates):
-    """ Convert dates in config into list
-    :param _dates: either one string separated by /to/ (and optinally /by/) or
-    a string with dates separated by comma
-    :return:
-    """
-
-    if "/to/" in _dates:
-        if not "/by/" in _dates:
-            raise ValueError('/by/ needs to be defined if /to/ is used in dates')
-
-        by_tmp = _dates.split('/by/')[1]
-        by_unit = by_tmp[-1]
-        by_value = by_tmp[:-1]
-        _dates_split = _dates.split('/by/')[0].split('/to/')
-        _dates_split = [dt.datetime.strptime(_datestring, '%Y%m%d') for _datestring in _dates_split]
-
-        date_list = []
-        start_date = _dates_split[0]
-        while start_date <= _dates_split[1]:
-            date_list.append(start_date.strftime("%Y%m%d"))
-            if by_unit == 'd':
-                start_date += dt.timedelta(days=int(by_value))
-            elif by_unit == 'm':
-                start_date += relativedelta(months=int(by_value))
-            elif by_unit == 'y':
-                start_date += relativedelta(years=int(by_value))
-    else:
-        date_list = csv_to_list(_dates)
-
-    return date_list
 
 def csv_to_list(_args, sep=','):
     """
@@ -181,18 +189,18 @@ def make_hc_datelist_new(refdates, fromdates, todates):
     :param todates:  end hindcast date
     :return: sorted hindcast list
     """
-    hc_date_list = dict()
-    shc_date_list = dict()
+    hc_date_dict = {}
+    shc_date_dict = {}
     alldates = []
     for (hc_refdate, hc_from_date, hc_to_date) in zip(refdates, fromdates,todates):
         dt_dates = [dt.datetime(d,hc_from_date.month,hc_from_date.day) \
                              for d in range(hc_from_date.year, hc_to_date.year + 1)]
-        hc_date_list.update({hc_refdate: dt_dates})
-        shc_date_list.update({hc_refdate: [d.strftime('%Y%m%d') for d in dt_dates]})
+        hc_date_dict.update({hc_refdate: dt_dates})
+        shc_date_dict.update({hc_refdate: [d.strftime('%Y%m%d') for d in dt_dates]})
         alldates.append(dt_dates)
 
 
-    return hc_date_list, shc_date_list, [num for sublist in alldates for num in sublist]
+    return hc_date_dict, shc_date_dict, [num for sublist in alldates for num in sublist]
 
 def make_dir(directory_name, verbose=False):
     """

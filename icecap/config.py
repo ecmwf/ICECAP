@@ -105,6 +105,8 @@ class Configuration():
         self.ndays = None
         self.source = None
         self.modelname = None
+        self.fromyear = None
+        self.toyear = None
 
         # the following attributes are only temporally allocated
         # but later saved for each plotID in the config file
@@ -140,11 +142,10 @@ class Configuration():
 
 
         conf_parser = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
-        self.filename = file
 
-        for filename in self.filename:
-            if not os.path.isfile(filename):
-                raise RuntimeError(f'Configuration file {self.filename} not found.')
+        self.filename = file
+        if not os.path.isfile(self.filename):
+            raise RuntimeError(f'Configuration file {self.filename} not found.')
         conf_parser.read(self.filename)
 
         # attributes to beways initialized irrespective of environment or ecflow setting
@@ -206,7 +207,9 @@ class Configuration():
                 ref = self.ref,
                 ndays = int(self.ndays),
                 source = self.source,
-                modelname = self.modelname
+                modelname = self.modelname,
+                fromyear = self.fromyear,
+                toyear = self.toyear
             )
 
         # check for 'ref' keyword

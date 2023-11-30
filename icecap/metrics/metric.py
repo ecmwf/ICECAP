@@ -35,22 +35,20 @@ class BaseMetric(dataobjects.DataObject):
 
         self.verif_fcsystem = utils.csv_to_list(conf.plotsets[name].verif_fcsystem)
         self.verif_source = utils.csv_to_list(conf.plotsets[name].verif_source)
-        self.verif_dates = utils.plotdates_to_list(conf.plotsets[name].verif_dates)
+        self.verif_dates = utils.confdates_to_list(conf.plotsets[name].verif_dates)
         self.conf_verif_dates = conf.plotsets[name].verif_dates
         self.verif_fromyear = conf.plotsets[name].verif_fromyear
         self.verif_toyear = conf.plotsets[name].verif_toyear
-        self.verif_refyear = conf.plotsets[name].verif_refdate
-
-
-
-
+        self.verif_refdate = utils.confdates_to_list(conf.plotsets[name].verif_refdate)
 
         self.verif_enssize = utils.csv_to_list(conf.plotsets[name].verif_enssize)
-        if len(self.verif_enssize) == 1:
-            self.verif_enssize = [self.verif_enssize[0] for n in range(len(self.verif_dates))]
-        elif len(self.verif_enssize) != len(self.verif_dates):
-            raise ValueError('enssize can be either length 1 (all dates/systems with same ensemble size)'
-                             'or must have the same length as dates')
+        #if len(self.verif_enssize) == 1:
+        #    self.verif_enssize = [self.verif_enssize[0] for n in range(len(self.verif_dates))]
+        if len(self.verif_enssize) != 1:
+            raise ValueError('enssize can be either length 1 (all dates/systems with same ensemble size)')
+        #elif len(self.verif_enssize) != len(self.verif_dates):
+        #    raise ValueError('enssize can be either length 1 (all dates/systems with same ensemble size)'
+        #                     'or must have the same length as dates')
 
 
         # initialize calibration forecasts
@@ -62,11 +60,11 @@ class BaseMetric(dataobjects.DataObject):
             self.calib_mode = utils.csv_to_list(conf.plotsets[name].calib_mode)
             self.calib_source = self.verif_source
             self.calib_fcsystem = self.verif_fcsystem
-            self.calib_dates = utils.plotdates_to_list(conf.plotsets[name].calib_dates)
+            self.calib_dates = utils.confdates_to_list(conf.plotsets[name].calib_dates)
             self.conf_calib_dates = conf.plotsets[name].calib_dates
             self.calib_fromyear = conf.plotsets[name].calib_fromyear
             self.calib_toyear = conf.plotsets[name].calib_toyear
-            self.calib_refyear = conf.plotsets[name].calib_refdate
+            self.calib_refdate = utils.confdates_to_list(conf.plotsets[name].calib_refdate)
             self.calib_enssize = utils.csv_to_list(conf.plotsets[name].calib_enssize)
             self.fccalibsets = self._init_fc(name='calib')
 
@@ -92,161 +90,169 @@ class BaseMetric(dataobjects.DataObject):
 
         self.area_mean = conf.plotsets[name].area_mean
 
-
-
     def _init_fc(self, name):
         """ Initialize forecast sets either for calibration or verification data
-        :param name: eitehr verif or calib
+        :param name: either verif or calib
         :return: dictionary with entries related to forecasts
         """
         fcsets = {}
-        for ifc, date in enumerate(getattr(self,f'{name}_dates')):
+        #if 'hc' in getattr(self,f'{name}_mode'):
+        #    raise ValueError('hc not implemented in _init_fc')
+
+        # first option: dates are given as YYYYMMDD so we can put them all in one forecast set
+        if len(getattr(self,f'{name}_dates')[0]) == 8:
+            date = 'all'
             fcsets[date] = {}
-            _dtfromdate = [dt.datetime.strptime(getattr(self,f'{name}_fromyear') +
-                                               date, '%Y%m%d')]
-            _dttodate = [dt.datetime.strptime(getattr(self,f'{name}_toyear') + date, '%Y%m%d')]
-            _dates = utils.make_hc_datelist(_dtfromdate, _dttodate)
+            fcsets[date]['sdates'] = getattr(self,f'{name}_dates')
 
-            fcsets[date]['sdates'] = [d.strftime('%Y%m%d') for d in _dates]
-
-            cycledate = getattr(self,f'{name}_fromyear') + date
-
-            # for hc refdate can be either a YYYY string or YYYYMMDD string
-            # for the former add MMDD from date variable
-            if 'hc' in getattr(self,f'{name}_mode'):
-                cycledate = getattr(self,f'{name}_refyear')
-                if len(cycledate) == 4:
-                    cycledate += date
-
-
+            # get cycle information for all dates
             kwargs = {
-                'source': getattr(self,f'{name}_source')[0],
-                'fcsystem': getattr(self,f'{name}_fcsystem')[0],
-                'expname': getattr(self,f'{name}_expname')[0],
-                'modelname': getattr(self,f'{name}_modelname')[0],
-                'mode': getattr(self,f'{name}_mode')[0],
-                'thisdate': cycledate
+                'source': getattr(self, f'{name}_source')[0],
+                'fcsystem': getattr(self, f'{name}_fcsystem')[0],
+                'expname': getattr(self, f'{name}_expname')[0],
+                'modelname': getattr(self, f'{name}_modelname')[0],
+                'mode': getattr(self, f'{name}_mode')[0]
             }
-            cycle = forecast_info.get_cycle(**kwargs)
+            _cycles = [forecast_info.get_cycle(**kwargs, thisdate=_date) for _date in fcsets[date]['sdates']]
+            if len(set(_cycles)) != 1:
+                raise ValueError('Forecast dates are pooled from different model cycles')
 
             kwargs = {
                 'cacherootdir': self.cacherootdir,
-                'fcsystem': getattr(self,f'{name}_fcsystem')[0],
-                'expname': getattr(self,f'{name}_expname')[0],
-                'refdate': date,
-                'source': getattr(self,f'{name}_source')[0],
-                'mode': getattr(self,f'{name}_mode')[0],
+                'fcsystem': getattr(self, f'{name}_fcsystem')[0],
+                'expname': getattr(self, f'{name}_expname')[0],
+                'source': getattr(self, f'{name}_source')[0],
+                'mode': getattr(self, f'{name}_mode')[0],
                 'modelname': getattr(self, f'{name}_modelname')[0],
-                'cycle': cycle
+                'cycle': _cycles[0]
             }
 
             fcsets[date]['cachedir'] = dataobjects.define_fccachedir(**kwargs)
-            fcsets[date]['enssize'] = getattr(self,f'{name}_enssize')[ifc]
+            fcsets[date]['enssize'] = getattr(self, f'{name}_enssize')[0]
+
+
+        # second option: dates are given as MMDD and fromyear toyear is given so we construct all dates here
+        # and have one forecast set for each initialization date MM/DD
+        else:
+            for date in getattr(self,f'{name}_dates'):
+
+                _dates_tmp = [f'{_year}{date}' for _year in range(int(getattr(self,f'{name}_fromyear')),
+                                                        int(getattr(self,f'{name}_toyear')) + 1)]
+
+                # remove dates which are not defined, e.g. 29.2 for non-leap years
+                _dates = []
+                for d in _dates_tmp:
+                    try:
+                        _dates.append(dt.datetime.strptime(d, '%Y%m%d'))
+                    except:
+                        pass
+                if _dates:
+                    fcsets[date] = {}
+                else:
+                    utils.print_info(f'No forecasts for Date {date}')
+
+                fcsets[date]['sdates'] = [d.strftime('%Y%m%d') for d in _dates]
+
+                # get cycle information for all dates
+                kwargs = {
+                    'source': getattr(self, f'{name}_source')[0],
+                    'fcsystem': getattr(self, f'{name}_fcsystem')[0],
+                    'expname': getattr(self, f'{name}_expname')[0],
+                    'modelname': getattr(self, f'{name}_modelname')[0],
+                    'mode': getattr(self, f'{name}_mode')[0]
+                }
+                if 'fc' in getattr(self,f'{name}_mode'):
+                    _cycles = [forecast_info.get_cycle(**kwargs, thisdate=_date) for _date in fcsets[date]['sdates']]
+                elif 'hc' in getattr(self,f'{name}_mode'):
+                    _refdates = getattr(self, f'{name}_refdate')
+                    _cycles = [forecast_info.get_cycle(**kwargs, thisdate=_date) for _date in _refdates]
+
+                if len(set(_cycles)) != 1:
+                    raise ValueError('Forecast dates are pooled from different model cycles')
+
+                kwargs = {
+                    'cacherootdir': self.cacherootdir,
+                    'fcsystem': getattr(self, f'{name}_fcsystem')[0],
+                    'expname': getattr(self, f'{name}_expname')[0],
+                    'source': getattr(self, f'{name}_source')[0],
+                    'mode': getattr(self, f'{name}_mode')[0],
+                    'modelname': getattr(self, f'{name}_modelname')[0],
+                    'cycle': _cycles[0]
+                }
+
+                fcsets[date]['cachedir'] = dataobjects.define_fccachedir(**kwargs)
+                fcsets[date]['enssize'] = getattr(self, f'{name}_enssize')[0]
 
         return fcsets
 
 
 
     def _load_verif_dummy(self):
+        """
+        Load the dummy verification file in case dates are not available for forecast
+        :return: xr DataArray
+        """
         _filename = f'{self.obscachedir}/{self.verif_name}.nc'
         da = xr.open_dataarray(_filename, chunks='auto')
         da = da.expand_dims(dim={"member": 1, "date":1, "inidate":1})
         return da
 
-    def _load_verif(self, fcset):
-        """ load verification data """
+    def _load_data(self, fcset, datatype, grid=None):
+        """ load forecast or verification data
+        :param fcset: forecast sets created in _init_fc
+        :param datatype: fc or verif
+        :param grid: 'native' or None
+        :return:
+        """
 
-        filename = self._filenaming_convention('verif')
+        if grid is None:
+            grid = self.grid
+
+        filename = self._filenaming_convention(datatype)
+
         _all_list = []
         _inits = []
-
         for fcname in fcset:
             _inits.append(fcname)
             _da_date_list = []
             _fcdates = fcset[fcname]['sdates']
-
 
             for _date in _fcdates:
                 _dtdate = [utils.string_to_datetime(_date)]
                 _dtseldates = utils.create_list_target_verif(self.target, _dtdate)
                 _seldates = [utils.datetime_to_string(dtdate) for dtdate in _dtseldates]
 
-                _da_seldate_list = []
-                for _seldate in _seldates:
+                if datatype == 'fc':
+                    _members = range(int(fcset[fcname]['enssize']))
+                else:
                     _members = range(1)
-                    _da_ensmem_list = []
-                    for _member in _members:
-                        _filename = f"{self.obscachedir}/" \
-                                    f"{filename.format(_seldate, self.params, self.grid)}"
 
-                        if self.use_dask:
-                            _da_ensmem_list.append(xr.open_dataarray(_filename, chunks='auto'))
-                        else:
-                            _da_ensmem_list.append(xr.open_dataarray(_filename))
-                    _ensdim = xr.DataArray(_members, dims='member', name='member')
-                    _da_member = xr.concat(_da_ensmem_list, dim=_ensdim)
-                    _da_seldate_list.append(_da_member)
-
-                _da_date = xr.concat(_da_seldate_list, dim='time')
-                _da_date = self.convert_time_to_lead(_da_date)
-
-                _da_date_list.append(_da_date)
-
-            _date_dim = xr.DataArray(range(len(_fcdates)), dims='date', name='date')
-            da_fc = xr.concat(_da_date_list, dim=_date_dim)
-            _all_list.append(da_fc.sortby(da_fc.date))
-
-        _init_dim = xr.DataArray(_inits, dims='inidate', name='inidate')
-        da_init = xr.concat(_all_list, dim=_init_dim)
-
-
-        return da_init
-
-    def load_verif_fc(self, name, grid=None):
-        """ load forecast data for verification"""
-        return self._load_forecasts(getattr(self,f'fc{name}sets'), grid=grid)
-
-    def load_verif_data(self, name):
-        """ load verification data """
-        if 'grid' in self.verif_name:
-            return self._load_verif_dummy()
-        return self._load_verif(getattr(self,f'fc{name}sets'))
-
-    def _load_forecasts(self, fcset, grid=None,):
-        """ load forecast data """
-
-        if grid is None:
-            grid = self.grid
-
-        filename = self._filenaming_convention('fc')
-        _all_list = []
-        _inits = []
-        for fcname in fcset:
-            _inits.append(fcname)
-            _da_date_list = []
-            _fcdates = fcset[fcname]['sdates']
-
-            for _date in _fcdates:
-
-                _members = range(int(fcset[fcname]['enssize']))
                 _da_ensmem_list = []
                 for _member in _members:
 
-                    _filename = f"{fcset[fcname]['cachedir']}/" \
-                                f"{filename.format(_date, _member, self.params,grid)}"
+                    if datatype == 'verif':
+                        _da_seldate_list = []
+                        for _seldate in _seldates:
+                            _filename = f"{self.obscachedir}/" \
+                                        f"{filename.format(_seldate, self.params, self.grid)}"
+                            _da_file = self._load_file(_filename)
+                            _da_seldate_list.append(_da_file)
+                        _da_file = xr.concat(_da_seldate_list, dim='time')
+                        _da_file = self.convert_time_to_lead(_da_file)
 
-                    _dtdate = [utils.string_to_datetime(_date)]
-                    _dtseldates = utils.create_list_target_verif(self.target,_dtdate)
-                    _seldates = [utils.datetime_to_string(dtdate) for dtdate in _dtseldates]
+                    elif datatype == 'fc':
+                        _filename = f"{fcset[fcname]['cachedir']}/" \
+                                    f"{filename.format(_date, _member, self.params, grid)}"
+                        _da_file = self._load_file(_filename, _seldates)
+                        _da_file = self.convert_time_to_lead(_da_file)
 
-                    _da_file = self.load_data(_filename, _seldates)
 
-                    _da_file = self.convert_time_to_lead(_da_file)
 
                     _da_ensmem_list.append(_da_file)
-                _ensdim = xr.DataArray(_members, dims='member', name='member')
+                    _ensdim = xr.DataArray(_members, dims='member', name='member')
                 _da_date = xr.concat(_da_ensmem_list, dim=_ensdim)
                 _da_date_list.append(_da_date)
+
 
             _date_dim = xr.DataArray(range(len(_fcdates)), dims='date', name='date')
             da_fc = xr.concat(_da_date_list, dim=_date_dim)
@@ -256,6 +262,35 @@ class BaseMetric(dataobjects.DataObject):
         da_init = xr.concat(_all_list, dim=_init_dim)
 
         return da_init
+
+
+
+
+
+
+    def load_verif_fc(self, name, grid=None):
+        """
+        load forecast data for verification
+        :param name: calib or verif
+        :param grid: 'native' or None
+        :return: xarray dataArray
+        """
+        #return self._load_forecasts(getattr(self,f'fc{name}sets'), grid=grid)
+        return self._load_data(getattr(self, f'fc{name}sets'), datatype='fc', grid=grid)
+
+    def load_verif_data(self, name):
+        """
+        load verification data
+        :param name: calib or verif
+        :return: xarray dataArray
+        """
+
+        if 'grid' in self.verif_name:
+            return self._load_verif_dummy()
+        return self._load_data(getattr(self,f'fc{name}sets'), datatype='verif')
+        #return self._load_verif(getattr(self,f'fc{name}sets'))
+
+
 
 
     def get_filename_metric(self):
@@ -282,17 +317,18 @@ class BaseMetric(dataobjects.DataObject):
             return 'ts'
 
     def convert_time_to_lead(self,_da=None):
-        """ Convert time variable to steps"""
+        """
+        Convert time variable to steps
+        :param _da: xr DataArray
+        :return: xr DataArray
+        """
         target_as_list = utils.create_list_target_verif(self.target, as_list=True)
         _da = _da.assign_coords(time=target_as_list)
         return _da
 
-
-
-
-    def load_data(self, _file,_seldate):
+    def _load_file(self, _file,_seldate=None):
         """
-        load single xarray data file and select specific timestep
+        load single xarray data file and select specific timestep if needed
         Use dask if selected
         :param _file: filename
         :param _seldate: timestep(s) to load
@@ -304,7 +340,11 @@ class BaseMetric(dataobjects.DataObject):
             _da_file = xr.open_dataarray(_file, chunks='auto')
         else:
             _da_file = xr.open_dataarray(_file)
-        return _da_file.sel(time=_da_file.time.dt.strftime("%Y%m%d").isin(_seldate))
+
+        if _seldate:
+            _da_file = _da_file.sel(time=_da_file.time.dt.strftime("%Y%m%d").isin(_seldate))
+
+        return _da_file
 
 
     def calc_area_statistics(self, datalist, minimum_value=0, statistic='mean'):
@@ -366,3 +406,95 @@ class BaseMetric(dataobjects.DataObject):
         combined_mask = np.logical_and(_ds_verif_mask == 1, _ds_fc_mask == 1)
 
         return combined_mask
+
+    def _load_verif(self, fcset):
+        """ load verification data """
+
+        filename = self._filenaming_convention('verif')
+        _all_list = []
+        _inits = []
+
+        for fcname in fcset:
+            _inits.append(fcname)
+            _da_date_list = []
+            _fcdates = fcset[fcname]['sdates']
+
+            for _date in _fcdates:
+                _dtdate = [utils.string_to_datetime(_date)]
+                _dtseldates = utils.create_list_target_verif(self.target, _dtdate)
+                _seldates = [utils.datetime_to_string(dtdate) for dtdate in _dtseldates]
+
+                _da_seldate_list = []
+                for _seldate in _seldates:
+                    _members = range(1)
+                    _da_ensmem_list = []
+                    for _member in _members:
+                        _filename = f"{self.obscachedir}/" \
+                                    f"{filename.format(_seldate, self.params, self.grid)}"
+
+                        if self.use_dask:
+                            _da_ensmem_list.append(xr.open_dataarray(_filename, chunks='auto'))
+                        else:
+                            _da_ensmem_list.append(xr.open_dataarray(_filename))
+                    _ensdim = xr.DataArray(_members, dims='member', name='member')
+                    _da_member = xr.concat(_da_ensmem_list, dim=_ensdim)
+                    _da_seldate_list.append(_da_member)
+
+                _da_date = xr.concat(_da_seldate_list, dim='time')
+                _da_date = self.convert_time_to_lead(_da_date)
+
+                _da_date_list.append(_da_date)
+
+            _date_dim = xr.DataArray(range(len(_fcdates)), dims='date', name='date')
+            da_fc = xr.concat(_da_date_list, dim=_date_dim)
+            _all_list.append(da_fc.sortby(da_fc.date))
+
+        _init_dim = xr.DataArray(_inits, dims='inidate', name='inidate')
+        da_init = xr.concat(_all_list, dim=_init_dim)
+
+        return da_init
+
+
+    def _load_forecasts(self, fcset, grid=None):
+        """ load forecast data """
+
+        if grid is None:
+            grid = self.grid
+
+        filename = self._filenaming_convention('fc')
+        _all_list = []
+        _inits = []
+        for fcname in fcset:
+            _inits.append(fcname)
+            _da_date_list = []
+            _fcdates = fcset[fcname]['sdates']
+
+            for _date in _fcdates:
+                _members = range(int(fcset[fcname]['enssize']))
+                _da_ensmem_list = []
+                for _member in _members:
+
+                    _filename = f"{fcset[fcname]['cachedir']}/" \
+                                f"{filename.format(_date, _member, self.params,grid)}"
+
+                    _dtdate = [utils.string_to_datetime(_date)]
+                    _dtseldates = utils.create_list_target_verif(self.target,_dtdate)
+                    _seldates = [utils.datetime_to_string(dtdate) for dtdate in _dtseldates]
+
+                    _da_file = self._load_file(_filename, _seldates)
+
+                    _da_file = self.convert_time_to_lead(_da_file)
+
+                    _da_ensmem_list.append(_da_file)
+                _ensdim = xr.DataArray(_members, dims='member', name='member')
+                _da_date = xr.concat(_da_ensmem_list, dim=_ensdim)
+                _da_date_list.append(_da_date)
+
+            _date_dim = xr.DataArray(range(len(_fcdates)), dims='date', name='date')
+            da_fc = xr.concat(_da_date_list, dim=_date_dim)
+            _all_list.append(da_fc.sortby(da_fc.date))
+
+        _init_dim = xr.DataArray(_inits, dims='inidate', name='inidate')
+        da_init = xr.concat(_all_list, dim=_init_dim)
+
+        return da_init

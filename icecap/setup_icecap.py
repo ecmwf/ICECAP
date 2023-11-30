@@ -4,9 +4,10 @@ create folders. copy scripts etc
 
 import os
 import shutil
+import subprocess
 import ecmwf
 import utils
-
+import flow
 
 def create_flow(conf):
     """
@@ -14,6 +15,8 @@ def create_flow(conf):
     :param conf: configuration object
     :return: flow object
     """
+    if conf.machine is None:
+        return flow.ProcessTree(conf)
     if conf.machine == 'ecmwf':
         return ecmwf.EcmwfTree(conf)
 
@@ -44,6 +47,14 @@ class ExecutionHost:
 
         self.directories_wipe = [conf.rundir, conf.datadir, conf.tmpdir]
         self.directories_wipe_full = [conf.cachedir]
+
+        _command = subprocess.Popen('hostname', stdout=subprocess.PIPE, stderr=None,shell=True)
+        _hostname = _command.communicate()[0].decode("utf-8").strip()
+        if _hostname[0] == 'a' and _hostname[3] == '-':
+            if not self.machine:
+                raise ValueError('It seems that you are working on ECMWF..so please set machine to ecmwf')
+
+
 
     def wipe(self, args):
         """
@@ -79,19 +90,25 @@ class ExecutionHost:
         self._copy_python_scripts(fromdir, args)
 
         if self.ecflow == 'yes':
-            fromdir = self.sourcedir + f'/ecf/{self.machine}'
-            self._copy_ecflow_files(fromdir, args)
             fromdir = self.sourcedir + '/ecf'
             self._copy_ecflow_files(fromdir, args, base_level_files_only=True)
 
-        # copy etc files for machine
-        fromdir = self.sourcedir + f'/etc/{self.machine}'
-        self._copy_etc_files(fromdir,args)
+            if self.machine:
+                fromdir = self.sourcedir + f'/ecf/{self.machine}'
+                self._copy_ecflow_files(fromdir, args)
+                # copy etc files for machine
+                fromdir = self.sourcedir + f'/etc/{self.machine}'
+                self._copy_etc_files(fromdir, args)
+            else:
+                fromdir = self.sourcedir + '/ecf/include'
+                self._copy_ecflow_files(fromdir, args, base_level_files_only=True)
+
+
+
 
 
         # copy config file
-        for filename in self.filename:
-            self._safe_copy(args, filename, './', self.pydir)
+        self._safe_copy(args, self.filename, './', self.pydir)
 
     def _copy_etc_files(self, fromdir, args):
         files = ['load_modules', 'module_versions']
@@ -124,6 +141,8 @@ class ExecutionHost:
         else:
             for file in os.listdir(ecfsourcedir):
                 target_dir = self.ecffilesdir
+                if file.endswith('.h'):
+                    target_dir = self.ecffilesdir+'/include'
                 if file.endswith('.ecf') or file.endswith('.h') or file in module_files:
                     self._safe_copy(args, file, ecfsourcedir, target_dir)
 

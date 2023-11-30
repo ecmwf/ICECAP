@@ -12,13 +12,14 @@ config_optnames = {
         },
         'machine': {
             'printname' : 'machine',
-            'optional' : False,
-            'allowed_values' : ['ecmwf','test']
+            'optional' : True,
+            'allowed_values' : ['ecmwf']
         },
         'ecflow': {
             'printname' : 'use ecflow',
             'optional' : True,
-            'allowed_values' : ["yes", "no"]
+            'default_value' : ["yes"],
+            'allowed_values' : ["yes"]
         },
         'suitename': {
             'printname' : 'name of suite',
@@ -111,15 +112,17 @@ config_optnames = {
         },
         'hcrefdate':{
             'printname' : 'hindcast reference date',
-            'optional' : True
+            'optional' : ['mode:hc']
         },
         'hcfromdate':{
             'printname' : 'first hindcast year',
-            'optional' : ['mode:hc']
+            'optional' : True
+            #'optional' : ['mode:hc']
         },
         'hctodate':{
             'printname' : 'first hindcast year',
-            'optional' : ['mode:hc'],
+            'optional' : True
+            #'optional' : ['mode:hc'],
         },
         'ndays': {
             'printname' : 'number of days to be staged',
@@ -130,7 +133,15 @@ config_optnames = {
             'optional' : True,
             'default_value' : ["no"],
             'allowed_values' : ["yes", "no"]
-        }
+        },
+        'fromyear' : {
+            'printname' : 'start year of data to retrieve',
+            'optional' : True
+        },
+        'toyear' : {
+            'printname' : 'end year of data to retrieve',
+            'optional' : True
+        },
     }, # end fc
     'plot' : {
         'verif_expname' : {
