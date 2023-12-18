@@ -4,7 +4,6 @@ create folders. copy scripts etc
 
 import os
 import shutil
-import subprocess
 import ecmwf
 import utils
 import flow
@@ -48,12 +47,12 @@ class ExecutionHost:
         self.directories_wipe = [conf.rundir, conf.datadir, conf.tmpdir]
         self.directories_wipe_full = [conf.cachedir]
 
-        _command = subprocess.Popen('hostname', stdout=subprocess.PIPE, stderr=None,shell=True)
-        _hostname = _command.communicate()[0].decode("utf-8").strip()
-        if _hostname[0] == 'a' and _hostname[3] == '-':
-            if not self.machine:
-                raise ValueError('It seems that you are working on ECMWF..so please set machine to ecmwf')
 
+        # this is to make sure machine = ecmwf is set if needed (to avoid using wrong head.h settings)
+        # this will cause problems if ecflow_host starts with 'ecflow-gen-' on other machine as well
+        if 'ecflow-gen-' in conf.ecflow_host:
+            if not self.machine == 'ecmwf':
+                raise ValueError('It seems that you are working on ECMWF..so please set machine to ecmwf')
 
 
     def wipe(self, args):
@@ -108,7 +107,7 @@ class ExecutionHost:
 
 
         # copy config file
-        self._safe_copy(args, self.filename, './', self.pydir)
+        self._safe_copy(args, self.filename, './', self.pydir, 'icecap.conf')
 
     def _copy_etc_files(self, fromdir, args):
         files = ['load_modules', 'module_versions']
@@ -175,21 +174,25 @@ class ExecutionHost:
                     self._safe_copy(args, file, root, target_dir)
 
     @staticmethod
-    def _safe_copy(args, fname, source_dir, target_dir):
+    def _safe_copy(args, fname, source_dir, target_dir, fname_save=None):
         """
         check whether target file exists and copy if appropriate
         :param args: arguments providing force and verbose
         :param fname: name of the file
         :param source_dir: source directory
         :param target_dir: target directory
+        :param fname_save: set to other than None tp specify output file name (if different from fname)
         """
 
         sfile = os.path.join(source_dir, fname)
-        tfile = os.path.join(target_dir, fname)
+        if fname_save is None:
+            fname_save = fname
+        tfile = os.path.join(target_dir, fname_save)
+
         if os.path.isfile(tfile):
             if not args.force:
                 raise RuntimeError(('File {} exists. ' +
                                     '\nUse option --force to overwrite').format(tfile))
         if args.verbose:
             print(f'Copying file {sfile} --> {target_dir}')
-        shutil.copy(sfile, target_dir)
+        shutil.copy(sfile, f'{target_dir}/{fname_save}')

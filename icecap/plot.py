@@ -31,10 +31,9 @@ if __name__ == '__main__':
     if m.gettype() == 'map':
         p = plottypes.MapPlot(conf, args.plotid,m)
     elif m.gettype() == 'ts':
-        print('ts')
         p = plottypes.TsPlot(conf,m)
 
 
 
-    print('plotting')
+    utils.print_info('PLOTTING')
     p.plot(m)

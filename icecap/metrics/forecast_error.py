@@ -1,9 +1,8 @@
-""" Metric calculating ensemble mean """
+""" Metric calculating mean error """
 import os
 import numpy as np
 import xarray as xr
 from .metric import BaseMetric
-
 
 xr.set_options(keep_attrs=True)
 os.environ['HDF5_USE_FILE_LOCKING']='FALSE'
@@ -13,38 +12,30 @@ class Metric(BaseMetric):
     def __init__(self, name, conf):
         super().__init__(name, conf)
         self.use_metric_name = True
-        self.plottext = ''
-        self.legendtext = ''
+        self.plottext = f'bias to {self.verif_name}'
+        self.legendtext = 'bias'
+        self.default_cmap = 'bwr'
+        self.levels = np.arange(-1.05, 1.15, .1)
+        self.levels = np.arange(-0.22, 0.26, .04)
+        self.default_cmap = 'RdBu_r'
         self.ylabel = 'sic'
-        self.levels = np.arange(0, 1.1, .1)
-        self.use_dask = False
-        if self.area_statistic_kind is None or self.area_statistic_function == 'mean':
-            self.clip = True
+
 
     def compute(self):
         """ Compute metric """
-
-        da_fc_verif = self.load_fc_data('verif',
-                                        average_dim=['member','date','inidate'])
-        data = [da_fc_verif.rename(f'{self.verif_expname[0]}')]
-
-
-
-
-        # we need to load reference data to calculate lsm
-        da_verdata_verif = self.load_verif_data('verif',
-                                                average_dim=['member','date','inidate'])
-        data.append(da_verdata_verif.rename('obs'))
+        da_verdata_verif = self.load_verif_data('verif', average_dim=['date','member','inidate'])
+        da_fc_verif = self.load_fc_data('verif',average_dim=['date','member','inidate'])
 
         if self.calib:
             da_fc_calib = self.load_fc_data('calib', average_dim=['member','date','inidate'])
             da_verdata_calib = self.load_verif_data('calib',average_dim=['member','date','inidate'])
             bias_calib = da_fc_calib - da_verdata_calib
             fc_verif_bc = da_fc_verif - bias_calib
-            data[0] = fc_verif_bc.rename(f'{self.verif_expname[0]}')
+            da_fc_verif = fc_verif_bc.rename(f'{self.verif_expname[0]}')
 
-        data, lsm_full = self.mask_lsm(data)
-
+        data, lsm_full = self.mask_lsm([da_verdata_verif, da_fc_verif])
+        bias = (data[1] - data[0]).rename(f'{self.verif_expname[0]}-bias')
+        data = [bias]
 
         if self.area_statistic_kind is not None:
             data, lsm = self.calc_area_statistics(data, lsm_full,
@@ -53,12 +44,5 @@ class Metric(BaseMetric):
 
             # add lsm to metric netcdf file
             data.append(lsm)
-
-        # if reference data is not desired remove it here from the dataset list
-        if self.add_verdata == "no":
-            data.pop(1)
-
         data.append(lsm_full)
-        data_xr = xr.merge(data)
-
-        self.result = data_xr
+        self.result = xr.merge(data)

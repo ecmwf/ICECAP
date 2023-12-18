@@ -305,19 +305,23 @@ class ProcessTree(Tree):
 
     def __init__(self, conf):
         super().__init__(conf)
-        # here the next steps which are independent from machines will be listed
-        self.add_attr(['trigger:retrieval != aborted'], 'retrieval')
-        self.add_attr(['task:verdata_retrieve'], 'retrieval:verdata')
 
+        # here the next steps which are independent from machines will be listed
+        trigger_plot = ['trigger:plot != aborted']
+
+        if conf.fcsets:
+            self.add_attr(['trigger:retrieval != aborted'], 'retrieval')
+            self.add_attr(['task:verdata_retrieve'], 'retrieval:verdata')
+            trigger_plot = ['trigger:retrieval==complete','trigger:plot != aborted;True']
+            finish_trigger = 'retrieval'
 
         if bool(conf.plotsets):
-            self.add_attr(['trigger:retrieval==complete',
-                           'trigger:plot != aborted;True'], 'plot')
+            self.add_attr(trigger_plot, 'plot')
+            finish_trigger = 'plot'
         for plotid in conf.plotsets:
             self.add_attr(['task:plot',
                            f'variable:PLOTTYPE;{plotid}'], f'plot:{plotid}')
 
-        finish_trigger = 'retrieval'
         if conf.keep_native == 'yes':
             clean_trigger = 'retrieval'
             finish_trigger = 'clean'
@@ -334,12 +338,14 @@ class ProcessTree(Tree):
                 self.add_attr([f'variable:EXPID;{expid}',
                                'trigger:verdata==complete'], f'retrieval:{expid}')
 
-                if conf.keep_native == 'yes':
-                    self.add_attr([f'variable:EXPID;{expid}',
-                                   'variable:DATES;WIPE',
-                                   f'task:{conf.fcsets[expid].source}_retrieve'], f'clean:{expid}')
+
 
                 if conf.fcsets[expid].source in ['nersc_tmp']:
+                    if conf.keep_native == 'yes':
+                        self.add_attr([f'variable:EXPID;{expid}',
+                                       'variable:DATES;WIPE',
+                                       f'task:{conf.fcsets[expid].source}_retrieve'], f'clean:{expid}')
+
                     self.add_attr(['variable:DATES;INIT',
                                    f'task:{conf.fcsets[expid].source}_retrieve'], f'retrieval:{expid}:init')
                     self.add_attr([f'repeat:DATES;{self.fcsets[expid].sdates}',
@@ -348,12 +354,7 @@ class ProcessTree(Tree):
                                   f'retrieval:{expid}:{conf.fcsets[expid].mode}')
 
                 elif conf.fcsets[expid].source in ['cds']:
-                    if conf.fcsets[expid].mode in ['hc']:
-                        loopdates = self.fcsets[expid].shcdates
-                    else:
-                        loopdates = self.fcsets[expid].sdates
-
-
+                    loopdates = self.fcsets[expid].sdates
                     self.add_attr([f'variable:DATES;{loopdates[0]}',
                                     'variable:TYPE;INIT',
                                    f'task:{conf.fcsets[expid].source}_retrieve'], f'retrieval:{expid}:init')
@@ -362,5 +363,11 @@ class ProcessTree(Tree):
                                    f'task:{conf.fcsets[expid].source}_retrieve',
                                    'trigger:init==complete'],
                                   f'retrieval:{expid}:{conf.fcsets[expid].mode}')
+
+                    if conf.keep_native == 'yes':
+                        self.add_attr([f'variable:EXPID;{expid}',
+                                       'variable:DATES;{loopdates[0]}',
+                                        'variable:TYPE;WIPE',
+                                       f'task:{conf.fcsets[expid].source}_retrieve'], f'clean:{expid}')
                 else:
                     raise ValueError(f'Retrieval for {conf.fcsets[expid].source} not implemented')

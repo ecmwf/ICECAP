@@ -121,7 +121,7 @@ class Configuration():
         self.verif_fromyear = None
         self.verif_toyear = None
         self.cmap = None
-        self.plot_extent = None
+        self.region_extent = None
         self.projection = None
         self.proj_options = None
         self.circle_border = None
@@ -135,8 +135,11 @@ class Configuration():
         self.points = None
         self.add_verdata = None
         self.ofile = None
-        self.modelname = None
-        self.area_mean = None
+        self.verif_modelname = None
+        self.plot_shading = None
+        self.inset_position = None
+        self.area_statistic = None
+        self.additonal_mask = None
 
 
 
@@ -181,14 +184,17 @@ class Configuration():
 
         # get fc config entries
         fcsetlist = [section[3:] for section in conf_parser.sections() if section.startswith('fc_')]
-        if len(fcsetlist) == 0:
-            raise MissingSection('fc_*', 'At least one forecast section needed.')
+        #if len(fcsetlist) == 0:
+        #    raise MissingSection('fc_*', 'At least one forecast section needed.')
         self.fcsets = {}
         for expid in fcsetlist:
             section = 'fc_' + expid
             self._init_config(conf_parser, section, 'fc', init=True)
 
             # check if hcrefdate given for mode='hc' and machine='ecmwf'
+            if self.mode in ['hc'] and not self.source in ['ecmwf']:
+                raise ValueError('mode=hc only works for ECMWF internal data so far')
+
             if self.hcrefdate is None and self.source in ['ecmwf'] and self.mode in ['hc']:
                 raise ValueError('hcrefdate needs to be defined for hindcast mode on ecmwf')
 
@@ -235,6 +241,11 @@ class Configuration():
             self._init_config(conf_parser, section, 'plot', init=True)
 
 
+            if (self.verif_mode in ['hc'] or self.calib_mode in ['hc']) and self.source != 'ecmwf':
+                raise ValueError('verif_mode=hc/calib_mode=hc only works for ECMWF internal data so far')
+
+
+
             if self.source is None:
                 self.source = self.machine
 
@@ -251,7 +262,7 @@ class Configuration():
                 projection = self.projection,
                 proj_options = self.proj_options,
                 circle_border=self.circle_border,
-                plot_extent = self.plot_extent,
+                region_extent = self.region_extent,
                 cmap = self.cmap,
                 source = self.source,
                 verif_dates = self.verif_dates,
@@ -264,11 +275,12 @@ class Configuration():
                 ofile=self.ofile,
                 add_verdata=self.add_verdata,
                 points=self.points,
-                modelname=self.modelname,
-                area_mean = self.area_mean
+                verif_modelname=self.verif_modelname,
+                area_statistic = self.area_statistic,
+                plot_shading = self.plot_shading,
+                inset_position = self.inset_position,
+                additonal_mask = self.additonal_mask
                 )
-
-
 
     def __str__(self):
         """Return string representation of configuration for printing"""
@@ -377,7 +389,7 @@ class Configuration():
                 if 'default_value' in config_optnames[section_config_name][name].keys():
                     _default = np.atleast_1d(config_optnames[section_config_name][name]['default_value']).tolist()
 
-                    if "yes" in _default or "no" in _default:
+                    if len(_default[0].split(':'))==1:
                         setattr(self, name, _default[0])
                     else:
                         self._lookup_config_dict(section_config_name, name, 'default_value')
@@ -393,8 +405,8 @@ class Configuration():
         :return:
         """
 
-        if opt_name not in ['default', 'optional']:
-            raise ValueError('Only default/optional allowed in _lookup_config_dict')
+        if opt_name not in ['default_value', 'optional']:
+            raise ValueError(f'Only default/optional allowed in _lookup_config_dict {opt_name}')
 
         _args = np.atleast_1d(config_optnames[section][name][opt_name]).tolist()
         for _arg in _args:

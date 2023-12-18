@@ -112,7 +112,7 @@ config_optnames = {
         },
         'hcrefdate':{
             'printname' : 'hindcast reference date',
-            'optional' : ['mode:hc']
+            'optional' : True
         },
         'hcfromdate':{
             'printname' : 'first hindcast year',
@@ -151,8 +151,8 @@ config_optnames = {
         'plottype' : {
             'printname':'plot type',
             'optional' : False,
-            'allowed_values' : ["interp_check","ensmean","bias","bias_corrected_map",
-                                "ice_distance", "area_mean_ts"]
+            'allowed_values' : ["interp_check","ensmean","forecast_error",
+                                "ice_distance", "plume"]
         },
         'verif_mode':{
             'printname': 'forcast or hindcast mode for plotting',
@@ -185,7 +185,7 @@ config_optnames = {
         },
         'verif_refdate':{
             'printname' : 'experiment reference date',
-            'optional': ['verif_mode:hc']
+            'optional': True
         },
         'projection' :{
             'printname' : 'map projection',
@@ -201,8 +201,8 @@ config_optnames = {
             'default_value' : ["yes"],
             'allowed_values' : ["yes", "no"]
         },
-        'plot_extent':{
-            'printname' : 'boundaries of the map',
+        'region_extent':{
+            'printname' : 'boundaries of the map/area averaging',
             'optional' : True
         },
         'cmap':{
@@ -223,7 +223,7 @@ config_optnames = {
         },
         'calib_refdate' : {
             'printname' : 'reference date used for calibration',
-            'optional': ['calib_mode:hc']
+            'optional': True
         },
         'calib_fromyear' : {
             'printname' : 'start year used for calibration',
@@ -251,14 +251,27 @@ config_optnames = {
             'printname' : 'points to be used for ice distance calculation',
             'optional' : ['plottype:ice_distance']
         },
-        'modelname' : {
+        'verif_modelname' : {
             'printname':'model name (for S2S)',
             'optional' : ['verif_fcsystem:s2s', 'verif_fcsystem:long-range'],
         },
-        'area_mean' : {
-            'printname':'area average',
+        'area_statistic' : {
+            'printname':'area statistics',
             'optional' : True,
-            'allowed_values' : ["data", "score"]
-        }
+        },
+        'plot_shading': {
+            'printname':'plot ensemble shaded',
+            'optional' : True
+        },
+        'inset_position': {
+            'printname':'inset position of map plot',
+            'optional' : True,
+            'default_value' : ["2"],
+            'allowed_values' : ["1", "2"]
+        },
+        'additonal_mask': {
+            'printname':'use additional land-sea-mask',
+            'optional' : True
+        },
     }
 }

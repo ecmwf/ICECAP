@@ -14,7 +14,7 @@ Clone source code repository
 
 Create conda environment and install necessary packages
 
-    $ conda remove --name icecap-test --all  # delete icecap env if it exists
+    $ conda remove --name icecap --all  # delete icecap env if it exists
     $ conda env create -f environment.yml 
 
 ### Usage

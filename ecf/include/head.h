@@ -13,6 +13,10 @@ export ECF_TRYNO=%ECF_TRYNO%  # Current try number of the task
 export ECF_RID=$$             # record the process id. Also used for zombie detection
 export ECF_PYTHON=%ECF_PYTHON%
 
+# see https://github.com/ks905383/xagg/issues/47
+esmf_file=$(python -c "import os; from pathlib import Path; print(str(Path(os.__file__).parent.parent / 'esmf.mk'))")
+export ESMFMKFILE=$esmf_file
+
 # Tell ecFlow we have started
 ecflow_client --init=$$
 

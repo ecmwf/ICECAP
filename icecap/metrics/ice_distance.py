@@ -5,7 +5,6 @@ import xarray as xr
 import cartopy.crs as ccrs
 from scipy import ndimage
 from dask.distributed import Client
-
 from .metric import BaseMetric
 
 client=Client(threads_per_worker=1)
@@ -178,11 +177,11 @@ class Metric(BaseMetric):
             da_obs_verif_dist = xr.concat(list_obs, dim='newdim')
             da_obs_verif_dist = da_obs_verif_dist.mean(dim='newdim')
 
-            datalist.append(da_obs_verif_dist)
+            datalist.append(da_obs_verif_dist.isel(member=0))
             data_names.append('obs')
         print('done')
 
-        da_fc_verif = self.load_verif_fc('verif')
+        da_fc_verif = self.load_fc_data('verif')
         list_fc_verif = []
         for idate in da_fc_verif['date'].values:
             da_fc_verif_tmp = da_fc_verif.isel(inidate=0).sel(date=idate)
@@ -194,7 +193,7 @@ class Metric(BaseMetric):
         print('done')
 
         if self.calib:
-            da_fc_calib = self.load_verif_fc('calib')
+            da_fc_calib = self.load_fc_data('calib')
             da_verdata_calib = self.load_verif_data('calib')
 
             bias_list = []

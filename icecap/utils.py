@@ -5,11 +5,14 @@ import datetime as dt
 import numpy as np
 from dateutil.relativedelta import relativedelta
 
+
 def confdates_to_list(_dates):
     """ Convert dates for plotting in config to list
     :param _dates: dates from config
     :return: dates as list
     """
+    if not _dates:
+        return None
 
     if '/to/' not in _dates:
         return csv_to_list(_dates)
@@ -58,8 +61,8 @@ def confdates_to_list(_dates):
             elif by_unit == 'y':
                 start_date += relativedelta(years=int(by_value))
     else:
-        raise ValueError(f'Date config entry is not in right format '
-                         f'(either MM/DD or YYYY/MM/DD')
+        raise ValueError('Date config entry is not in right format '
+                         '(either MM/DD or YYYY/MM/DD')
 
     return date_list
 

@@ -112,7 +112,7 @@ class DataObject:
         # make sure interpolated fields have same xc and yc values as ref
         ds_out['xc'] = ds_ref['xc'].values
         ds_out['yc'] = ds_ref['yc'].values
-        ds_out.rename({'lon':'longitude','lat':'latitude'})
+        ds_out = ds_out.rename({'lon':'longitude','lat':'latitude'})
 
         # copy projection information if needed
         for proj_param in ['projection', 'central_longitude', 'central_latitude',
@@ -329,7 +329,7 @@ class ForecastConfigObject:
         # a loop variable, as the reference date might be equivalent for different forecasts dates, e.g. for S2S
         if self.mode == 'hc':
             if len(_dates_list[0]) != 4:
-                raise ValueError('Dates need to be spcified in MMDD format together '
+                raise ValueError('Dates need to be specified in MMDD format together '
                                  'with fromyear and toyear if mode = hc')
 
             _dates_list_ref = utils.confdates_to_list(self.hcrefdate)
@@ -351,7 +351,7 @@ class ForecastConfigObject:
             if not self.fromyear or not self.toyear:
                 raise ValueError('fromyear and toyear need to be specified if date is given as MMDD')
 
-            # for hindcast mode wen need to store hindcast dates as dt and string dictionaries
+            # for hindcast mode we need to store hindcast dates as dt and string dictionaries
             # this is as the keys of these dictionary are defined bu the loopvariable created earlier
             if self.mode == 'hc':
                 hc_date_dict = {}
@@ -359,8 +359,8 @@ class ForecastConfigObject:
 
             _dates_list_yyyymmdd = []
             for di, date in enumerate(_dates_list):
-                _dates_tmp = [f'{_year}{date}' for _year in range(int(getattr(self, f'fromyear')),
-                                                                  int(getattr(self, f'toyear')) + 1)]
+                _dates_tmp = [f'{_year}{date}' for _year in range(int(getattr(self, 'fromyear')),
+                                                                  int(getattr(self, 'toyear')) + 1)]
 
                 # remove dates which are not defined, e.g. 29.2 for non-leap years
                 _dates = []
@@ -408,7 +408,7 @@ class PlotConfigObject:
         self.projection = kwargs['projection']
         self.proj_options = kwargs['proj_options']
         self.circle_border = kwargs['circle_border']
-        self.plot_extent = kwargs['plot_extent']
+        self.region_extent = kwargs['region_extent']
         self.cmap = kwargs['cmap']
         self.verif_source = kwargs['source']
         self.verif_dates = kwargs['verif_dates']
@@ -421,5 +421,8 @@ class PlotConfigObject:
         self.ofile = kwargs['ofile']
         self.points = kwargs['points']
         self.add_verdata = kwargs['add_verdata']
-        self.modelname = kwargs['modelname']
-        self.area_mean = kwargs['area_mean']
+        self.verif_modelname = kwargs['verif_modelname']
+        self.area_statistic = kwargs['area_statistic']
+        self.plot_shading = kwargs['plot_shading']
+        self.inset_position = kwargs['inset_position']
+        self.additonal_mask = kwargs['additonal_mask']

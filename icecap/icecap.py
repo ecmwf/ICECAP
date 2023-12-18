@@ -25,8 +25,9 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     conf = config.Configuration(file=args.configfile)
-    flow = setup_icecap.create_flow(conf)
     execution_host = setup_icecap.ExecutionHost(conf)
+    flow = setup_icecap.create_flow(conf)
+
 
 
     if args.wipe > 0:

@@ -1,7 +1,6 @@
 """ Create 2-D filled contour plots """
 
 import os
-import datetime as dt
 from matplotlib import pyplot as plt
 import matplotlib
 from mpl_toolkits.axes_grid1.inset_locator import InsetPosition
@@ -11,6 +10,7 @@ import cartopy.crs as ccrs
 from cartopy.mpl.gridliner import LONGITUDE_FORMATTER, LATITUDE_FORMATTER
 from cartopy.util import add_cyclic_point
 import xarray as xr
+from dateutil.relativedelta import relativedelta
 import cmocean
 
 
@@ -28,6 +28,24 @@ class GenericPlot:
         self.levels = metric.levels
         self.format = 'png'
         self.plotdir = conf.plotdir
+        self.verif_source = metric.verif_source[0]
+        self.verif_fcsystem = metric.verif_fcsystem[0]
+        self.verif_expname = metric.verif_expname[0]
+        self.verif_enssize = metric.verif_enssize[0]
+        self.verif_mode = metric.verif_mode[0]
+        self.verif_fromyear = metric.verif_fromyear
+        self.verif_toyear = metric.verif_toyear
+        self.verif_name = metric.verif_name
+        self.verif_dates = metric.verif_dates
+        self.conf_verif_dates = metric.conf_verif_dates
+        self.plottype = metric.plottype
+
+        self.calib = metric.calib
+        if self.calib:
+            self.calib = True
+            self.conf_calib_dates = metric.conf_calib_dates
+            self.calib_fromyear = metric.calib_fromyear
+            self.calib_toyear = metric.calib_toyear
 
     def get_filename_plot(self, **kwargs):
         """
@@ -54,8 +72,18 @@ class GenericPlot:
         """
 
         fname = metric.get_filename_metric()
-        ds_file = xr.open_dataset(fname)
-        self.xr_file = ds_file
+        if os.path.isfile(fname):
+            output = xr.open_dataset(fname)
+        else:
+            fdir = os.path.dirname(fname)+'/'
+            files = [f for f in os.listdir(fdir) if os.path.isfile(fdir+f)]
+            files = [f for f in files if '.nc' in f]
+            output = []
+            for f in files:
+                output.append(xr.open_dataset(fdir+f))
+
+
+        self.xr_file = output
 
 
 class TsPlot(GenericPlot):
@@ -63,75 +91,221 @@ class TsPlot(GenericPlot):
     def __init__(self, conf, metric):
         super().__init__(conf, metric)
         self.points = metric.points
+        self.mul_factor = 1
 
-    def plot(self, metric, verbose=False):
+
+        if self.plottype == 'ice_distance':
+            self.ylabel = 'distance to ice-edge [km]'
+        if metric.area_statistic_unit == 'total':
+            self.ylabel = f'{metric.ylabel} [$km^2$]'
+        elif metric.area_statistic_unit == 'fraction':
+            self.ylabel = f'{metric.ylabel} [fraction]'
+        elif metric.area_statistic_unit == 'percent':
+            self.ylabel = f'{metric.ylabel} [%]'
+            self.mul_factor = 100
+
+        self.area_statistic_minvalue = None
+        if metric.area_statistic_minvalue is not None:
+            self.area_statistic_minvalue = metric.area_statistic_minvalue
+
+
+        self.plot_shading = metric.plot_shading
+        if self.plot_shading:
+            self.plot_shading = list(map(int, utils.csv_to_list(metric.plot_shading)))
+
+        self.inset_position = None
+        if metric.inset_position:
+            self.inset_position = metric.inset_position
+
+
+
+
+    def plot(self, metric):
         """ plot timeseries
         :param verbose: verbosity on or off
         """
-        ofile = self.ofile
-        if self.ofile is None:
-            ofile = self.get_filename_plot(varname='model', time=None,
-                                           plotformat=self.format)
+
+        plot_dict = {
+            'obs': {
+                'color':'k',
+                'label' : self.verif_name,
+            },
+            'obs-hc': {
+                'color':'red',
+                'label' : f'{self.verif_name} hc period'
+            },
+            'model': {
+                'color': 'blue',
+                'label': f'{self.verif_expname}',
+            },
+            'model-topaz4' : {
+                'color':'blue',
+                'label':'forecast',
+            },
+            'model-topaz5': {
+                'color': 'green',
+                'label': 'forecast',
+            }
+        }
+
+
         _ds_file = self.xr_file
         var_list = list(_ds_file.data_vars)
+        if 'lsm' in var_list:
+            lsm = True
+            var_list.remove('lsm')
+            var_list.remove('lsm-full')
+        else:
+            lsm = False
+
 
         thisfig = plt.figure(figsize=(8, 6))
         ax = plt.axes()
+        ofile = self.get_filename_plot(varname='model', time=None,
+                                       plotformat=self.format)
+
         for _var in var_list:
-            _ds_file = self.xr_file[_var].dropna(dim='member').copy()
+            _ds_file = self.xr_file[_var]
+            if 'member' in _ds_file.dims:
+                _ds_file = _ds_file.dropna(dim='member').copy()
+                multi_member = True
+            else:
+                multi_member = False
+
             if self.clip:
                 _ds_file = _ds_file.clip(self.levels[0], self.levels[-1])
-            if len(_ds_file['member']) > 1:
-                perc = [5, 25, 33]  # ,1/3*100]
-                shading = (np.linspace(0.2,1,len(perc)+1)**3)[1:]
-                for pi, p in enumerate(perc):
-                    ax.fill_between(_ds_file.time, _ds_file.quantile(p/100, dim='member'),
-                                     _ds_file.quantile(1-p/100, dim='member'),
-                                     color='teal', alpha=shading[pi],
-                                    label=f'probability: {p}-{100 - p}%')
-            for m in _ds_file['member'].values:
-                if _var == 'obs':
-                    ax.plot(_ds_file.time, _ds_file.sel(member=m).values,
-                            color='k', alpha=1, linewidth=2, label=self.verif_name)
-                elif _var == 'obs-hc':
-                    ax.plot(_ds_file.time, _ds_file.sel(member=m).mean(dim='date').values,
-                            color='red', alpha=1, linewidth=2,
-                            zorder=200)
-                else:
-                    ax.plot(_ds_file.time, _ds_file.sel(member=m).values, alpha=.1, linewidth=1,
-                             color='blue')
 
-        if self.points is not None:
+            # multiply to get percentage if desired
+            _ds_file = _ds_file*self.mul_factor
+
+            _var_dict = _var
+            if 'obs' not in _var:
+                _var_dict = 'model'
+
+            if not multi_member:
+                ax.plot(_ds_file.time+1, _ds_file.values,
+                        color=plot_dict[_var_dict]['color'], alpha=1, linewidth=2,
+                        label=plot_dict[_var_dict]['label'])
+
+            else:
+                if _var_dict =='model':
+                    ax.plot(_ds_file.time+1, _ds_file.mean(dim='member').values,
+                            color=plot_dict[_var_dict]['color'], alpha=1, linewidth=2,
+                            label=plot_dict[_var_dict]['label'])
+
+
+                if self.plot_shading:
+                    perc = self.plot_shading  # ,1/3*100]
+                    shading = (np.linspace(0.2,1,len(perc)+1)**3)[1:]
+                    for pi, p in enumerate(perc):
+                        ax.fill_between(_ds_file.time+1, _ds_file.quantile(p/100, dim='member'),
+                                         _ds_file.quantile(1-p/100, dim='member'),
+                                         color='teal', alpha=shading[pi],
+                                        label=f'probability: {p}-{100 - p}%')
+                else:
+                    for m in _ds_file['member'].values:
+                        ax.plot(_ds_file.time+1, _ds_file.sel(member=m).values,
+                                color=plot_dict[_var_dict]['color'], alpha=.1, linewidth=1)
+
+
+        if self.points is not None or metric.region_extent:
+            _ylim = ax.get_ylim()
+
+            ax.set_ylim([_ylim[0],_ylim[1]+.3*(_ylim[1]-_ylim[0])])
+
+
             ax2 = plt.axes([0, 0, 1, 1],
                            projection=ccrs.NorthPolarStereo())
-            ip = InsetPosition(ax, [0.72, 0.67, 0.3, 0.3])
+            if self.inset_position == '1':
+                ip = InsetPosition(ax, [0.05, 0.68, 0.25, 0.25])
+            elif self.inset_position == '2':
+                ip = InsetPosition(ax, [0.72, 0.68, 0.25, 0.25])
+
             ax2.set_axes_locator(ip)
-            ax2.set_extent([-180, 180, 60, 90], ccrs.PlateCarree())
 
-            theta = np.linspace(0, 2 * np.pi, 100)
-            center, radius = [0.5, 0.5], 0.5
-            verts = np.vstack([np.sin(theta), np.cos(theta)]).T
-            circle = matplotlib.path.Path(verts * radius + center)
+            self.region_extent = None
+            if metric.region_extent:
+                self.region_extent = metric.region_extent
+                if self.region_extent:
+                    self.region_extent = utils.csv_to_list(self.region_extent)
+                    self.region_extent = list(map(int, self.region_extent))
+                    region_extent_large = [-180,180,0,0]
+                    region_extent_large[2] = self.region_extent[2] - 5
+                    region_extent_large[3] = np.min([90, self.region_extent[3]])
+            else:
+                region_extent_large = [-180,180,60,90]
 
-            ax2.set_boundary(circle, transform=ax2.transAxes)
+
+            lat_end = 90 - region_extent_large[2]
+            proj = ccrs.NorthPolarStereo()
+
+            ax2.set_extent([-lat_end * 111000,
+                           lat_end * 111000,
+                           -lat_end * 111000,
+                           lat_end * 111000],
+                          crs=proj)
+
+            r_limit = 1 * (lat_end) * 111 * 1000
+            circle_path = matplotlib.path.Path.unit_circle()
+            circle_path = matplotlib.path.Path(circle_path.vertices.copy() * r_limit,
+                                               circle_path.codes.copy())
+            ax2.set_boundary(circle_path)
+
+
+
+
+            ax2.set_extent(region_extent_large, ccrs.PlateCarree())
+            if self.region_extent:
+                region_test =  '/'.join(utils.csv_to_list(metric.region_extent))
+                if lsm:
+                    lsm_nan = (~np.isnan(self.xr_file['lsm'].values)).sum()
+                    region_test = f'{region_test} (#:{lsm_nan})'
+
+                ttl = ax2.set_title(region_test,
+                          fontsize=10)
+                ttl.set_position([.5, 0.99])
 
             # plt.plot(ds_clim_pmax_am.lon.values, ds_clim_pmax_am.lat.values, marker='*')
             ax2.coastlines(color='grey')
+            if lsm:
+                lsm_data = self.xr_file['lsm']
+                lsm_data = xr.where(lsm_data==1,1,0)
 
-            if len(self.points) == 1:
-                ax2.scatter(self.points[0][0],self.points[0][1], color='red',s=15,
-                            transform=ccrs.PlateCarree())
-            else:
-                norm = matplotlib.colors.Normalize(vmin=0, vmax=len(self.points))
+                if self.region_extent[0] < self.region_extent[1]:
+                    ax2.contourf(self.xr_file['lsm'].longitude,
+                                 self.xr_file['lsm'].latitude,
+                                 lsm_data, hatches=['...'], levels=[0.5,1.5], alpha=0.5,
+                                 colors='red', transform=ccrs.PlateCarree())
+                else:
+                    lsm_data_1 = xr.where(self.xr_file['lsm'].longitude < 160, float('nan'), lsm_data)
+                    lsm_data_2 = xr.where(self.xr_file['lsm'].longitude > -160, float('nan'), lsm_data)
 
-                for pi, point in enumerate(self.points):
-                    rgba_color = matplotlib.cm.jet(norm(pi))
-                    ax2.scatter(point[0], point[1], color=rgba_color, s=15,
+                    ax2.contourf(self.xr_file['lsm'].longitude,
+                                  self.xr_file['lsm'].latitude,
+                                  lsm_data_1, hatches=['...'], levels=[0.5,1.5], alpha=0.5,
+                                  colors='red', transform=ccrs.PlateCarree())
+
+                    ax2.contourf(self.xr_file['lsm'].longitude,
+                                 self.xr_file['lsm'].latitude,
+                                 lsm_data_2, hatches=['...'], levels=[0.5, 1.5], alpha=0.5,
+                                 colors='red', transform=ccrs.PlateCarree())
+
+
+
+            if self.points is not None:
+                if len(self.points) == 1:
+                    ax2.scatter(self.points[0][0],self.points[0][1], color='red',s=15,
                                 transform=ccrs.PlateCarree())
-                    ax.scatter(_ds_file.time[pi], -15,
-                               color=rgba_color, s=25, clip_on=False)
+                else:
+                    norm = matplotlib.colors.Normalize(vmin=0, vmax=len(self.points))
 
-        11
+                    for pi, point in enumerate(self.points):
+                        rgba_color = matplotlib.cm.jet(norm(pi))
+                        ax2.scatter(point[0], point[1], color=rgba_color, s=15,
+                                    transform=ccrs.PlateCarree())
+                        ax.scatter(_ds_file.time[pi]+1, -15,
+                                   color=rgba_color, s=25, clip_on=False)
+
 
         handles, labels = ax.get_legend_handles_labels()
         handle_list, label_list = [], []
@@ -139,15 +313,61 @@ class TsPlot(GenericPlot):
             if label not in label_list:
                 handle_list.append(handle)
                 label_list.append(label)
-        plt.legend(handle_list, label_list)
-#        ax.legend(loc='lower right', ncol=1,
-#                  bbox_to_anchor=(.95,.1)) #loc='lower left')
-        ax.set_ylabel('distance to ice edge [km]')
 
-        ax.set_xlim([0, _ds_file.time.max() + 1])
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0 + box.height * 0.1,
+                         box.width, box.height * 0.9])
+
+        ax.legend(handle_list, label_list,
+                  loc='upper center', bbox_to_anchor=(0.5, -.15),
+                  ncol=len(handle_list), fancybox=True, shadow=True)
+
+        ax.set_ylabel(self.ylabel)
+        _title = self._create_title()
+        ax.set_title(_title)
+
+        ax.set_xlim([0.5, _ds_file.time.max() + 1.5])
         ax.set_xlabel('forecast time [days]')
         thisfig.savefig(ofile)
-        print(ofile)
+        utils.print_info(f'output file: {ofile}')
+
+
+    def _create_title(self):
+
+        _title = f'{self.verif_source} {self.verif_fcsystem} ' \
+                 f'{self.verif_expname} {self.verif_mode} (enssize = {self.verif_enssize}) \n'
+
+        # calc target date
+        # check if only one date
+        if self.verif_fromyear:
+            _verif_fromyear = int(self.verif_fromyear)
+            _verif_toyear = int(self.verif_toyear)
+
+        if len(self.verif_dates) == 1:
+            _init_time = self.verif_dates[0]
+
+        elif 'to' in self.conf_verif_dates:
+            _init_time = self.conf_verif_dates
+
+        if self.verif_fromyear is None:
+            if len(self.verif_dates) == 1:
+                _title += f' init-time {_init_time}'
+            else:
+                _title += f' combined dates init-time {_init_time}'
+        else:
+            _title += f' combined dates init-time {_init_time}' \
+                      f' ({_verif_fromyear} - {_verif_toyear})'
+
+        if self.area_statistic_minvalue is not None:
+            _title += f'(cells wit sic>{self.area_statistic_minvalue} set to 1)'
+
+
+        if self.calib:
+            _title += f'\n calibrated using {self.conf_calib_dates}'
+            if self.calib_fromyear:
+                _title += f' averaged from {self.calib_fromyear} to {self.calib_toyear}'
+
+        return _title
 
 
 
@@ -156,30 +376,22 @@ class MapPlot(GenericPlot):
     def __init__(self, conf, secname, metric):
         super().__init__(conf, metric)
         self.param = conf.params
-        self.verif_name = metric.verif_name
-        self.verif_expname = metric.verif_expname[0]
-        self.verif_enssize = metric.verif_enssize[0]
-        self.verif_dates = metric.verif_dates
-        self.conf_verif_dates = metric.conf_verif_dates
-        self.verif_fromyear = metric.verif_fromyear
-        self.verif_toyear = metric.verif_toyear
-        self.verif_mode = metric.verif_mode[0]
-        self.verif_source = metric.verif_source[0]
-        self.verif_fcsystem = metric.verif_fcsystem[0]
+
+
+
+
+
+
+
         self.metric_plottext = metric.plottext
         self.projection = conf.plotsets[secname].projection
         self.proj_options = conf.plotsets[secname].proj_options
         self.circle_border = conf.plotsets[secname].circle_border
-        self.plot_extent = conf.plotsets[secname].plot_extent
+        self.region_extent = conf.plotsets[secname].region_extent
         self.cmap = conf.plotsets[secname].cmap
         self.units = ''
         self.shortname = ''
-        self.calib = metric.calib
-        if self.calib:
-            self.calib = True
-            self.conf_calib_dates = metric.conf_calib_dates
-            self.calib_fromyear = metric.calib_fromyear
-            self.calib_toyear = metric.calib_toyear
+
 
 
 
@@ -193,12 +405,14 @@ class MapPlot(GenericPlot):
         self._init_proj()
 
 
-        if self.plot_extent is None:
+        if self.region_extent is None:
             self.plot_global = True
         else:
-            self.plot_extent = utils.csv_to_list(self.plot_extent)
-            self.plot_extent = list(map(int, self.plot_extent))
+            self.region_extent = utils.csv_to_list(self.region_extent)
+            self.region_extent = list(map(int, self.region_extent))
             self.plot_global = False
+
+            self.plot_global = True
 
 
 
@@ -207,7 +421,8 @@ class MapPlot(GenericPlot):
 
 
     def _init_proj(self):
-        allowed_projections = ['LambertAzimuthalEqualArea', 'LambertConformal']
+        allowed_projections = ['LambertAzimuthalEqualArea', 'LambertConformal',
+                               'Stereographic']
         if self.projection is None:
             self.projection = 'LambertAzimuthalEqualArea'
 
@@ -237,126 +452,152 @@ class MapPlot(GenericPlot):
 
     def plot(self, metric, verbose=False):
         """ plot all steps in file """
-        _ds_file = self.xr_file
-        var_list = [i for i in _ds_file.data_vars]
-        for _vi, _var in enumerate(var_list):
-            _steps = utils.convert_to_list(_ds_file[_var]['time'].values)
+        xr_file_list = self.xr_file
+        if not isinstance(self.xr_file, list):
+            xr_file_list = [self.xr_file]
 
-            for _step in _steps:
-                _data = _ds_file[_var].sel(time=_step)
-                if 'member' in _data.dims:
-                    _data = _data.mean(dim='member')
+        for _ds_file in xr_file_list:
+            var_list = list(_ds_file.data_vars)
 
+            if 'lsm' in var_list:
+                var_list.remove('lsm')
+            if 'lsm-full' in var_list:
+                var_list.remove('lsm-full')
 
-                thisfig = plt.figure(figsize=(11.69, 8.27))  # A4 figure size
-                # set up map axes
-                proj = getattr(ccrs, self.projection)(**self.proj_options)
-                if verbose:
-                    utils.print_info(f'Target projection of plot {proj.proj4_init}')
-
-                ax = plt.axes(projection=proj)
-
-                if self.plot_global:
-                    ax.set_global()
-
-                polar_projs = ['LambertAzimuthalEqualArea']
-                if self.circle_border == "yes" and self.projection in polar_projs:
-                    lat_end = 90-60
-                    ax.set_extent([-lat_end * 111000,
-                                   lat_end * 111000,
-                                   -lat_end * 111000,
-                                   lat_end * 111000],
-                                  crs=proj)
-
-                    r_limit = 1 * (lat_end) * 111 * 1000
-                    circle_path = matplotlib.path.Path.unit_circle()
-                    circle_path = matplotlib.path.Path(circle_path.vertices.copy() * r_limit,
-                                             circle_path.codes.copy())
-                    ax.set_boundary(circle_path)
-
-                if not self.plot_global:
-                    ax.set_extent(self.plot_extent)
-
-                if 'yc' in _data.dims:
-                    _projection =  getattr(_ds_file[_var],'projection')
-                    _proj_options = {}
-                    for proj_param in ['central_longitude', 'central_latitude',
-                                       'true_scale_latitude']:
-                        if proj_param in _ds_file[_var].attrs:
-                            _proj_options[proj_param] = getattr(_ds_file[_var],proj_param)
-                    trans_grid = getattr(ccrs, _projection)(**_proj_options)
-
-                    x_dim = _data['xc']
-                    y_dim = _data['yc']
-
-                elif f'yc_{_var}' in _data.dims:
-                    _projection = getattr(_ds_file[_var], 'projection')
-                    _proj_options = {}
-                    for proj_param in ['central_longitude', 'central_latitude',
-                                       'true_scale_latitude']:
-                        if proj_param in _ds_file[_var].attrs:
-                            _proj_options[proj_param] = getattr(_ds_file[_var], proj_param)
-                    trans_grid = getattr(ccrs, _projection)(**_proj_options)
-
-                    x_dim = _data[f'xc_{_var}']
-                    y_dim = _data[f'yc_{_var}']
-
-                elif 'latitude' in _data.dims:
-                    trans_grid = ccrs.PlateCarree()
-                    x_dim = _data['longitude']
-                    y_dim = _data['latitude']
-                    _data, x_dim = add_cyclic_point(_data.values, coord=x_dim.values)
-
-                if verbose:
-                    utils.print_info(f'Input projection of file {trans_grid.proj4_init}')
-
-                levels = self.levels
-                cmap = plt.get_cmap(self.cmap)
-
-                extend = 'both'
-                if self.clip:
-                    _data = _data.clip(levels[0], levels[-1])
-                    extend = 'neither'
+            for _vi, _var in enumerate(var_list):
+                _steps = utils.convert_to_list(_ds_file[_var]['time'].values)
 
 
-                plot = ax.contourf(x_dim, y_dim, _data, levels, transform=trans_grid,
-                                   cmap=cmap, extend=extend, vmin=levels[0])
+                for _step in _steps:
+                    _data = _ds_file[_var].sel(time=_step)
+
+                    if 'member' in _data.dims:
+                        _data = _data.mean(dim='member')
 
 
-                # only GA (needs to be removed or made more flexible)
-                #plot_contour = ax.contour(x_dim, y_dim, _data, levels=[0.15], transform=trans_grid,
-                #                          colors='cyan', linewidths=2)
-                #ax.scatter(146.5, 76.8, color='red', s=20, transform=ccrs.PlateCarree())
 
-                ax.add_feature(cartopy.feature.LAND,
-                               zorder=1, edgecolor='k',
-                               facecolor='slategray')
+                    thisfig = plt.figure(figsize=(11.69, 8.27))  # A4 figure size
+                    # set up map axes
+                    proj = getattr(ccrs, self.projection)(**self.proj_options)
+
+                    # first check for yc/xc coordinates; then for longitude/latitude
+                    if 'yc' in _data.dims:
+                        _projection = getattr(_ds_file[_var], 'projection')
+                        _proj_options = {}
+                        for proj_param in ['central_longitude', 'central_latitude',
+                                           'true_scale_latitude']:
+                            if proj_param in _ds_file[_var].attrs:
+                                _proj_options[proj_param] = getattr(_ds_file[_var], proj_param)
+                        trans_grid = getattr(ccrs, _projection)(**_proj_options)
+
+                        x_dim = _data['xc']
+                        y_dim = _data['yc']
+
+                    elif f'yc_{_var}' in _data.dims:
+                        _projection = getattr(_ds_file[_var], 'projection')
+                        _proj_options = {}
+                        for proj_param in ['central_longitude', 'central_latitude',
+                                           'true_scale_latitude']:
+                            if proj_param in _ds_file[_var].attrs:
+                                _proj_options[proj_param] = getattr(_ds_file[_var], proj_param)
+                        trans_grid = getattr(ccrs, _projection)(**_proj_options)
+
+                        x_dim = _data[f'xc_{_var}']
+                        y_dim = _data[f'yc_{_var}']
+
+                    elif 'latitude' in _data.dims:
+                        trans_grid = ccrs.PlateCarree()
+                        x_dim = _data['longitude']
+                        y_dim = _data['latitude']
+                        _data, x_dim = add_cyclic_point(_data.values, coord=x_dim.values)
+
+                    if verbose:
+                        utils.print_info(f'Input projection of file {trans_grid.proj4_init}')
+                        utils.print_info(f'Target projection of plot {proj.proj4_init}')
 
 
-                gl = ax.gridlines(draw_labels=True,
-                                  ylocs=range(-80,91,10),
-                                  x_inline=False, y_inline=False,)
-                #gl.top_labels = False
-                #gl.right_labels = False
-                gl.xformatter = LONGITUDE_FORMATTER
-                gl.yformatter = LATITUDE_FORMATTER
 
-                # add coast lines
-                ax.coastlines(color='grey')
-                cb = plt.colorbar(plot)
-                cb.set_ticks(levels)
-                cblabelstr = f'{self.shortname} {metric.legendtext} in {self.units}'
-                cb.set_label(cblabelstr, labelpad=10)
 
-                ax.set_title(self._create_title(_step, _var))
-                if self.ofile is None:
-                    ofile = self.get_filename_plot(varname=_var, time=_step,
-                                           plotformat=self.format)
-                else:
-                    ofile = utils.csv_to_list(self.ofile)[_vi]
-                print(ofile)
-                thisfig.savefig(ofile)
-                plt.close(thisfig)
+
+                    ax = plt.axes(projection=proj)
+
+                    if self.plot_global:
+                        ax.set_global()
+
+                    polar_projs = ['LambertAzimuthalEqualArea', 'Stereographic']
+                    if self.circle_border == "yes" and self.projection in polar_projs:
+                        lat_end = 90-60
+                        ax.set_extent([-lat_end * 111000,
+                                       lat_end * 111000,
+                                       -lat_end * 111000,
+                                       lat_end * 111000],
+                                      crs=proj)
+
+                        r_limit = 1 * (lat_end) * 111 * 1000
+                        circle_path = matplotlib.path.Path.unit_circle()
+                        circle_path = matplotlib.path.Path(circle_path.vertices.copy() * r_limit,
+                                                 circle_path.codes.copy())
+                        ax.set_boundary(circle_path)
+
+                    if not self.plot_global:
+                        ax.set_extent(self.region_extent)
+
+
+
+                    levels = self.levels
+                    cmap = plt.get_cmap(self.cmap)
+
+
+                    if self.clip:
+                        _data = _data.clip(levels[0], levels[-1])
+                        extend = 'neither'
+                    else:
+                        extend = 'both'
+                        # if levels[0] is zero and trans_grid != proj
+                        # missing values are drawn as lowest color
+                        # this workaround ensures that this is not the case
+                        levels[0] -= 1e-05
+
+                    plot = ax.contourf(x_dim, y_dim, _data, levels, transform=trans_grid,
+                                       cmap=cmap, extend=extend)
+
+
+                    ax.add_feature(cartopy.feature.LAND,
+                                   zorder=1, edgecolor='k',
+                                   facecolor='slategray')
+                    plt.gca().set_facecolor("slategray")
+
+
+
+                    gl = ax.gridlines(draw_labels=True,
+                                      ylocs=range(-80,91,10),
+                                      x_inline=False, y_inline=False,)
+                    #gl.top_labels = False
+                    #gl.right_labels = False
+                    gl.xformatter = LONGITUDE_FORMATTER
+                    gl.yformatter = LATITUDE_FORMATTER
+
+                    # add coast lines
+                    ax.coastlines(color='grey')
+                    cb = plt.colorbar(plot)
+
+                    # revert level changes to ensure NaN are plotted with background color
+                    if extend == 'both':
+                        levels[0] += 1e-05
+
+                    cb.set_ticks(levels)
+                    cblabelstr = f'{self.shortname} {metric.legendtext} in {self.units}'
+                    cb.set_label(cblabelstr, labelpad=10)
+
+                    ax.set_title(self._create_title(_step, _var))
+                    if self.ofile is None:
+                        ofile = self.get_filename_plot(varname=_var, time=_step,
+                                               plotformat=self.format)
+                    else:
+                        ofile = utils.csv_to_list(self.ofile)[_vi]
+                    print(ofile)
+                    thisfig.savefig(ofile)
+                    plt.close(thisfig)
 
 
     def _create_title(self, _step, _var):
@@ -366,27 +607,70 @@ class MapPlot(GenericPlot):
             _title = f'{self.verif_source} {self.verif_fcsystem} ' \
                      f'{self.verif_expname} {self.verif_mode} (enssize = {self.verif_enssize}) \n'
 
+        # calc target date
+        # check if only one date
+        if self.verif_fromyear:
+            _verif_fromyear = int(self.verif_fromyear)
+            _verif_toyear = int(self.verif_toyear)
 
 
-        if len(self.verif_dates) == 1 and self.verif_fromyear == self.verif_toyear:
-            _fcdate = utils.string_to_datetime(self.verif_fromyear+self.verif_dates[0]) \
-                      + dt.timedelta(days=int(_step))
-            _title += f' {utils.datetime_to_string(_fcdate, "%Y-%m-%d")}'
-        elif len(self.verif_dates) == 1 and self.verif_fromyear != self.verif_toyear:
-            _title += f' {self.verif_dates[0]} averaged from ' \
-                      f'{self.verif_fromyear} to {self.verif_toyear}'
-        elif len(self.verif_dates) != 1:
-            _title += f' combined dates {self.conf_verif_dates} averaged from ' \
-                     f'{self.verif_fromyear} to {self.verif_toyear}'
+        if len(self.verif_dates) == 1:
+            _tmp_date = self.verif_dates[0]
+            if len(self.verif_dates[0]) == 4:
+                _tmp_date = f'2000{self.verif_dates[0]}'
+            _target_time = utils.string_to_datetime(_tmp_date)
+
+            _target_time += relativedelta(days=int(_step))
+            if len(self.verif_dates[0]) == 4:
+                _target_time = utils.datetime_to_string(_target_time, '%m-%d')
+            else:
+                _target_time = utils.datetime_to_string(_target_time, '%Y-%m-%d')
+
+        elif 'to' in self.conf_verif_dates:
+            by_tmp = self.conf_verif_dates.split('/by/')[1]
+            _dates = self.conf_verif_dates.split('/by/')[0]
+            _dates = _dates.split('/to/')
+            yymm_format = False
+            if len(_dates[0]) == 4:
+                yymm_format = True
+
+
+            if yymm_format:
+                _dates = [f'2000{d}' for d in _dates]
+            _dates_dt = [utils.string_to_datetime(d) for d in _dates]
+            _dates_dt_target = [d+relativedelta(days=int(_step + 1)) for d in _dates_dt]
+
+            if yymm_format:
+                _next_year = [1 if d.year > 2000 else 0 for d in _dates_dt_target]
+                _verif_fromyear += _next_year[0]
+                _verif_toyear += _next_year[1]
+                _target_time = [utils.datetime_to_string(d, '%m-%d') for d in _dates_dt_target]
+            else:
+                _target_time = [utils.datetime_to_string(d, '%Y-%m-%d') for d in _dates_dt_target]
+            _target_time = '/to/'.join(_target_time)
+            _target_time += f'/by/{by_tmp}'
+
+
+
+        if self.verif_fromyear is None:
+            if len(self.verif_dates) == 1:
+                _title += f' valid-time {_target_time}'
+            else:
+                _title += f' combined dates valid-time {_target_time}'
         else:
-            raise ValueError('create title function failed')
+            _title += f' combined dates valid-time {_target_time}' \
+                      f' ({_verif_fromyear} - {_verif_toyear})'
+
 
         if _var != 'obs':
             _title += f' (leadtime: {_step+1} days)'
 
         if self.calib:
-            _title += f'\n calibrated using {self.conf_calib_dates} averaged from ' \
-                     f'{self.calib_fromyear} to {self.calib_toyear}'
+            _title += f'\n calibrated using {self.conf_calib_dates}'
+            if self.calib_fromyear:
+                _title += f' averaged from {self.calib_fromyear} to {self.calib_toyear}'
+
+
 
         _title += f' {self.metric_plottext}'
 
