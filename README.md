@@ -10,7 +10,7 @@ Interfaces and functionality are likely to change, and the project itself may be
 ### Installation
 Clone source code repository
 
-    $ git clone 
+    $ git clone https://git.ecmwf.int/scm/~nedb/icecap.git
 
 Create conda environment and install necessary packages
 
