@@ -638,7 +638,7 @@ class MapPlot(GenericPlot):
             if yymm_format:
                 _dates = [f'2000{d}' for d in _dates]
             _dates_dt = [utils.string_to_datetime(d) for d in _dates]
-            _dates_dt_target = [d+relativedelta(days=int(_step + 1)) for d in _dates_dt]
+            _dates_dt_target = [d+relativedelta(days=int(_step)) for d in _dates_dt]
 
             if yymm_format:
                 _next_year = [1 if d.year > 2000 else 0 for d in _dates_dt_target]
