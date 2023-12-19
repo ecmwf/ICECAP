@@ -62,7 +62,7 @@ config_optnames = {
         'maximum_processes_plot': {
             'printname': 'maximum number of parallel plot processes',
             'optional' : True,
-            'default_value' : ["4"],
+            'default_value' : ["1"],
 
         },
     }, # end ecflow
