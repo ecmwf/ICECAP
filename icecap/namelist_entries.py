@@ -58,7 +58,13 @@ config_optnames = {
         'ecflow_port': {
             'printname': 'ecflow host port',
             'optional' : ['ecflow:yes']
-        }
+        },
+        'maximum_processes_plot': {
+            'printname': 'maximum number of parallel plot processes',
+            'optional' : True,
+            'default_value' : ["4"],
+
+        },
     }, # end ecflow
     'staging': {
         'verdata' : {

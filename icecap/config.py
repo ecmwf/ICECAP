@@ -90,6 +90,7 @@ class Configuration():
         self.ecfhomeroot = None
         self.ecflow_host = None
         self.ecflow_port = None
+        self.maximum_processes_plot = None
         self.lonlatres = None
         self.verdata = None
         self.params = None
@@ -177,6 +178,7 @@ class Configuration():
             self.split_get = True
 
             self._init_config(conf_parser, 'ecflow')
+
 
 
         # get forecast attributes from config

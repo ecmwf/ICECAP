@@ -44,7 +44,8 @@ class ExecutionHost:
                                    self.etcdir]
         self.directories_create_ecflow = [conf.ecffilesdir, conf.ecfincdir, conf.ecfhomeroot]
 
-        self.directories_wipe = [conf.rundir, conf.datadir, conf.tmpdir]
+        self.directories_wipe = [conf.rundir, conf.datadir, conf.tmpdir,
+                                 f'{conf.ecfhomeroot}/icecap/{self.suitename}']
         self.directories_wipe_full = [conf.cachedir]
 
 

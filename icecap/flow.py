@@ -57,6 +57,7 @@ class Tree:
             self.fcsets = conf.fcsets
             self.defs_file = self.rundir + '/' + self.suitename + '.def'
             self.defs = ecflow.Defs()
+            self.maximum_processes_plot = conf.maximum_processes_plot
 
     def add_attr(self, attr, parent):
         """
@@ -141,8 +142,9 @@ class Tree:
             pass
 
         # add limits
-        toplevel_s.add_limit('mars', 8)  # limit number of active MARS requests
-        toplevel_s.add_limit('proc', 8)  # limit total number of active tasks
+        if self.machine == 'ecmwf':
+            toplevel_s.add_limit('mars', 8)  # limit number of active MARS requests
+        toplevel_s.add_limit('plot', int(self.maximum_processes_plot))  # limit total number of active tasks
 
         # add suite variables
         suite_f.add_variable('ECF_PYTHON', subprocess.check_output('which python3', shell=True).strip())
@@ -319,8 +321,9 @@ class ProcessTree(Tree):
             self.add_attr(trigger_plot, 'plot')
             finish_trigger = 'plot'
         for plotid in conf.plotsets:
-            self.add_attr(['task:plot',
+            self.add_attr(['task:plot;plot',
                            f'variable:PLOTTYPE;{plotid}'], f'plot:{plotid}')
+
 
         if conf.keep_native == 'yes':
             clean_trigger = 'retrieval'
