@@ -18,13 +18,9 @@ Create conda environment and install necessary packages
     $ conda env create -f environment.yml 
 
 ### Usage
-Start conda environemnt, ecFlow server and monitoring tool
+Please follow the section 1.2 in the user guide how to set up your machine. 
+An example how to run ICECAP is provided Section 1.3.
 
-	$ conda activate icecap
-	$ ecflow_server --port 3141 &
-	$ ecflow_ui & 
-
-Follow Quick-start instructions in the user guide (section 1.3).
 
 ### License
 
