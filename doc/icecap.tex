@@ -75,12 +75,17 @@ To allow that there are two ways to interact with \ice: one through a \notimplem
 
 
 \section{Setting up your machine}\label{sec:setup}
-First clone the \ice repository to a user defined \texttt{icecap\_rootdir}. \tbd{ADD HowTo}
+First clone the \ice repository to a user defined \texttt{icecap\_rootdir}.
 \begin{lstlisting}[language=bash, float]
 	$ git clone https://git.ecmwf.int/scm/~nedb/icecap.git
 \end{lstlisting}
 
+
+\clearpage
+
+
 It contains the following subdirectories:
+
 \dirtree{% This % is required
 	.1 icecap\_rootdir.
 	.2 doc/: contains documentation.
@@ -104,7 +109,7 @@ The following code will install icecap on your local machine and start a local e
 		$ ecflow_server --port 3141 &
 		$ ecflow_ui & 
 	\end{lstlisting}
-	In ecflow\_ui the top menu navigate to \texttt{Servers -> Manage servers -> Add server} and add the ecFlow server by setting \texttt{Host} to \texttt{localhost}, \texttt{Port} to \texttt{3141} where \texttt{name} can be set individually. After licking \texttt{OK} and \texttt{Close} the server shoudl appear. Next restart the server (right click and restart).\\
+	In ecflow\_ui the top menu navigate to \texttt{Servers -> Manage servers -> Add server} and add the ecFlow server by setting \texttt{Host} to \texttt{localhost}, \texttt{Port} to \texttt{3141} where \texttt{name} can be set individually. After licking \texttt{OK} and \texttt{Close} the server should appear. Next restart the server (right click and restart).\\
 	
 	Registration is compulsory to retrieve data from the CDS. Please follow the instruction here \url{https://cds.climate.copernicus.eu/api-how-to} to set this up on your local machine.
 
@@ -115,18 +120,19 @@ This is an example how to run \ice on your local machine using a test configurat
 
 \begin{enumerate}
 	\item If not already running, start ecFlow server and monitoring tool 
-		\begin{lstlisting}[language=bash, float]
+		\begin{lstlisting}[language=bash]
 			$ ecflow_server --port 3141 &
 			$ ecflow_ui & 
 		\end{lstlisting}
+
 		
 	\item go to the directory of all python files provided with the package.
-	\begin{lstlisting}[language=bash, float]
+	\begin{lstlisting}[language=bash]
 		$ cd icecap_rootdir/icecap
 	\end{lstlisting}
 	
 	\item choose one configuration file from \texttt{icecap\_rootdir/conf/test} and copy it to your working directory.Two configuration files, which should run machine independent, are implemented. One using TOPAZ5 forecast data provided by MetNorway (\texttt{test\_topaz.conf}) and one using seasonal forecasts from the CDS (\texttt{test\_cds.conf}). Note that for the latter it is necessary to set up access to the CDS (see section \ref{sec:setup})\\
-	\begin{lstlisting}[language=bash, float]
+	\begin{lstlisting}[language=bash]
 		$ cp icecap_rootdir/conf/test/icecap_topaz.conf icecap.conf
 	\end{lstlisting}
 	
@@ -142,7 +148,7 @@ This is an example how to run \ice on your local machine using a test configurat
 	If your ecFlow server is running on your localmachine as described in section \ref{sec:setup} no changes to the \texttt{ecflow\_host} and  \texttt{ecflow\_port} of the configuration file are needed. If it is running on a different \texttt{Host} or \texttt{Port} it needs to be changed accordingly.
 	
 	\item Load \ice configuration file on ecFlow server\\
-	\begin{lstlisting}[language=bash, float]
+	\begin{lstlisting}[language=bash]
 		$ ./icecap.py
 	\end{lstlisting}
 	\item Start \ice on ecFlow server using ecFlow\_ui. \\
@@ -150,7 +156,7 @@ This is an example how to run \ice on your local machine using a test configurat
 	
 	\item Inspect graphic products.  \\
 	After the ecFlow suite has been run successfully the graphic products should be produced and can be inspected.
-	\begin{lstlisting}[language=bash, float]
+	\begin{lstlisting}[language=bash]
 		$ cd datadir/topaz_test/plots/[metric-name]/
 	\end{lstlisting}
 	
@@ -228,12 +234,12 @@ If you make changes to the code, remember that changes in \texttt{rundir/py} are
 This directory includes all files created by the \ice suite defined in the respective configuration file.
 \dirtree{% This % is required
 	.1 \texttt{datadir}.
-	.2 \texttt{metric} 
+	.2 \texttt{metric} .
 	.3 \texttt{metric-1} - metric files for metric-1.
 	.3 \texttt{metric-2} - metric files for metric-2.
 	.3 \texttt{...} .
 	.3 \texttt{metric-n} - metric fiels for metric-n.
-	.2 \texttt{plots} 
+	.2 \texttt{plots}.
 	.3 \texttt{metric-1} - plot files for metric-1.
 	.3 \texttt{metric-2} - plot files for metric-2.
 	.3 \texttt{...} .
@@ -294,7 +300,7 @@ This configures the basic setup, such as all directories and the name of the ecF
 	 \item \texttt{datadir}: Location of metric files, and the plots all go in this directory. Make sure you have enough space. 
 	  \item \texttt{tmpdir}: Location for working directories for a single \ice suite.
 	   \item \texttt{cachedir}: Location of the local data cache, including reference and forecast data. This directory can get relatively large, depending on the amount of forecasts retrieved. The cache can be cleared entirely if needed 
-	   \begin{lstlisting}[language=bash, float]
+	   \begin{lstlisting}[language=bash]
 	   	$ ./icecap.py -ww
 	   \end{lstlisting}
 \end{itemize}
@@ -309,7 +315,7 @@ This configures the basic setup of the ecFlow server. This should be usually som
  \end{itemize}
  
  Changes to \texttt{maximum\_processes\_plot} affect all \ice suites. This means to make the new settings effective the whole icecap toplevel suite needs to be removed and re-created. To do this, follow these steps:
-  \begin{lstlisting}[language=bash, float]
+  \begin{lstlisting}[language=bash]
  	# remove icecap toplevel family (incl. all suites)
  	$ ecflow_client --host=[YOU-ECFLOW-HOST-ADDRESS] --port=[YOUR-ECFLOW-PORT]] --delete /icecap
  	
@@ -470,7 +476,7 @@ The metrics are specified using the \texttt{plottype} option in the \texttt{plot
 \subsection{\texttt{plume}}
 This metric allows to derive the plumes of  sea ice concentration for a specific initialization date. An example is:
 
-\begin{lstlisting}[language=bash, float]
+\begin{lstlisting}[language=bash]
 	[plot_plume]
 	source = nersc_tmp   
 	plottype = plume 
@@ -490,7 +496,7 @@ In this case, \texttt{plume} is calculated for TOPAZ4 data using all 10 ensemble
 \subsection{\texttt{ice\_distance}}
 This metric allows to derive distance of a specific point to the sea ice edge for each ensemble member. \notimplement{Please note that this metric is not fully tested yet. An example is}:
 
-\begin{lstlisting}[language=bash, float]
+\begin{lstlisting}[language=bash]
 	[plot_ice_distance]
 	source = nersc_tmp
 	plottype = ice_distance
@@ -511,7 +517,7 @@ In this case, the distance to the point located at 146.5\,W and 76.8\,N is calcu
 \subsection{\texttt{interp\_check}}
 This metric creates a 2-d spatial map of the forecast on the original grid (as retrieved) and on the interpolated grid. This metric can thus be used to check if the interpolation works as expected. Note that in order to use this metric \texttt{keep\_native} needs to be set to yes. An example is:
 
-\begin{lstlisting}[language=bash, float]
+\begin{lstlisting}[language=bash]
 	[plot_interp_check]
 	source = nersc_tmp
 	plottype = interp_check
@@ -531,7 +537,7 @@ Two figures will be created, one with the suffix native and one with the suffix 
 \subsection{\texttt{ensmean}}
 The metric \texttt{ensmean} allows to derive the ensemble mean sea ice concentration for a specific date or averaged over a set of dates. An example is:
 
-\begin{lstlisting}[language=bash, float]
+\begin{lstlisting}[language=bash]
 	[plot_ensmean]
 	source = nersc_tmp
 	plottype = ensmean
@@ -589,8 +595,8 @@ Here, \texttt{data} and \texttt{score} define if the statistic is calculated for
 \subsubsection{OPTION: \texttt{additional\_mask}}
 Users can specify an additional mask, which is applied to forecast data. This might be useful to make sure that the area statistics for two experiments are derived for exactly the same grid cells. In general, all grid cells for which either observations or forecasts are not defined are set to NaN, but these grid cells depend on the forecast model (lower resolution leads to fewer grid cells for which sea ice is defined). In the metric files for the different \texttt{plot\_plotID} sections, the full land-sea-mask used for the respective forecast is included when setting \texttt{area\_statistic}. Two land-sea-masks can be then used to create a combined land-sea-mask, e.g using cdo (climate data operators).\\
 
-\begin{lstlisting}[language=bash, float]
-	$cdo mul -selvar,lsm-full ${path to first metric file} \
+\begin{lstlisting}[language=bash]
+	$ cdo mul -selvar,lsm-full ${path to first metric file} \
 			-selvar,lsm-full ${path to 2nd metric file} \
 			{output_file}
 \end{lstlisting}
@@ -600,7 +606,7 @@ Users can specify an additional mask, which is applied to forecast data. This mi
 \ice is designed in a modular fashion to allow flexible verification, calibration and product generation of sea ice forecasts from different modeling centres and for different time scales across Copernicus services. 
 
 \section{General}
-\ice si designed to be further developed by the scientific community. This includes the implementation of new data sources and new metrics but also bug-fixes. If implementing new code the pylint package should be used to check the readability (beside a few exceptions, a score above 8 is requested before I will merge it into the master branch of the git repository).
+\ice is designed to be further developed by the scientific community. This includes the implementation of new data sources and new metrics but also bug-fixes. If implementing new code the pylint package should be used to check the readability (beside a few exceptions, a score above 8 is requested before I will merge it into the master branch of the git repository).
 
 \section{Adding data sources}
 Whereas the necessary code to retrieve some public datasets is already implemented, \ice is designed to allow simple implementation to read in further datasets. This could be either data from remote servers but also data from local disks. \notimplement{If you like to implement new dataset retrievals in version \version, refer to the module \texttt{nersc\_tmp.py}, which includes the implementation of TOPAZ4/5 data from the THREDDS server. Also please get in touch with me as I am happy to provide support to scientific partners within the ACCIBERG project).}
