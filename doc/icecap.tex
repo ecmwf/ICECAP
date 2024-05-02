@@ -31,7 +31,7 @@
 \newcommand{\notimplement}[1]{#1}
 
 \title{ICECAP user manual}
-\subtitle{Version 0.1}
+\subtitle{Version 0.2}
 \author{Daniel J. Befort \\ daniel.befort@ecmwf.int}
 
 
@@ -303,6 +303,7 @@ This configures the basic setup, such as all directories and the name of the ecF
 	   \begin{lstlisting}[language=bash]
 	   	$ ./icecap.py -ww
 	   \end{lstlisting}
+	   \item \texttt{python\_exe}: Specify location of python binary. This is useful in case of personal conda environments. If not specified the python3 binary used as default on executing shell will be used.
 \end{itemize}
 	
 \subsection{Section \texttt{ecflow}} \label{sec:ecflow}
@@ -452,12 +453,14 @@ The reasons for the implementation of these 3 methods is that it allows the user
 \section{Understanding and using existing metrics}
 In \ice, a \emph{metric} is any set of fields or time series that is derived from forecast and reference data and represents some relevant aspect of the full data. The dimensions of metrics data are a subset of the dimensions of the full data. Thus, metrics data are orders of magnitude smaller than full forecast/verification data. Since metrics data are stored on disk as NetCDF files, they can be quickly read for further processing and plotting. 
 
-Currently, the follwoing metrics are \notimplement{implemented}
+Currently, the following metrics are \notimplement{implemented}
 \begin{enumerate}
 	\item timeseries only
 	\begin{itemize}
 		\item plume
 		\item ice\_distance - distance of user given location to sea ice edge (not fully tested yet)
+		\item iiee - integrated ice edge error
+		\item sps - spatial probability score
 	\end{itemize}
 	\item 2-d maps only
 	\begin{itemize}
@@ -467,6 +470,10 @@ Currently, the follwoing metrics are \notimplement{implemented}
 		\begin{itemize}
 		\item ensmean - ensemble mean for one forecast date or over a set of forecast dates 
 		\item forecast\_error - error for one forecast date or averaged over many forecast dates
+		\item crps: continuous ranked probability skill score
+		\item brier: Brier Skill Score
+		\item rmse: Root mean square error
+		\item ser: Spread-error ratio
 	\end{itemize}
 \end{enumerate}
 
@@ -514,6 +521,28 @@ This metric allows to derive distance of a specific point to the sea ice edge fo
 In this case, the distance to the point located at 146.5\,W and 76.8\,N is calculated for each of the 10 members from the TOPAZ4 forecast initialized on the 29.6.2023. Observational data is added and the position of the map inset is changed to upper left (\texttt{inset\_position}).
 
 
+\subsection{\texttt{iiee}}
+\label{subsec:iiee}
+This metric allows to calculate the integrated ice edge error (IIEE). Per definition the IIEE is a quantity averaged over a specific multiplied by the grid cell size. The example below calculates the IIEE for one forecast from TOPAZ4.
+
+\begin{lstlisting}[language=bash]
+	[plot_iiee]
+	source = nersc_tmp
+	plottype = iiee
+	verif_expname = topaz4
+	verif_mode = fc
+	verif_fcsystem = medium-range
+	verif_dates = 20230627
+	verif_enssize = 10
+	target = r:10
+	add_verdata = yes
+	region_extent = -120., 20., 75, 90
+	area_statistic = data:sum
+\end{lstlisting}
+
+\subsection{\texttt{sps}}
+This metric allows to calculate the Spatial probability Scorer (SPS). Per definition the SPS is a quantity averaged over a specific region multiplied by the grid cell size. For a deterministic forecast the SPS is equal to the IIEE. The example in \ref{subsec:iiee} can be simply used to derive the SPS instead of the IIEE by replacing the \texttt{plottype} parameter. 
+
 \subsection{\texttt{interp\_check}}
 This metric creates a 2-d spatial map of the forecast on the original grid (as retrieved) and on the interpolated grid. This metric can thus be used to check if the interpolation works as expected. Note that in order to use this metric \texttt{keep\_native} needs to be set to yes. An example is:
 
@@ -553,6 +582,51 @@ The metric \texttt{ensmean} allows to derive the ensemble mean sea ice concentra
 \end{lstlisting}
 
 In this case, \texttt{ensmean} is calculated for TOPAZ4 data using all 10 ensemble members. Ensemble mean statistics are derived for the first three forecast days (indicated by the \texttt{target} option) averaging over both start dates (given by \texttt{verif\_dates}). In this case, sea-ice data is only plotted over the region given by \texttt{plot\_extent}. Note that using e.g. \texttt{area\_statistic = data:mean:percent} would automatically create a timeseries plot over the selected region.
+
+\subsection{\texttt{crpss}}
+The metric \texttt{CRPSS} allows to compute the continuous ranked probability skill score using persistence as reference. An example is
+
+\begin{lstlisting}[language=bash]
+	[plot_crps_ecmwf]
+	source = ecmwf
+	plottype = crps
+	verif_expname = 0001
+	verif_mode = fc
+	verif_fcsystem = medium-range
+	verif_dates = 20231001/to/20231020/by/1d
+	verif_enssize = 51
+	target = r:10
+	region_extent = 120., -120., 75, 80
+	area_statistic = score:mean
+\end{lstlisting}
+This example calculates the average CRPSS over a selected region using a set of forecasts. Here, CRPSS values are first derived for each grid cell and then averaged over the region specified. Changing \texttt{area\_statistic = score:mean} to \texttt{area\_statistic = data:mean}  averages sea ice concentration data averaged over the region specified first before deriving the CRPSS. \notimplement{Note that calibration is not implemented yet for CRPSS calculations.}
+
+
+\subsection{\texttt{brier}}
+The metric \texttt{BSS} allows to compute the brier skill score using persistence as reference. Here all grid cells with sea ice concentrations above 15\% are declared as sea ice events. An example is
+
+\begin{lstlisting}[language=bash]
+	[plot_crps_ecmwf]
+	source = ecmwf
+	plottype = brier
+	verif_expname = 0001
+	verif_mode = fc
+	verif_fcsystem = medium-range
+	verif_dates = 20231001/to/20231020/by/1d
+	verif_enssize = 51
+	target = r:10
+	region_extent = 120., -120., 75, 80
+	area_statistic = score:mean
+\end{lstlisting}
+This calculates the average BSS over a selected region using a set of forecasts. Here, BSS values are first derived for each grid cell and then averaged over the region specified. Changing \texttt{area\_statistic = score:mean} to \texttt{area\_statistic = data:mean}  averages sea ice concentration data averaged over the region specified first before deriving the BSS.  \notimplement{Note that calibration is not implemented yet for BSS calculations.}
+
+
+\subsection{\texttt{rmse}}
+Metric to derive the root mean square error (RMSE) for a given (set of) forecast(s). The example in \ref{subsec:iiee} can be simply used to derive the RMSE instead of the IIEE by replacing the \texttt{plottype} parameter. 
+
+\subsection{\texttt{ser}}
+Metric to derive the spread error ratio (SER) for a given (set of) forecast(s). The example in \ref{subsec:iiee} can be simply used to derive the SER instead of the IIEE by replacing the \texttt{plottype} parameter. Using this metric will automatically create plots for the \texttt{spread} (square root of teh average ensemble variance), the \texttt{RMSE} and the \texttt{SER}. When averaging over a user-specified area, two line-plots will be created: one including \texttt{SPREAD} and \texttt{RMSE} and one with the \texttt{SER}.
+
 
 
 \subsection{Additional plot options}\label{subsec:add_options}
@@ -651,4 +725,32 @@ A new configuration options needs to be inserted at the correct place. The new o
 
 After implementing the new option in \texttt{namelist.py}, it will now automatically be read at the respective part of the \texttt{config.py} file. The function reading the config file section is called \texttt{\_init\_config(conf\_parser, 'section name')}. After reading the configuration file section the value of the new option should be available as a class attribute \texttt{self.new\_option}.
 
+\chapter{Changelog History}
+\paragraph{\textbf{\ice v0.2\\[5pt]}}
+
+\textit{Bug fixes}
+\begin{itemize}
+	\item check for not pooling different forecast cycles fixed (only ECMWF data affected)
+	\item  reading calibration model data with \texttt{-grid} option
+	\item \texttt{region\_extent} wasn't working properly on inset
+	\item \texttt{Tsplot class}: map inset was wrong for boxes over dateline 
+	\item \texttt{MapPlot class}: pass crs to \texttt{set\_extent} call
+	\item land-sea-masking didn't work properly for cds data where ensemble size for forecast and hindcast  differ
+	\item \texttt{ice\_distance metrics}: longitude/latitude coordinates corrected
+	
+\end{itemize}
+
+\textit{Features}
+\begin{itemize}
+	\item new metrics: CRPSS, BSS, RMSE, SER (spread-error-ratio), IIEE
+	\item \texttt{python\_exe} allows to specify python binary used to run \ice
+	\item points given in namelist are now plotted on map plots
+	\item land-sea masking based on combined mask from fc and obs used in ice\_distance metric
+	\item observational data for the day before the first forecast day is now also retrieved (needed to derive scores using persistence as reference)
+\end{itemize}
+
+\textit{Breaking changes}
+\begin{itemize}
+	\item ecmwf medium and extended-range retrievals. Retrieve one less time step as daily means are calculated from [0 to 24[ UTC. In version 0.1 daily sea ice data for one more day than specified in the namelist has been computed. However, the last daily mean was only computed from one 6-hourly timestep (00UTC), meaning that the daily mean for this day is incorrect. --> the cache should be updates for ECMWF medium and extended-range data retrieved with version 0.1.
+\end{itemize}
 \end{document}
