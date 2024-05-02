@@ -21,8 +21,6 @@ class Metric(BaseMetric):
         fc_regrid = self.load_fc_data('verif')
         fc_native = self.load_fc_data('verif', grid='native')
 
-
-
         fc_regrid_select = fc_regrid.isel(inidate=0,date=0, member=0, time=[-1]).rename('regrid')
         fc_regrid_select = fc_regrid_select.rename({'xc':'xc_regrid', 'yc':'yc_regrid'})
         fc_native_select = fc_native.isel(inidate=0,date=0, member=0, time=[-1]).rename('native')

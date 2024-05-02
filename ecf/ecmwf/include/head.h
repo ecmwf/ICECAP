@@ -50,13 +50,20 @@ export ECF_NAME=%ECF_NAME%    # The name of this current task
 export ECF_PASS=%ECF_PASS%    # A unique password
 export ECF_TRYNO=%ECF_TRYNO%  # Current try number of the task
 export ECF_RID=${SLURM_JOB_ID:-$$}
+export ECF_PYTHON=%ECF_PYTHON%
 
 module load ecflow/%ECF_VERSION%
 
-cd %ETCDIR%
-source ./load_modules python3
-export ECF_PYTHON=python3
-
+# To allow personal conda environments
+if [ $ECF_PYTHON == 'None' ]; then
+    cd %ETCDIR%
+    source ./load_modules python3
+    export ECF_PYTHON=python3
+else
+    # see https://github.com/ks905383/xagg/issues/47
+    esmf_file=$($ECF_PYTHON -c "import os; from pathlib import Path; print(str(Path(os.__file__).parent.parent / 'esmf.mk'))")
+    export ESMFMKFILE=$esmf_file
+fi
 
 # Tell ecFlow we have started
 ecflow_client --init=$ECF_RID

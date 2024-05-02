@@ -34,7 +34,6 @@ if __name__ == '__main__':
     elif args.exptype == 'WIPE':
         data.remove_native_files()
     else:
-
         if not data.check_cache(verbose=args.verbose):
             data.get_from_tape(dryrun=False)
             data.process()

@@ -28,6 +28,7 @@ if __name__ == '__main__':
 
     m.compute()
     m.save()
+
     if m.gettype() == 'map':
         p = plottypes.MapPlot(conf, args.plotid,m)
     elif m.gettype() == 'ts':

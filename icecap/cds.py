@@ -181,14 +181,15 @@ class CdsData(dataobjects.ForecastObject):
             ds_in = xr.open_dataset(file, engine='cfgrib')
             da_in = ds_in[iname].rename(self.params)
 
+
+
             # mask using the land-sea mask (if necessary for the respective dataset)
             if self.lsm:
-                da_lsm = xr.open_dataarray(f'{self.fccachedir}/lsm.nc')
+                da_lsm = xr.open_dataarray(f'{self.fccachedir}/lsm.nc').isel(number=0)
                 # drop coords not in dims as otherwise time is deleted from da_in after where command
                 da_lsm = da_lsm.drop([i for i in da_lsm.coords if i not in da_lsm.dims])
                 da_in = da_in.where(da_lsm == 0)
                 da_in = da_in.astype(dtype=da_in.dtype, order='C')
-
 
             is_number = 'number' in da_in.dims
             is_step = 'step' in da_in.dims
@@ -213,6 +214,7 @@ class CdsData(dataobjects.ForecastObject):
             startdate = startdate[0]
             da_out = da_in.sel(starttime=startdate)
 
+
             # convert step to time
             da_out = convert_step2time(da_out, offset_hour=12)
 
@@ -236,3 +238,4 @@ class CdsData(dataobjects.ForecastObject):
 
                 ofile = self._save_filename(date=startdate, number=number, grid=self.grid)
                 da_out_save.to_netcdf(ofile)
+                print(ofile)

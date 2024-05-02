@@ -14,7 +14,7 @@ export ECF_RID=$$             # record the process id. Also used for zombie dete
 export ECF_PYTHON=%ECF_PYTHON%
 
 # see https://github.com/ks905383/xagg/issues/47
-esmf_file=$(python -c "import os; from pathlib import Path; print(str(Path(os.__file__).parent.parent / 'esmf.mk'))")
+esmf_file=$($ECF_PYTHON -c "import os; from pathlib import Path; print(str(Path(os.__file__).parent.parent / 'esmf.mk'))")
 export ESMFMKFILE=$esmf_file
 
 # Tell ecFlow we have started

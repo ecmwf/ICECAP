@@ -36,6 +36,7 @@ class Tree:
         self.rundir = conf.rundir
         self.suitename = conf.suitename
         self.ecflow = conf.ecflow
+        self.python_binary = conf.python_exe
         if self.ecflow == "yes":
             self.user = conf.user
             self.ecflow_host = conf.ecflow_host
@@ -147,7 +148,13 @@ class Tree:
         toplevel_s.add_limit('plot', int(self.maximum_processes_plot))  # limit total number of active tasks
 
         # add suite variables
-        suite_f.add_variable('ECF_PYTHON', subprocess.check_output('which python3', shell=True).strip())
+        if self.python_binary is not None:
+            suite_f.add_variable('ECF_PYTHON', self.python_binary)
+        elif self.machine != 'ecmwf':
+            suite_f.add_variable('ECF_PYTHON', subprocess.check_output('which python3', shell=True).strip())
+        else:
+            suite_f.add_variable('ECF_PYTHON', 'None')
+
         suite_f.add_variable('ECF_INCLUDE', self.ecfincdir)
         suite_f.add_variable('ECF_FILES', self.ecffilesdir)
         suite_f.add_variable('ECF_HOME', self.ecfhomedir)

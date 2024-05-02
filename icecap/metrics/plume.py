@@ -7,6 +7,7 @@ from .metric import BaseMetric
 xr.set_options(keep_attrs=True)
 os.environ['HDF5_USE_FILE_LOCKING']='FALSE'
 
+
 class Metric(BaseMetric):
     """ Metric object """
     def __init__(self, name, conf):
@@ -16,7 +17,7 @@ class Metric(BaseMetric):
         self.legendtext = ''
         self.ylabel = 'sic'
         self.levels = np.arange(0, 1.1, .1)
-        self.use_dask = False
+        self.use_dask = True
 
 
         if self.area_statistic is None:
@@ -30,22 +31,24 @@ class Metric(BaseMetric):
 
     def compute(self):
         """ Compute metric """
-
-        da_fc_verif = self.load_fc_data('verif', average_dim=['date','inidate'])
+        da_fc_verif = self.load_fc_data('verif')
+        da_fc_verif = da_fc_verif.isel(inidate=0, date=0)
         data = [da_fc_verif.rename(f'{self.verif_expname[0]}')]
 
-        # we need to load reference data to calculate lsm
-        da_verdata_verif = self.load_verif_data('verif',
-                                                average_dim=['member','date','inidate'])
-        data.append(da_verdata_verif.rename('obs'))
 
+        # we need to load reference data to calculate lsm
+        da_verdata_verif = self.load_verif_data('verif')
+        da_verdata_verif = da_verdata_verif.isel(inidate=0, date=0, member=0)
+        data.append(da_verdata_verif.rename('obs'))
 
         if self.calib:
             da_fc_calib = self.load_fc_data('calib', average_dim=['member','date','inidate'])
             da_verdata_calib = self.load_verif_data('calib',average_dim=['member','date','inidate'])
             bias_calib = da_fc_calib - da_verdata_calib
             fc_verif_bc = da_fc_verif - bias_calib
+            #fc_verif_bc = da_fc_verif - da_fc_calib
             data[0] = fc_verif_bc.rename(f'{self.verif_expname[0]}')
+
 
 
         data, lsm_full = self.mask_lsm(data)
@@ -65,5 +68,7 @@ class Metric(BaseMetric):
 
         data.append(lsm_full)
         data_xr = xr.merge(data)
+        data_xr = data_xr.assign_attrs({'obs-linecolor': 'k'})
+        data_xr = data_xr.assign_attrs({f'{self.verif_expname[0]}-linecolor': 'blue'})
 
         self.result = data_xr

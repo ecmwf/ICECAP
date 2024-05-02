@@ -16,7 +16,7 @@ class Metric(BaseMetric):
         self.legendtext = 'bias'
         self.default_cmap = 'bwr'
         self.levels = np.arange(-1.05, 1.15, .1)
-        self.levels = np.arange(-0.22, 0.26, .04)
+        self.levels = [-.25,-.2,-.15,-.1,-.05,.05,.1,.15,.2,.25]
         self.default_cmap = 'RdBu_r'
         self.ylabel = 'sic'
 

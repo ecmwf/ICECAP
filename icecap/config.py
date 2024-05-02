@@ -87,6 +87,7 @@ class Configuration():
         self.sourcedir = None
         self.rundir = None
         self.datadir = None
+        self.python_exe = None
         self.ecfhomeroot = None
         self.ecflow_host = None
         self.ecflow_port = None

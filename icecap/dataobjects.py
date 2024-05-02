@@ -4,6 +4,7 @@ to forecasts and verification data for staging and for config"""
 import os
 import glob
 import datetime as dt
+from dateutil.relativedelta import relativedelta
 import shutil
 
 import xesmf as xe
@@ -64,7 +65,8 @@ class DataObject:
                     ds_in = xr.open_dataset(f'{file}')
                     if len(ds_in.time) < self.ndays:
                         if verbose:
-                            print(f'Not all timesteps needed found in {file}')
+                            print(f'Not all timesteps needed found in {file}'
+                                  f' {len(ds_in.time)} < {self.ndays}')
                         self.files_to_retrieve.append(file)
 
 
@@ -324,6 +326,11 @@ class ForecastConfigObject:
             self.sdates = _dates_list
             self.dtdates = [utils.string_to_datetime(d) for d in self.sdates ]
 
+            # add previous day for persistence calculation
+            prev_day = self.dtdates[0] - relativedelta(days=1)
+            dtdates_prev = [prev_day] + self.dtdates
+
+
         # for hindcast mode dates need to be given in MMDD format
         # for hc we need hc reference dates as well as
         # a loop variable, as the reference date might be equivalent for different forecasts dates, e.g. for S2S
@@ -333,18 +340,21 @@ class ForecastConfigObject:
                                  'with fromyear and toyear if mode = hc')
 
             _dates_list_ref = utils.confdates_to_list(self.hcrefdate)
+
             if len(_dates_list_ref[0]) != 8:
                 raise ValueError('hcrefdate needs to be in the format YYYYMMDD')
             if len(_dates_list_ref) == 1:
-                _dates_list_ref = [_dates_list_ref[0] for _d in range(len(self.dates))]
+                _dates_list_ref = [_dates_list_ref[0] for _d in range(len(_dates_list))]
             elif len(_dates_list_ref) != len(_dates_list):
                 raise ValueError('hcrefdate must have length 1 or the same length '
                                  'as dates')
+
 
             self.dthcrefdate = [dt.datetime.strptime(d, '%Y%m%d') for d in _dates_list_ref]
             self.shcrefdate = [d.strftime('%Y%m%d') for d in self.dthcrefdate]
             self.shcrefdate_loop = [f'{self.shcrefdate[i]}-{i + 1}'
                                     for i in range(len(self.shcrefdate))]
+
 
         # dates given in MMDD format + fromyear/toyear
         if len(_dates_list[0]) == 4:
@@ -362,6 +372,7 @@ class ForecastConfigObject:
                 _dates_tmp = [f'{_year}{date}' for _year in range(int(getattr(self, 'fromyear')),
                                                                   int(getattr(self, 'toyear')) + 1)]
 
+
                 # remove dates which are not defined, e.g. 29.2 for non-leap years
                 _dates = []
                 for d in _dates_tmp:
@@ -370,6 +381,9 @@ class ForecastConfigObject:
                     except:
                         pass
                 if _dates:
+                    # dates including previosu day for persistence scores
+                    dtdates_prev = [ fcday - relativedelta(days=1) for fcday in _dates] + _dates
+
                     _dates_list_yyyymmdd += _dates
                     if self.mode == 'hc':
                         hc_date_dict[self.shcrefdate_loop[di]] = _dates
@@ -386,9 +400,11 @@ class ForecastConfigObject:
                 self.shcdates = shc_date_dict
 
         # all forecast days calculated from init-day + ndays parameter
-        self.dtalldates = utils.make_days_datelist(self.dtdates, self.ndays)
+        #self.dtalldates = utils.make_days_datelist(self.dtdates, self.ndays)
+        self.dtalldates = utils.make_days_datelist(dtdates_prev, self.ndays)
         self.salldates = sorted(list(dict.fromkeys([d.strftime('%Y%m%d')
                                                     for d in self.dtalldates])))
+
 
 
 

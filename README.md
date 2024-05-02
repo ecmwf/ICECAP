@@ -19,7 +19,7 @@ Create conda environment and install necessary packages
     $ conda config --set channel_priority flexible
     $ conda env create -f environment.yml 
 
-Installation has been tested successfully on osx-arm64 (Macbook M2), linux-65, ATOS HPC.
+Installation has been tested successfully on osx-arm64 (Macbook M2), linux-64, ATOS HPC.
 
 ### Usage
 Please follow the section 1.2 in the user guide how to set up your machine. 

@@ -140,11 +140,11 @@ class Metric(BaseMetric):
 
 
                     if 'lon' in da.coords:
-                        tind_lon = da.lon.values[tind].flatten()
-                        tind_lat = da.lat.values[tind].flatten()
+                        tind_lon = ds_edge.lon.values[tind].flatten()
+                        tind_lat = ds_edge.lat.values[tind].flatten()
                     else:
-                        tind_lon = da.longitude.values[tind].flatten()
-                        tind_lat = da.latitude.values[tind].flatten()
+                        tind_lon = ds_edge.longitude.values[tind].flatten()
+                        tind_lat = ds_edge.latitude.values[tind].flatten()
                     edge_points = (np.column_stack((tind_lon, tind_lat))).tolist()
 
                     out_dist[m, tsi] = _distance_haversine(edge_points, [current_point])
@@ -161,14 +161,49 @@ class Metric(BaseMetric):
         # ice-regions with less than min_size grid cells will be removed
         # (to avoid distance being calculated to small ice areas, e.g. at the coasts)
         min_size = 255
+        #min_size = 15
+        min_size = None
         datalist = []
         data_names = []
 
 
+        da_fc_verif = self.load_fc_data('verif')
+        da_obs_verif = self.load_verif_data('verif')
+        data = [da_fc_verif, da_obs_verif]
+
+        if self.calib:
+            da_fc_calib = self.load_fc_data('calib')
+            da_verdata_calib = self.load_verif_data('calib')
+            data.extend([da_fc_calib,da_verdata_calib])
+
+
+        data, _ = self.mask_lsm(data)
+
+        if self.calib:
+            da_fc_verif, da_obs_verif, da_fc_calib, da_verdata_calib = data
+            da_fc_verif = da_fc_verif.load()
+            da_obs_verif = da_obs_verif.load()
+            da_fc_calib = da_fc_calib.load()
+            da_verdata_calib = da_verdata_calib.load()
+
+        else:
+            da_fc_verif, da_obs_verif = data
+            da_fc_verif = da_fc_verif.load()
+            da_obs_verif = da_obs_verif.load()
+        print('done')
+
+
+        list_fc_verif = []
+        for idate in da_fc_verif['date'].values:
+            da_fc_verif_tmp = da_fc_verif.isel(inidate=0).sel(date=idate)
+            da_fc_verif_dist_tmp = self._compute_distance(da_fc_verif_tmp, min_size=min_size)
+            list_fc_verif.append(da_fc_verif_dist_tmp)
+        da_fc_verif_dist = xr.concat(list_fc_verif, dim='newdim')
+        da_fc_verif_dist = da_fc_verif_dist.mean(dim='newdim')
+
+
+
         if self.add_verdata == "yes":
-            da_obs_verif = self.load_verif_data('verif')
-
-
             list_obs = []
             for idate in da_obs_verif['date'].values:
                 da_obs_verif_tmp = da_obs_verif.sel(date=idate).isel(inidate=0)
@@ -179,23 +214,9 @@ class Metric(BaseMetric):
 
             datalist.append(da_obs_verif_dist.isel(member=0))
             data_names.append('obs')
-        print('done')
-
-        da_fc_verif = self.load_fc_data('verif')
-        list_fc_verif = []
-        for idate in da_fc_verif['date'].values:
-            da_fc_verif_tmp = da_fc_verif.isel(inidate=0).sel(date=idate)
-            da_fc_verif_dist_tmp = self._compute_distance(da_fc_verif_tmp, min_size=min_size)
-            list_fc_verif.append(da_fc_verif_dist_tmp)
-        da_fc_verif_dist = xr.concat(list_fc_verif, dim='newdim')
-        da_fc_verif_dist = da_fc_verif_dist.mean(dim='newdim')
-
-        print('done')
 
         if self.calib:
-            da_fc_calib = self.load_fc_data('calib')
-            da_verdata_calib = self.load_verif_data('calib')
-
+            print('calibrating')
             bias_list = []
             verdata_list = []
             for idate in da_fc_calib['date'].values:
@@ -211,11 +232,17 @@ class Metric(BaseMetric):
             bias_dist_calib = bias_dist_calib.mean(dim='newdim')
             verdata_dist_calib = xr.concat(verdata_list, dim='date')
 
-            datalist.append(verdata_dist_calib)
+            datalist.append(verdata_dist_calib.mean(dim='date').dropna(dim='member').isel(member=0))
             data_names.append('obs-hc')
             da_fc_verif_dist = da_fc_verif_dist - bias_dist_calib
 
         datalist.append(da_fc_verif_dist)
         data_names.append('model')
 
-        self.result = xr.merge([data.rename(data_names[di]) for di, data in enumerate(datalist)])
+        data_xr = xr.merge([data.rename(data_names[di]) for di, data in enumerate(datalist)])
+
+        data_xr = data_xr.assign_attrs({'obs-linecolor': 'k',
+                                        'obs-hc-linecolor': 'red',
+                                        'model-linecolor': 'blue'})
+
+        self.result = data_xr

@@ -183,7 +183,7 @@ class _EcmwfMediumRangeRetrieval(EcmwfRetrieval):
         super().__init__(kwargs)
         self.kwargs['class'] = 'od'
         stepsize = 6
-        self.kwargs['step'] = [0, 'to', int(kwargs['ndays'])*24, 'by', stepsize ]
+        self.kwargs['step'] = [0, 'to', int(kwargs['ndays'])*24-stepsize, 'by', stepsize ]
 
 
         if kwargs['mode'] == 'hc':
@@ -212,7 +212,7 @@ class _EcmwfExtendedRangeRetrieval(EcmwfRetrieval):
         super().__init__(kwargs)
         self.kwargs['class'] = 'od'
         stepsize = 6
-        self.kwargs['step'] = [0, 'to', int(kwargs['ndays'])*24, 'by', stepsize ]
+        self.kwargs['step'] = [0, 'to', int(kwargs['ndays'])*24-stepsize, 'by', stepsize ]
 
         if int(kwargs['cycle'][:2]) >= 48:
             if kwargs['mode'] == 'hc':
@@ -250,9 +250,6 @@ class _EcmwfLongRangeRetrieval(EcmwfRetrieval):
 
 
         self.kwargs['number'] = list(range(int(kwargs['enssize'])))
-
-        if kwargs['origin'] != 'ecmwf':
-            raise ValueError('Only ecmwf is allowed for source=ecmwf and fcsystem=long-range')
         self.kwargs['origin'] = 'ecmf'
 
         self.kwargs['method'] = '1'
@@ -318,8 +315,9 @@ class EcmwfData(dataobjects.ForecastObject):
 
 
             if self.type == 'INIT':
+                self.enssize = 1
                 self.tmptargetfile += '.grb'
-                cycles_alldates = [self.init_cycle(d) for d in self.sdates]
+                cycles_alldates = [self.init_cycle(d) for d in self.refdate]
                 cycles = list(dict.fromkeys(cycles_alldates))
                 cycle_firstdate = [self.sdates[cycles_alldates.index(_cycle)] for _cycle in cycles]
                 cycle_info = [f'{cycles[i]}:{cycle_firstdate[i]}' for i in range(len(cycles))]
@@ -466,9 +464,12 @@ class EcmwfData(dataobjects.ForecastObject):
 
 
 
+
             # mask using the land-sea mask (if necessary for the respective dataset)
             if self.lsm:
                 da_lsm = xr.open_dataarray(f'{self.fccachedir}/lsm.nc')
+                if 'number' in da_lsm.dims:
+                    da_lsm = da_lsm.isel(number=0)
                 # drop coords not in dims as otherwise time is deleted from da_in after where command
                 da_lsm = da_lsm.drop([i for i in da_lsm.coords if i not in da_lsm.dims])
                 da_in = da_in.where(da_lsm==0)
@@ -504,7 +505,6 @@ class EcmwfData(dataobjects.ForecastObject):
 
             # convert step to time
             da_out = convert_step2time(da_out, offset_hour=self.offset)
-
             if self.ldmean:
                 da_out = da_out.resample(time='1D').mean()
 

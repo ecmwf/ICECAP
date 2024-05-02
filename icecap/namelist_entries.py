@@ -44,6 +44,10 @@ config_optnames = {
         'cachedir':{
             'printname': 'cache directory',
             'optional' : False
+        },
+        'python_exe':{
+            'printname': 'python binary',
+            'optional' : True
         }
     }, # end environment
     'ecflow': {
@@ -96,7 +100,7 @@ config_optnames = {
         },
         'modelname' : {
             'printname':'model name (for S2S)',
-            'optional' : ['fcsystem:s2s', 'fcsystem:long-range'],
+            'optional' : ['fcsystem:s2s'],
         },
         'expname' : {
             'printname':'experiment name',
@@ -158,7 +162,8 @@ config_optnames = {
             'printname':'plot type',
             'optional' : False,
             'allowed_values' : ["interp_check","ensmean","forecast_error",
-                                "ice_distance", "plume"]
+                                "ice_distance", "plume", "freeze-up", 'brier',
+                                'crps', 'rmse', 'ser','iiee','sps']
         },
         'verif_mode':{
             'printname': 'forcast or hindcast mode for plotting',
@@ -259,7 +264,7 @@ config_optnames = {
         },
         'verif_modelname' : {
             'printname':'model name (for S2S)',
-            'optional' : ['verif_fcsystem:s2s', 'verif_fcsystem:long-range'],
+            'optional' : ['verif_fcsystem:s2s'],
         },
         'area_statistic' : {
             'printname':'area statistics',

@@ -5,6 +5,27 @@ import datetime as dt
 import numpy as np
 from dateutil.relativedelta import relativedelta
 
+def set_xarray_attribute(data, da_ref,
+                         params=None):
+    """
+    Set projection attributes for dataArrays in data list to the ones from da_ref.
+    Needed as attributes are sometimes removed when applying xr funtions
+    :param data: list of xr dataArrays
+    :param da_ref: reference dataArray with parameters to copy
+    :param params: attributes to copy
+    :return: list of xr DataArrays with attributes from da_ref
+    """
+
+    if params is None:
+        params = ['projection', 'central_longitude', 'central_latitude',
+                  'true_scale_latitude']
+    for proj_param in params:
+        if proj_param in da_ref.attrs:
+            data_out = []
+            for _data in data:
+                _data.attrs[proj_param] = getattr(da_ref, proj_param)
+                data_out.append(_data)
+    return data_out
 
 def confdates_to_list(_dates):
     """ Convert dates for plotting in config to list

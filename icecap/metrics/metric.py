@@ -103,9 +103,9 @@ class BaseMetric(dataobjects.DataObject):
                                  'is calculated over data or score')
             if len(self.area_statistic)>1:
                 self.area_statistic_function = self.area_statistic[1]
-                if self.area_statistic_function not in ['mean', 'sum']:
+                if self.area_statistic_function not in ['mean', 'sum', 'median']:
                     raise ValueError('2nd argument of area_statistic need to be either'
-                                     'mean or sum')
+                                     'mean, median or sum')
 
             if len(self.area_statistic)>2:
                 self.area_statistic_unit = self.area_statistic[2]
@@ -113,8 +113,8 @@ class BaseMetric(dataobjects.DataObject):
                     raise ValueError('3rd argument of area_statistic (unit)'
                                      'needs to be either total, fraction, percent')
                 if self.area_statistic_unit == 'fraction' and self.area_statistic_function == 'sum':
-                    utils.print_info(f'Setting the unit of area_statistics to fraction has no effect when using sum as function')
-                    self.area_statistic_unit == 'total'
+                    utils.print_info('Setting the unit of area_statistics to fraction has no effect when using sum as function')
+                    self.area_statistic_unit = 'total'
 
             if len(self.area_statistic)>3:
                 self.area_statistic_minvalue = float(self.area_statistic[3])
@@ -127,6 +127,11 @@ class BaseMetric(dataobjects.DataObject):
         self.inset_position = conf.plotsets[name].inset_position
         self.additonal_mask = conf.plotsets[name].additonal_mask
 
+        self.ticks = None
+        self.ticklabels = None
+        self.norm = None
+
+        self.time_average = None
 
 
     def _init_fc(self, name):
@@ -237,23 +242,31 @@ class BaseMetric(dataobjects.DataObject):
         Load the dummy verification file in case dates are not available for forecast
         :return: xr DataArray
         """
+
         _filename = f'{self.obscachedir}/{self.verif_name}.nc'
-        da = xr.open_dataarray(_filename, chunks='auto')
+        da = xr.open_dataarray(_filename)
         da = da.expand_dims(dim={"member": 1, "date":1, "inidate":1})
-        if average_dim is not None:
+
+        if None not in average_dim :
             for d in average_dim:
                 da = da.mean(dim=d)
         return da
 
     def _load_data(self, fcset, datatype, grid=None,
-                   average_dim=None):
+                   average_dim=None, target=None):
         """ load forecast or verification data
         :param fcset: forecast sets created in _init_fc
         :param datatype: fc or verif
         :param grid: 'native' or None
         :param average_dim: list of dimensions to average when loading data
+        :param target: target days to be selected (usually determined by neamlist), but can be
+        set to 'i:0' for persistence
         :return:
         """
+        if target is None:
+            target = self.target
+        elif target != 'i:0':
+            raise ValueError('Target can be either None or i:0')
 
         if grid is None:
             grid = self.grid
@@ -266,10 +279,9 @@ class BaseMetric(dataobjects.DataObject):
             _inits.append(fcname)
             _da_date_list = []
             _fcdates = fcset[fcname]['sdates']
-
             for _date in _fcdates:
                 _dtdate = [utils.string_to_datetime(_date)]
-                _dtseldates = utils.create_list_target_verif(self.target, _dtdate)
+                _dtseldates = utils.create_list_target_verif(target, _dtdate)
                 _seldates = [utils.datetime_to_string(dtdate) for dtdate in _dtseldates]
 
                 if datatype == 'fc':
@@ -288,20 +300,30 @@ class BaseMetric(dataobjects.DataObject):
                             _da_file = self._load_file(_filename)
                             _da_seldate_list.append(_da_file)
                         _da_file = xr.concat(_da_seldate_list, dim='time')
-                        _da_file = self.convert_time_to_lead(_da_file)
 
                     elif datatype == 'fc':
                         _filename = f"{fcset[fcname]['cachedir']}/" \
                                     f"{filename.format(_date, _member, self.params, grid)}"
 
                         _da_file = self._load_file(_filename, _seldates)
-                        _da_file = self.convert_time_to_lead(_da_file)
+
+
+
+
+                    # utils.print_info('CAUTION TEMPORARY IMPLEMENTATION')
+                    # self.time_average = 'QS-DEC'
+                    #
+                    # if self.time_average is not None:
+                    #     _da_file = _da_file.resample(time=self.time_average).mean(dim="time")
+
+                    _da_file = self.convert_time_to_lead(_da_file, target=target)
 
                     _da_ensmem_list.append(_da_file)
                     _ensdim = xr.DataArray(_members, dims='member', name='member')
                 _da_date = xr.concat(_da_ensmem_list, dim=_ensdim)
                 if 'member' in average_dim:
                     _da_date = _da_date.mean(dim='member')
+                    _da_date = _da_date.load()
                 _da_date_list.append(_da_date)
 
 
@@ -338,21 +360,22 @@ class BaseMetric(dataobjects.DataObject):
         return self._load_data(getattr(self, f'fc{name}sets'), datatype='fc', grid=grid,
                                average_dim=average_dim)
 
-    def load_verif_data(self, name, average_dim=None):
+    def load_verif_data(self, name, average_dim=None, target=None):
         """
         load verification data
         :param name: calib or verif
         :param average_dim: list of dimensions to average when loading data
+        :param target: target days to be selected (usually determined by neamlist), but can be
+        set to 'i:0' for persistence
         :return: xarray dataArray
         """
         utils.print_info(f"READING OBSERVATION DATA FOR {name}")
         average_dim = [average_dim] if not (isinstance(average_dim, list)) else average_dim
-        if 'grid' in self.verif_name:
+        if 'grid' in self.verif_name and name != 'calib':
             return self._load_verif_dummy(average_dim)
 
         return self._load_data(getattr(self,f'fc{name}sets'), datatype='verif',
-                               average_dim=average_dim)
-        #return self._load_verif(getattr(self,f'fc{name}sets'))
+                               average_dim=average_dim, target=target)
 
 
 
@@ -371,10 +394,14 @@ class BaseMetric(dataobjects.DataObject):
         utils.make_dir(os.path.dirname(_ofile))
 
         result = self.result
+
+
         if isinstance(result, list):
             for fi, file in enumerate(result):
+                utils.print_info(f'Saving metric file {_ofile.replace(".nc",f"_{fi}.nc")}')
                 file.to_netcdf(_ofile.replace('.nc',f'_{fi}.nc'))
         else:
+            utils.print_info(f'Saving metric file {_ofile}')
             result.to_netcdf(_ofile)
     def gettype(self):
         """ Determine typ of plot (timeseries or mapplot) """
@@ -384,14 +411,21 @@ class BaseMetric(dataobjects.DataObject):
             return 'map'
 
 
-    def convert_time_to_lead(self,_da=None):
+    def convert_time_to_lead(self,_da=None, target=None):
         """
         Convert time variable to steps
         :param _da: xr DataArray
         :return: xr DataArray
         """
-        target_as_list = utils.create_list_target_verif(self.target, as_list=True)
-        _da = _da.assign_coords(time=target_as_list)
+        if self.time_average is None:
+            target_as_list = utils.create_list_target_verif(target, as_list=True)
+            _da = _da.assign_coords(time=target_as_list)
+        elif 'QS' in self.time_average:
+            _da = _da.assign_coords(time=_da.time.dt.month.values+1)
+        elif 'MS' in self.time_average:
+            _da = _da.assign_coords(time=_da.time.dt.month.values)
+        else:
+            _da = _da.assign_coords(time=range(len(_da.time.values)))
         return _da
 
     def _load_file(self, _file,_seldate=None):
@@ -405,6 +439,7 @@ class BaseMetric(dataobjects.DataObject):
 
 
         if self.use_dask:
+            #_da_file = xr.open_dataarray(_file, chunks={'time':1, 'xc':50}) #chunks='auto')
             _da_file = xr.open_dataarray(_file, chunks='auto')
         else:
             _da_file = xr.open_dataarray(_file)
@@ -416,6 +451,16 @@ class BaseMetric(dataobjects.DataObject):
 
     @staticmethod
     def area_cut(ds, lon1, lon2, lat1, lat2):
+        """
+        Set values outside lon/lat regions specified here to NaN values
+        :param ds: input xarray DataArray
+        :param lon1: east longitude
+        :param lon2: west longitude
+        :param lat1: south latitude
+        :param lat2: north latitude
+        :return: maksed dataArray
+        """
+
         if 'longitude' in ds.coords:
             lon_name = 'longitude'
             lat_name = 'latitude'
@@ -485,6 +530,8 @@ class BaseMetric(dataobjects.DataObject):
                 datalist_out = [d*cell_area for d in datalist_out]
         elif statistic == 'sum':
             datalist_out = [d.sum(dim=('xc', 'yc'), skipna=True)*cell_area for d in datalist_mask]
+        elif statistic == 'median':
+            datalist_out = [d.median(dim=('xc', 'yc'), skipna=True) for d in datalist_mask]
         else:
             raise ValueError(f'statistic can be either mean or sum not {statistic}')
 
@@ -530,8 +577,15 @@ class BaseMetric(dataobjects.DataObject):
         :return: combined mask as xarray (boolean array)
         """
 
+        for dim in ['inidate','date']:
+            if dim in _ds_fc.dims:
+                _ds_fc = _ds_fc.isel({dim:0})
+            if dim in _ds_verif.dims:
+                _ds_verif = _ds_verif.isel({dim:0})
+
 
         _ds_verif_tmp = xr.where(np.isnan(_ds_verif), 1, 0)
+
 
         if 'member' in _ds_verif_tmp.dims:
             _ds_verif_tmp = _ds_verif_tmp.sum(dim='member')
@@ -547,96 +601,3 @@ class BaseMetric(dataobjects.DataObject):
         combined_mask = xr.where(combined_mask,1,float('nan'))
 
         return combined_mask
-
-
-    def _load_verif(self, fcset):
-        """ load verification data """
-
-        filename = self._filenaming_convention('verif')
-        _all_list = []
-        _inits = []
-
-        for fcname in fcset:
-            _inits.append(fcname)
-            _da_date_list = []
-            _fcdates = fcset[fcname]['sdates']
-
-            for _date in _fcdates:
-                _dtdate = [utils.string_to_datetime(_date)]
-                _dtseldates = utils.create_list_target_verif(self.target, _dtdate)
-                _seldates = [utils.datetime_to_string(dtdate) for dtdate in _dtseldates]
-
-                _da_seldate_list = []
-                for _seldate in _seldates:
-                    _members = range(1)
-                    _da_ensmem_list = []
-                    for _member in _members:
-                        _filename = f"{self.obscachedir}/" \
-                                    f"{filename.format(_seldate, self.params, self.grid)}"
-
-                        if self.use_dask:
-                            _da_ensmem_list.append(xr.open_dataarray(_filename, chunks='auto'))
-                        else:
-                            _da_ensmem_list.append(xr.open_dataarray(_filename))
-                    _ensdim = xr.DataArray(_members, dims='member', name='member')
-                    _da_member = xr.concat(_da_ensmem_list, dim=_ensdim)
-                    _da_seldate_list.append(_da_member)
-
-                _da_date = xr.concat(_da_seldate_list, dim='time')
-                _da_date = self.convert_time_to_lead(_da_date)
-
-                _da_date_list.append(_da_date)
-
-            _date_dim = xr.DataArray(range(len(_fcdates)), dims='date', name='date')
-            da_fc = xr.concat(_da_date_list, dim=_date_dim)
-            _all_list.append(da_fc.sortby(da_fc.date))
-
-        _init_dim = xr.DataArray(_inits, dims='inidate', name='inidate')
-        da_init = xr.concat(_all_list, dim=_init_dim)
-
-        return da_init
-
-
-    def _load_forecasts(self, fcset, grid=None):
-        """ load forecast data """
-
-        if grid is None:
-            grid = self.grid
-
-        filename = self._filenaming_convention('fc')
-        _all_list = []
-        _inits = []
-        for fcname in fcset:
-            _inits.append(fcname)
-            _da_date_list = []
-            _fcdates = fcset[fcname]['sdates']
-
-            for _date in _fcdates:
-                _members = range(int(fcset[fcname]['enssize']))
-                _da_ensmem_list = []
-                for _member in _members:
-
-                    _filename = f"{fcset[fcname]['cachedir']}/" \
-                                f"{filename.format(_date, _member, self.params,grid)}"
-
-                    _dtdate = [utils.string_to_datetime(_date)]
-                    _dtseldates = utils.create_list_target_verif(self.target,_dtdate)
-                    _seldates = [utils.datetime_to_string(dtdate) for dtdate in _dtseldates]
-
-                    _da_file = self._load_file(_filename, _seldates)
-
-                    _da_file = self.convert_time_to_lead(_da_file)
-
-                    _da_ensmem_list.append(_da_file)
-                _ensdim = xr.DataArray(_members, dims='member', name='member')
-                _da_date = xr.concat(_da_ensmem_list, dim=_ensdim)
-                _da_date_list.append(_da_date)
-
-            _date_dim = xr.DataArray(range(len(_fcdates)), dims='date', name='date')
-            da_fc = xr.concat(_da_date_list, dim=_date_dim)
-            _all_list.append(da_fc.sortby(da_fc.date))
-
-        _init_dim = xr.DataArray(_inits, dims='inidate', name='inidate')
-        da_init = xr.concat(_all_list, dim=_init_dim)
-
-        return da_init
