@@ -48,8 +48,8 @@ class Metric(BaseMetric):
 
         _, lsm_full = self.mask_lsm([da_fc_verif_mask, da_verdata_verif_mask, da_persistence_mask])
         datalist = [da_fc_verif_ice, da_verdata_verif_ice, da_persistence_ice]
-        data = [d.where(~np.isnan(lsm_full)) for d in datalist]
 
+        data = [d.where(~np.isnan(lsm_full)) for d in datalist]
         if self.area_statistic_kind == 'data':
             data, lsm = self.calc_area_statistics(data, lsm_full,
                                                   minimum_value=self.area_statistic_minvalue,
@@ -58,7 +58,6 @@ class Metric(BaseMetric):
         da_fc_verif_ice = data[0]
         da_verdata_verif_ice = data[1].isel(member=0)
         da_persistence_ice = data[2]
-
 
 
         # brier score
@@ -71,7 +70,7 @@ class Metric(BaseMetric):
         # clip bss to -1 to 1
         da_fc_verif_bss = da_fc_verif_bss.clip(-1,1)
         # restore zero values before saving
-        da_persistence_bc = xr.where(da_persistence_bs == 1e-11, 0, da_persistence_bs)
+        da_persistence_bs = xr.where(da_persistence_bs == 1e-11, 0, da_persistence_bs)
         da_fc_verif_bs = xr.where(da_fc_verif_bs == 1e-11, 0, da_fc_verif_bs)
 
 
@@ -100,7 +99,7 @@ class Metric(BaseMetric):
 
         data = [
             da_fc_verif_bs.rename('noplot_fc_bs'),
-            da_persistence_bc.rename('noplot_pers_bs'),
+            da_persistence_bs.rename('noplot_pers_bs'),
             da_fc_verif_bss.rename('fc_bss')
         ]
 

@@ -5,8 +5,34 @@ import clargs
 import config
 import metrics
 import utils
-import plottypes
+import plottype_map
+import plottype_ts
 
+
+def plot_api(conf, args):
+    """
+    API running all steps to plot metric
+    (can e.g also called from jupyter notebook)
+    :param conf: configuration object
+    :param args: command line arguments
+    :return: list of output files created
+    """
+    utils.print_banner(conf.plotsets[args.plotid].plottype)
+
+    m = metrics.factory.create(args.plotid, conf)
+
+    m.compute()
+    m.save()
+
+    if m.gettype() == 'map':
+        p = plottype_map.MapPlot(conf, args.plotid, m)
+    elif m.gettype() == 'ts':
+        p = plottype_ts.TsPlot(conf, m)
+
+    utils.print_info('PLOTTING')
+    ofiles = p.plot(m)
+
+    return ofiles
 
 if __name__ == '__main__':
     des = 'Plot a metric from staged data files'
@@ -22,19 +48,5 @@ if __name__ == '__main__':
         args.configfile.append(args.plotconfigfile)
 
     conf = config.Configuration(file=args.configfile)
-    utils.print_banner(conf.plotsets[args.plotid].plottype)
 
-    m = metrics.factory.create(args.plotid, conf)
-
-    m.compute()
-    m.save()
-
-    if m.gettype() == 'map':
-        p = plottypes.MapPlot(conf, args.plotid,m)
-    elif m.gettype() == 'ts':
-        p = plottypes.TsPlot(conf,m)
-
-
-
-    utils.print_info('PLOTTING')
-    p.plot(m)
+    plot_api(conf, args)

@@ -23,7 +23,7 @@ class Metric(BaseMetric):
         if self.area_statistic is None:
             raise ValueError('area_statistic needs to be set (with region_extent if desired)'
                              'to plot plumes')
-        if len(self.verif_dates) !=1:
+        if len(self.verif_dates) !=1 or self.verif_fromyear != self.verif_toyear:
             raise ValueError('only one verification date (verif_dates) can be specified'
                              'to plot plumes')
 

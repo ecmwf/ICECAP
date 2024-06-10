@@ -4,8 +4,9 @@ to forecasts and verification data for staging and for config"""
 import os
 import glob
 import datetime as dt
-from dateutil.relativedelta import relativedelta
 import shutil
+from dateutil.relativedelta import relativedelta
+
 
 import xesmf as xe
 import xarray as xr
@@ -154,7 +155,7 @@ class ForecastObject(DataObject):
         """
         :param conf: config object
         :param args: expid (config entry after fc_),
-        startdate (loopvalue used internally to retrive efficiently)
+        startdate (loopvalue used internally to retrieve efficiently)
         """
         super().__init__(conf)
 
@@ -373,6 +374,7 @@ class ForecastConfigObject:
                                                                   int(getattr(self, 'toyear')) + 1)]
 
 
+
                 # remove dates which are not defined, e.g. 29.2 for non-leap years
                 _dates = []
                 for d in _dates_tmp:
@@ -384,7 +386,7 @@ class ForecastConfigObject:
                     # dates including previosu day for persistence scores
                     dtdates_prev = [ fcday - relativedelta(days=1) for fcday in _dates] + _dates
 
-                    _dates_list_yyyymmdd += _dates
+                    _dates_list_yyyymmdd += dtdates_prev #_dates
                     if self.mode == 'hc':
                         hc_date_dict[self.shcrefdate_loop[di]] = _dates
                         shc_date_dict[self.shcrefdate_loop[di]] = [d.strftime('%Y%m%d') for d in _dates]
@@ -399,9 +401,10 @@ class ForecastConfigObject:
                 self.hcdates = hc_date_dict
                 self.shcdates = shc_date_dict
 
+
         # all forecast days calculated from init-day + ndays parameter
         #self.dtalldates = utils.make_days_datelist(self.dtdates, self.ndays)
-        self.dtalldates = utils.make_days_datelist(dtdates_prev, self.ndays)
+        self.dtalldates = utils.make_days_datelist(self.dtdates, self.ndays)
         self.salldates = sorted(list(dict.fromkeys([d.strftime('%Y%m%d')
                                                     for d in self.dtalldates])))
 
@@ -425,6 +428,7 @@ class PlotConfigObject:
         self.proj_options = kwargs['proj_options']
         self.circle_border = kwargs['circle_border']
         self.region_extent = kwargs['region_extent']
+        self.nsidc_region = kwargs['nsidc_region']
         self.cmap = kwargs['cmap']
         self.verif_source = kwargs['source']
         self.verif_dates = kwargs['verif_dates']
@@ -442,3 +446,4 @@ class PlotConfigObject:
         self.plot_shading = kwargs['plot_shading']
         self.inset_position = kwargs['inset_position']
         self.additonal_mask = kwargs['additonal_mask']
+        self.calib_method = kwargs['calib_method']

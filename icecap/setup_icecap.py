@@ -89,6 +89,9 @@ class ExecutionHost:
         fromdir = self.sourcedir + '/icecap'
         self._copy_python_scripts(fromdir, args)
 
+        fromdir = self.sourcedir + f'/etc'
+        self._copy_nsidc_files(fromdir, args)
+
         if self.ecflow == 'yes':
             fromdir = self.sourcedir + '/ecf'
             self._copy_ecflow_files(fromdir, args, base_level_files_only=True)
@@ -112,6 +115,12 @@ class ExecutionHost:
 
     def _copy_etc_files(self, fromdir, args):
         files = ['load_modules', 'module_versions']
+        target_dir = self.etcdir
+        for file in files:
+            self._safe_copy(args, file, fromdir, target_dir)
+
+    def _copy_nsidc_files(self, fromdir, args):
+        files = ['nsidc_osi-401-b.nc', 'nsidc_osi-cdr.nc']
         target_dir = self.etcdir
         for file in files:
             self._safe_copy(args, file, fromdir, target_dir)

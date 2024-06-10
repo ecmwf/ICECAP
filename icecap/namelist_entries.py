@@ -19,7 +19,7 @@ config_optnames = {
             'printname' : 'use ecflow',
             'optional' : True,
             'default_value' : ["yes"],
-            'allowed_values' : ["yes"]
+            'allowed_values' : ["yes",'no']
         },
         'suitename': {
             'printname' : 'name of suite',
@@ -29,17 +29,13 @@ config_optnames = {
             'printname': 'Directory of source code',
             'optional' : False
         },
-        'rundir': {
-            'printname': 'Directory for runtime copy of ecFlow and Python scripts',
+        'scratchdir': {
+            'printname': 'Base directory for data/metrics/plots',
             'optional' : False
         },
-        'datadir': {
-            'printname': 'Directory for data/metrics/plots',
+        'permdir': {
+            'printname': 'Base directory for runtime scripts',
             'optional' : False
-        },
-        'tmpdir': {
-            'printname': 'temporary working directory',
-            'optional' : False,
         },
         'cachedir':{
             'printname': 'cache directory',
@@ -163,7 +159,9 @@ config_optnames = {
             'optional' : False,
             'allowed_values' : ["interp_check","ensmean","forecast_error",
                                 "ice_distance", "plume", "freeze-up", 'brier',
-                                'crps', 'rmse', 'ser','iiee','sps']
+                                'crps', 'rmse', 'ser','iiee','sps',
+                                'brier_edge','linear_trend',
+                                'test', 'test2']
         },
         'verif_mode':{
             'printname': 'forcast or hindcast mode for plotting',
@@ -171,11 +169,11 @@ config_optnames = {
         },
         'verif_fromyear':{
             'printname' : 'first year',
-            'optional' : ['mode:hc']
+            'optional' : ['verif_mode:hc']
         },
         'verif_toyear':{
             'printname' : 'last year',
-            'optional' : ['mode:hc']
+            'optional' : ['verif_mode:hc']
         },
         'target':{
             'printname' : 'target time for plotting',
@@ -215,6 +213,22 @@ config_optnames = {
         'region_extent':{
             'printname' : 'boundaries of the map/area averaging',
             'optional' : True
+        },
+        'nsidc_region':{
+            'printname' : 'NSIDC region identifier',
+            'optional' : True,
+            'allowed_values' : ['CARC','BEAS','CHUS','ESS','LS',
+                                'KS','BARS','EGS','BBLS','GOSL','HB','CAA',
+                                'BERS','SOO','SOJ','BYS','BALS','GOA',
+                                'carc', 'beas', 'chus', 'ess', 'ls', 'ks', 'bars', 'egs', 'bbls',
+                                'gosl', 'hb', 'caa', 'bers', 'soo', 'soj', 'bys', 'bals', 'goa',
+                                'central_arctic', 'beaufort_sea', 'chukchi_sea',
+                                'east_siberian_sea', 'laptev_sea', 'kara_sea', 'barents_sea',
+                                'east_greenland_sea', 'baffin_bay_and_labrador_seas',
+                                'gulf_of_st_lawrence', 'hudson_bay', 'canadian_archipelago',
+                                'bering_sea', 'sea_of_okhotsk', 'sea_of_japan',
+                                'bohai_and_yellow_seas', 'baltic_sea', 'gulf_of_alaska'
+                                ]
         },
         'cmap':{
             'printname' : 'colormap to be used',
@@ -284,5 +298,10 @@ config_optnames = {
             'printname':'use additional land-sea-mask',
             'optional' : True
         },
+        'calib_method' : {
+            'printname':'Method used for calibration',
+            'optional' : True,
+            'allowed_values' : ["mean", "mean+trend"]
+        }
     }
 }

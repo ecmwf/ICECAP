@@ -3,7 +3,7 @@ import os
 import numpy as np
 import xarray as xr
 from .metric import BaseMetric
-
+import utils
 
 xr.set_options(keep_attrs=True)
 os.environ['HDF5_USE_FILE_LOCKING']='FALSE'
@@ -24,41 +24,44 @@ class Metric(BaseMetric):
     def compute(self):
         """ Compute metric """
 
-        da_fc_verif = self.load_fc_data('verif',
-                                        average_dim=['member','date','inidate'])
-        data = [da_fc_verif.rename(f'{self.verif_expname[0]}')]
-
-
-
-
-        # we need to load reference data to calculate lsm
-        da_verdata_verif = self.load_verif_data('verif',
-                                                average_dim=['member','date','inidate'])
-        data.append(da_verdata_verif.rename('obs'))
-
-        if self.calib:
-            da_fc_calib = self.load_fc_data('calib', average_dim=['member','date','inidate'])
-            da_verdata_calib = self.load_verif_data('calib',average_dim=['member','date','inidate'])
-            bias_calib = da_fc_calib - da_verdata_calib
-            fc_verif_bc = da_fc_verif - bias_calib
-            data[0] = fc_verif_bc.rename(f'{self.verif_expname[0]}')
-
-        data, lsm_full = self.mask_lsm(data)
-
-
+        # averaging over data or score the same for ensmean. data is faster
         if self.area_statistic_kind is not None:
-            data, lsm = self.calc_area_statistics(data, lsm_full,
-                                             minimum_value=self.area_statistic_minvalue,
-                                             statistic=self.area_statistic_function)
+            self.area_statistic_kind = 'data'
 
-            # add lsm to metric netcdf file
-            data.append(lsm)
+        average_dims = ['member', 'inidate']
 
-        # if reference data is not desired remove it here from the dataset list
-        if self.add_verdata == "no":
-            data.pop(1)
+        processed_data_dict = self.process_data_for_metric(average_dims)
 
-        data.append(lsm_full)
-        data_xr = xr.merge(data)
+        data_plot = []
+        data_plot.append(processed_data_dict['lsm_full'])
+        if 'lsm' in processed_data_dict:
+            data_plot.append(processed_data_dict['lsm'])
+        if self.calib:
+            da_fc_verif_plot = processed_data_dict['da_fc_verif_bc']
+        else:
+            da_fc_verif_plot = processed_data_dict['da_fc_verif']
+
+        # average over dates if present
+        if 'date' in da_fc_verif_plot.dims:
+            da_fc_verif_plot = da_fc_verif_plot.mean(dim='date')
+
+
+        data_plot.append(da_fc_verif_plot.rename(f'{self.verif_expname[0]}'))
+
+        if self.add_verdata == "yes":
+            da_verdata_verif = processed_data_dict['da_verdata_verif']
+            # average over dates if present
+            if 'date' in da_verdata_verif.dims:
+                da_verdata_verif = da_verdata_verif.mean(dim='date')
+            data_plot.append(da_verdata_verif.rename('obs'))
+
+
+        # set projection attributes
+        data_plot = utils.set_xarray_attribute(data_plot, processed_data_dict['da_verdata_verif'],
+                                                 params=['projection', 'central_longitude', 'central_latitude',
+                                                         'true_scale_latitude'])
+
+        data_xr = xr.merge(data_plot)
+
 
         self.result = data_xr

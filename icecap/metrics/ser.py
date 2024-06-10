@@ -10,6 +10,11 @@ from .metric import BaseMetric
 xr.set_options(keep_attrs=True)
 os.environ['HDF5_USE_FILE_LOCKING']='FALSE'
 
+# computation is very slow as there are many grid cells/timesteps
+        # to make teh computation faster we do the following
+        # 1. stack array along xc and yc
+        # 2. drop all cells for which standard deviation is 0
+
 class Metric(BaseMetric):
     """ Metric object """
     def __init__(self, name, conf):

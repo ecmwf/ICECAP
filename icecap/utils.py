@@ -108,7 +108,9 @@ def convert_to_list(_obj):
     :param _obj: an object
     :return: object as list
     """
-    if isinstance(_obj, (list, np.ndarray)):
+    if isinstance(_obj, list):
+        return _obj
+    if np.iterable(_obj):
         return _obj
 
     return [_obj]

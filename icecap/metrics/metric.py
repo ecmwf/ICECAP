@@ -12,7 +12,7 @@ import datetime as dt
 import xarray as xr
 import numpy as np
 
-
+import metrics.metric_utils as mutils
 import dataobjects
 import utils
 import forecast_info
@@ -26,6 +26,8 @@ class BaseMetric(dataobjects.DataObject):
         self.target = conf.plotsets[name].target
         self.plottype = conf.plotsets[name].plottype
         self.metricdir = conf.metricdir
+
+
 
 
         #initialise verification attributes
@@ -51,7 +53,8 @@ class BaseMetric(dataobjects.DataObject):
 
         # initialize calibration forecasts
         self.calib = False
-        if conf.plotsets[name].calib_dates is not None:
+        self.calib_method = conf.plotsets[name].calib_method
+        if self.calib_method is not None:
             self.calib = True
             self.calib_modelname = self.verif_modelname
             self.calib_expname = self.verif_expname
@@ -123,15 +126,21 @@ class BaseMetric(dataobjects.DataObject):
                                      'needs to be between 0 and 1')
 
         self.region_extent = conf.plotsets[name].region_extent
+        self.nsidc_region = conf.plotsets[name].nsidc_region
         self.plot_shading = conf.plotsets[name].plot_shading
         self.inset_position = conf.plotsets[name].inset_position
         self.additonal_mask = conf.plotsets[name].additonal_mask
+
+        self.etcdir = conf.etcdir
 
         self.ticks = None
         self.ticklabels = None
         self.norm = None
 
         self.time_average = None
+
+
+
 
 
     def _init_fc(self, name):
@@ -200,6 +209,7 @@ class BaseMetric(dataobjects.DataObject):
                 else:
                     utils.print_info(f'No forecasts for Date {date}')
 
+                fcsets[date] = {}
                 fcsets[date]['sdates'] = [d.strftime('%Y%m%d') for d in _dates]
 
                 # get cycle information for all dates
@@ -244,12 +254,16 @@ class BaseMetric(dataobjects.DataObject):
         """
 
         _filename = f'{self.obscachedir}/{self.verif_name}.nc'
+        if '-grid' not in _filename:
+            _filename = _filename.replace('.nc','-grid.nc')
         da = xr.open_dataarray(_filename)
-        da = da.expand_dims(dim={"member": 1, "date":1, "inidate":1})
+        da = da.expand_dims(dim={"member": [1], "date":[1], "inidate":[1]})
+
 
         if None not in average_dim :
             for d in average_dim:
                 da = da.mean(dim=d)
+
         return da
 
     def _load_data(self, fcset, datatype, grid=None,
@@ -284,6 +298,7 @@ class BaseMetric(dataobjects.DataObject):
                 _dtseldates = utils.create_list_target_verif(target, _dtdate)
                 _seldates = [utils.datetime_to_string(dtdate) for dtdate in _dtseldates]
 
+
                 if datatype == 'fc':
                     _members = range(int(fcset[fcname]['enssize']))
                 else:
@@ -304,7 +319,6 @@ class BaseMetric(dataobjects.DataObject):
                     elif datatype == 'fc':
                         _filename = f"{fcset[fcname]['cachedir']}/" \
                                     f"{filename.format(_date, _member, self.params, grid)}"
-
                         _da_file = self._load_file(_filename, _seldates)
 
 
@@ -371,8 +385,11 @@ class BaseMetric(dataobjects.DataObject):
         """
         utils.print_info(f"READING OBSERVATION DATA FOR {name}")
         average_dim = [average_dim] if not (isinstance(average_dim, list)) else average_dim
-        if 'grid' in self.verif_name and name != 'calib':
-            return self._load_verif_dummy(average_dim)
+
+        if name != 'calib':
+            if 'grid' in self.verif_name:# or self.add_verdata == 'no':
+                utils.print_info(f"READING DUMMY observation DATA FOR {name}")
+                return self._load_verif_dummy(average_dim)
 
         return self._load_data(getattr(self,f'fc{name}sets'), datatype='verif',
                                average_dim=average_dim, target=target)
@@ -449,38 +466,7 @@ class BaseMetric(dataobjects.DataObject):
 
         return _da_file
 
-    @staticmethod
-    def area_cut(ds, lon1, lon2, lat1, lat2):
-        """
-        Set values outside lon/lat regions specified here to NaN values
-        :param ds: input xarray DataArray
-        :param lon1: east longitude
-        :param lon2: west longitude
-        :param lat1: south latitude
-        :param lat2: north latitude
-        :return: maksed dataArray
-        """
 
-        if 'longitude' in ds.coords:
-            lon_name = 'longitude'
-            lat_name = 'latitude'
-        else:
-            lon_name = 'lon'
-            lat_name = 'lat'
-
-        if lon1 > lon2:
-            data_masked1 = ds.where((ds[lat_name] > lat1) & (ds[lat_name] <= lat2)
-                                     & (ds[lon_name] > lon1) & (ds[lon_name] < 180))
-            data_masked2 = ds.where((ds[lat_name] > lat1) & (ds[lat_name] <= lat2)
-                                     & (ds[lon_name] >= -180) & (ds[lon_name] < lon2))
-
-            combined_mask = np.logical_or(~np.isnan(data_masked1), ~np.isnan(data_masked2))
-            _data = xr.where(combined_mask, ds, float('nan'))
-        else:
-            _data = ds.where((ds[lat_name] >= lat1) & (ds[lat_name] <= lat2)
-                             & (ds[lon_name] >= lon1) & (ds[lon_name] <= lon2))
-
-        return _data
     def calc_area_statistics(self, datalist, ds_mask, minimum_value=0, statistic='mean'):
         """
         Calculate area statistics (mean/sum) for verif and fc using a combined land-sea-mask from both datasets
@@ -501,8 +487,22 @@ class BaseMetric(dataobjects.DataObject):
             lat1 = _region_bounds[2]
             lat2 = _region_bounds[3]
 
-            datalist = [self.area_cut(d, lon1,lon2,lat1,lat2) for d in datalist]
-            ds_mask_reg  =self.area_cut(ds_mask, lon1,lon2,lat1,lat2)
+            datalist = [mutils.area_cut(d, lon1,lon2,lat1,lat2) for d in datalist]
+            ds_mask_reg = mutils.area_cut(ds_mask, lon1,lon2,lat1,lat2)
+        elif self.nsidc_region:
+
+            utils.print_info('Selecting NSIDC region')
+            ifile = f"{self.etcdir}/nsidc_{self.verif_name.replace('-grid','')}.nc"
+            try:
+                ds_nsidc = xr.open_dataarray(ifile)
+            except:
+                raise FileNotFoundError(f'NSIDC region file {ifile} not found ')
+
+            region_number = mutils.get_nsidc_region(ds_nsidc, self.nsidc_region)
+            ds_mask_reg = xr.where(ds_nsidc == region_number,ds_mask,float('nan'))
+            ds_mask_reg = ds_mask_reg.drop([i for i in ds_mask_reg.coords if i not in ds_mask_reg.dims])
+            datalist = [d.where(~np.isnan(ds_mask_reg)) for d in datalist]
+
         else:
             ds_mask_reg = ds_mask
 
@@ -541,11 +541,11 @@ class BaseMetric(dataobjects.DataObject):
 
 
     def mask_lsm(self, datalist):
-        """ Create land-sea mask from two datasets (usually observatiosn and fc)
+        """ Create land-sea mask from two datasets (usually observations and fc)
         :param datalist: list of dataArrays (first two will be used to generate combined lsm)
         :return: list masked dataArrays from datalist
         """
-        ds_mask = self._create_combined_mask(datalist[0],
+        ds_mask = mutils.create_combined_mask(datalist[0],
                                              datalist[1])
 
         if self.additonal_mask:
@@ -557,10 +557,13 @@ class BaseMetric(dataobjects.DataObject):
 
         datalist_mask = [d.where(~np.isnan(ds_mask)) for d in datalist]
 
-        if 'member' in datalist_mask[0].dims:
-            len1 = len(np.argwhere(~np.isnan(datalist_mask[0].isel(member=0, time=0).values)))
-        else:
-            len1 = len(np.argwhere(~np.isnan(datalist_mask[0].isel(time=0).values)))
+        fcdata = datalist_mask[0]
+        for d in ['member','date']:
+            if d not in fcdata.dims:
+                fcdata = fcdata.expand_dims(d)
+        fcdata = fcdata.isel(member=0, date=0)
+
+        len1 = len(np.argwhere(~np.isnan(datalist_mask[1].isel(time=0).values)))
         len2 = len(np.argwhere(~np.isnan(datalist_mask[1].isel(time=0).values)))
         if len1 != len2:
             raise ValueError(f'Masking produces observations and forecasts with different number of'
@@ -568,36 +571,111 @@ class BaseMetric(dataobjects.DataObject):
 
         return datalist_mask, ds_mask.rename('lsm-full')
 
-    @staticmethod
-    def _create_combined_mask(_ds_verif, _ds_fc):
+
+    def process_data_for_metric(self, average_dims):
         """
-        Create a mask for cells which are set to NaN in verification or forecast data
-        :param _ds_verif: verification xarray dataarray
-        :param _ds_fc: forecast xarray dataarray
-        :return: combined mask as xarray (boolean array)
+        Process forecast/observation data for metric (load data, calibrate forecast etc)
+        :param average_dims: dimesnions over which to average when loading data
+        :return: dictionary of forecast/observation data
         """
+        dict_out = {}
 
-        for dim in ['inidate','date']:
-            if dim in _ds_fc.dims:
-                _ds_fc = _ds_fc.isel({dim:0})
-            if dim in _ds_verif.dims:
-                _ds_verif = _ds_verif.isel({dim:0})
-
-
-        _ds_verif_tmp = xr.where(np.isnan(_ds_verif), 1, 0)
-
-
-        if 'member' in _ds_verif_tmp.dims:
-            _ds_verif_tmp = _ds_verif_tmp.sum(dim='member')
-        _ds_verif_mask = xr.where(_ds_verif_tmp.sum(dim='time') == 0, True, False)
+        # read verdata/fc data for verif
+        da_fc_verif = self.load_fc_data('verif',
+                                        average_dim=average_dims)
+        da_verdata_verif = self.load_verif_data('verif',
+                                                average_dim=average_dims)
+        data = [da_fc_verif, da_verdata_verif]
 
 
-        _ds_fc_tmp = xr.where(np.isnan(_ds_fc), 1, 0)
-        if 'member' in _ds_fc_tmp.dims:
-            _ds_fc_tmp = _ds_fc_tmp.sum(dim='member')
-        _ds_fc_mask = xr.where(_ds_fc_tmp.sum(dim='time') == 0, True, False)
+        # read verdata/fc data for calib
+        if self.calib:
+            da_fc_calib = self.load_fc_data('calib', average_dim=average_dims)
+            da_verdata_calib = self.load_verif_data('calib', average_dim=average_dims)
+            data.append(da_fc_calib)
+            data.append(da_verdata_calib)
 
-        combined_mask = np.logical_and(_ds_verif_mask == 1, _ds_fc_mask == 1)
-        combined_mask = xr.where(combined_mask,1,float('nan'))
 
-        return combined_mask
+
+
+        # mask land-sea (only first two items will be used for combined mask)
+        data, lsm_full = self.mask_lsm(data)
+        dict_out['lsm_full'] = lsm_full
+
+        # derive area statistics if desired for data itself
+        if self.area_statistic_kind == 'data':
+            data, lsm = self.calc_area_statistics(data, lsm_full,
+                                                  minimum_value=self.area_statistic_minvalue,
+                                                  statistic=self.area_statistic_function)
+            dict_out['lsm'] = lsm
+            # reassign data list items to individual xarray objects
+
+            da_fc_verif = data[0]
+            da_verdata_verif = data[1]
+            dict_out['da_verdata_verif'] = da_verdata_verif
+            dict_out['da_fc_verif'] = da_fc_verif
+
+
+
+
+        # now calibrate if desired
+        method = 'mean+trend'
+        if self.calib:
+            da_fc_calib = data[2]
+            da_verdata_calib = data[3]
+            da_fc_verif_bc = self.calibrate(da_verdata_calib, da_fc_calib, da_fc_verif, method=method)
+
+            dict_out['da_fc_verif_bc'] = da_fc_verif_bc
+            dict_out['da_verdata_calib'] = da_verdata_calib
+            dict_out['da_fc_calib'] = da_fc_calib
+        return dict_out
+
+
+    def calibrate(self, da_verdata_calib, da_fc_calib, da_fc_verif, method=None):
+        """
+        Apply calibration to forecast to be verified
+        :param da_verdata_calib: calibration observation data
+        :param da_fc_calib: calibration forecast data
+        :param da_fc_verif: forecast data to be calibrated
+        :param method: method used for calibration
+        :return: calibrated forecast
+        """
+        utils.print_info(f'Calibrating using method: {method}')
+        allowed_methods = ['mean', 'mean+trend']
+        if method not in allowed_methods:
+            raise ValueError(f'Method calibration needs to be one of {allowed_methods}')
+
+        if method == 'mean':
+            bias_calib = da_fc_calib - da_verdata_calib
+            if 'date' in bias_calib.dims:
+                bias_calib = bias_calib.mean(dim='date')
+            fc_verif_bc = da_fc_verif - bias_calib
+            return fc_verif_bc
+
+        if method == 'mean+trend':
+            utils.print_info('Calibration mean+trend')
+            bias_calib = da_fc_calib - da_verdata_calib
+
+            if 'xc' not in bias_calib.dims:
+                bias_calib = bias_calib.expand_dims(['xc', 'yc'])
+            da_slope, da_intercept, da_pvalue = mutils.compute_linreg(bias_calib)
+
+            years_calib = np.arange(int(self.calib_fromyear), int(self.calib_toyear) + 100)
+
+
+            if self.verif_fromyear is not None:
+                years_verif = np.arange(int(self.verif_fromyear), int(self.verif_toyear)+1)
+            else:
+                verif_year = self.verif_dates[0][:4]
+                years_verif = np.arange(int(verif_year), int(verif_year) + 1)
+            years_verif_int = np.intersect1d(years_verif, years_calib, return_indices=True)[2]
+
+            orgdates = da_fc_verif['date'].values[:]
+            da_fc_verif['date'] = years_verif_int
+
+            correction = da_slope*da_fc_verif['date'] + da_intercept
+            fc_verif_bc = da_fc_verif - correction
+            fc_verif_bc['date'] = orgdates
+            fc_verif_bc = fc_verif_bc.squeeze()
+
+            return fc_verif_bc

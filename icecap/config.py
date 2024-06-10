@@ -85,8 +85,8 @@ class Configuration():
         self.ecflow = None
         self.suitename = None
         self.sourcedir = None
-        self.rundir = None
-        self.datadir = None
+        self.scratchdir = None
+        self.permdir = None
         self.python_exe = None
         self.ecfhomeroot = None
         self.ecflow_host = None
@@ -142,6 +142,8 @@ class Configuration():
         self.inset_position = None
         self.area_statistic = None
         self.additonal_mask = None
+        self.calib_method =None
+        self.nsidc_region = None
 
 
 
@@ -161,12 +163,7 @@ class Configuration():
         self._init_config(conf_parser, 'environment')
 
         # some default values in icecap which can't be changed via config file
-        self.stagedir = self.datadir + '/stage'  # staged data files
-        self.metricdir = self.datadir + '/metrics'  # metrics computed from data
-        self.plotdir = self.datadir + '/plots'  # plots of metrics
-        self.pydir = self.rundir + '/py'  # Python scripts
-        self.ecffilesdir = self.rundir + '/ecf_files'  # ECF_FILES
-        self.ecfincdir = self.ecffilesdir + '/include'  # ECF_INC
+        # self.update_config()
 
 
         # set up ecflow variables if needed
@@ -252,6 +249,10 @@ class Configuration():
             if self.source is None:
                 self.source = self.machine
 
+            if self.region_extent is not None and self.nsidc_region is not None:
+                raise ValueError('Selecting a region via nsidc_region and region_extent is not allowed')
+
+
             self.plotsets[plotid] = dataobjects.PlotConfigObject(
                 verif_expname=self.verif_expname,
                 plottype =self.plottype,
@@ -266,6 +267,7 @@ class Configuration():
                 proj_options = self.proj_options,
                 circle_border=self.circle_border,
                 region_extent = self.region_extent,
+                nsidc_region = self.nsidc_region,
                 cmap = self.cmap,
                 source = self.source,
                 verif_dates = self.verif_dates,
@@ -282,8 +284,54 @@ class Configuration():
                 area_statistic = self.area_statistic,
                 plot_shading = self.plot_shading,
                 inset_position = self.inset_position,
-                additonal_mask = self.additonal_mask
+                additonal_mask = self.additonal_mask,
+                calib_method=self.calib_method
                 )
+
+    @property
+    def rundir(self):
+        """ init permdir """
+        return self.permdir + '/' + self.suitename
+    @property
+    def pydir(self):
+        """ init pydir """
+        return self.rundir + '/py'
+    @property
+    def datadir(self):
+        """ init datadir """
+        return self.scratchdir + '/' + self.suitename
+    @property
+    def tmpdir(self):
+        """ init tmpdir """
+        return self.datadir + '/tmp'
+    @property
+    def stagedir(self):
+        """ init stagedir """
+        return self.datadir + '/stage'
+
+    @property
+    def metricdir(self):
+        """ init metricdir """
+        return self.datadir + '/metrics'
+    @property
+    def plotdir(self):
+        """ init plotdir """
+        return self.datadir + '/plots'
+
+    @property
+    def ecffilesdir(self):
+        """ init ecffiledir """
+        return self.rundir + '/ecf_files'
+
+    @property
+    def ecfincdir(self):
+        """ init ecfincdir """
+        return self.ecffilesdir + '/include'
+
+    @property
+    def etcdir(self):
+        """ init etcdir """
+        return self.rundir + '/etc'
 
     def __str__(self):
         """Return string representation of configuration for printing"""

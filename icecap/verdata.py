@@ -58,6 +58,8 @@ class VerifyingData(dataobjects.DataObject):
 
 
 
+
+
 class _OSIThreddsRetrieval(VerifyingData):
     def __init__(self, conf):
         super().__init__(conf)
@@ -123,17 +125,17 @@ class _OSIThreddsRetrieval(VerifyingData):
             if _ofile in self.files_to_retrieve:
                 try:
                     file = f'{self.server[0]}{_date[:4]}/{_date[4:6]}/{self.filebase[0]}{_date}{self.fileext[0]}'
+                    da_in = xr.open_dataset(file)[params_verdata[self.params][self.verif_name]]
                     if verbose:
                         print(f'Processing file {file}')
-                    da_in = xr.open_dataset(file)[params_verdata[self.params][self.verif_name]]
 
                 except:
                     if len(self.server) > 1:
                         try:
                             file = f'{self.server[1]}{_date[:4]}/{_date[4:6]}/{self.filebase[1]}{_date}{self.fileext[1]}'
+                            da_in = xr.open_dataset(file)[params_verdata[self.params][self.verif_name]]
                             if verbose:
                                 print(f'Processing file {file}')
-                            da_in = xr.open_dataset(file)[params_verdata[self.params][self.verif_name]]
                         except:
                             raise BaseException(f'Data {file} not found')
                     else:

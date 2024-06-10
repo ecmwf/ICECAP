@@ -128,6 +128,7 @@ class Metric(BaseMetric):
 
                     # calculate minimum over shifted grids
                     ds_merged_min = ds_merged.min(axis=0)
+                    ds_merged_min = xr.where(np.isnan(ds_merged_min), 0, ds_merged_min)
 
                     # edge grid cells are define as those with ice
                     # and with one surrounding cell with no ice
