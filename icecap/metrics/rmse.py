@@ -5,6 +5,8 @@ import xarray as xr
 import utils
 from .metric import BaseMetric
 
+
+
 xr.set_options(keep_attrs=True)
 os.environ['HDF5_USE_FILE_LOCKING']='FALSE'
 
@@ -18,46 +20,53 @@ class Metric(BaseMetric):
         self.ylabel = 'RMSE'
         self.levels = np.arange(0.05, 1.05, .1)
         self.default_cmap = 'hot_r'
-        self.use_dask = False
-        # self.use_dask = True
+        self.use_dask = True
+
 
     def compute(self):
         """ Compute metric """
 
+        average_dims = ['member']
+        persistence = False
+
+        processed_data_dict = self.process_data_for_metric(average_dims, persistence)
+
+
         if self.calib:
-            raise NotImplementedError('Calibration not supported yet for this metric')
+            da_fc_verif = processed_data_dict['da_fc_verif_bc']
+        else:
+            da_fc_verif = processed_data_dict['da_fc_verif']
 
-        da_fc_verif = self.load_fc_data('verif', average_dim=['member'])
-        da_verdata_verif = self.load_verif_data('verif')
-        data, lsm_full = self.mask_lsm([da_fc_verif, da_verdata_verif])
+        da_verdata_verif = processed_data_dict['da_verdata_verif']
 
-        if self.area_statistic_kind == 'data':
-            data, lsm = self.calc_area_statistics(data, lsm_full,
-                                                  minimum_value=self.area_statistic_minvalue,
-                                                  statistic=self.area_statistic_function)
-        da_fc_verif = data[0]
-        da_verdata_verif = data[1].isel(member=0)
-
-        da_rmse = np.sqrt(((da_fc_verif - da_verdata_verif)**2).mean(dim=('inidate','date')))
+        da_rmse = np.sqrt(((da_fc_verif - da_verdata_verif) ** 2).mean(dim=('inidate', 'date')))
 
         if self.area_statistic_kind == 'score':
-            data, lsm = self.calc_area_statistics([da_rmse], lsm_full,
-                                                  minimum_value=self.area_statistic_minvalue,
+            data, lsm = self.calc_area_statistics([da_rmse], processed_data_dict['lsm_full'],
                                                   statistic=self.area_statistic_function)
             da_rmse = data[0]
+            processed_data_dict['lsm'] = lsm
 
-        # set projection attributes
-        data = utils.set_xarray_attribute([da_rmse], da_verdata_verif,
-                                          params=['projection', 'central_longitude', 'central_latitude',
-                                                  'true_scale_latitude'])
-        data = [
-            data[0].rename('fc_rmse'),
+        data_plot = []
+        data_plot.append(processed_data_dict['lsm_full'])
+        if 'lsm' in processed_data_dict:
+            data_plot.append(processed_data_dict['lsm'])
+
+        data_plot += [
+            da_rmse.rename('fc_rmse'),
         ]
 
-        if self.area_statistic_kind is not None:
-            data.append(lsm)
+        # set projection attributes
+        data_plot = utils.set_xarray_attribute(data_plot, processed_data_dict['da_coords'],
+                                               params=['projection', 'central_longitude', 'central_latitude',
+                                                       'true_scale_latitude'])
 
-        data.append(lsm_full)
 
-        data_xr = xr.merge(data)
+
+        data_xr = xr.merge(data_plot)
+
+        data_xr = data_xr.assign_attrs({'obs-linecolor': 'k'})
+        data_xr = data_xr.assign_attrs({f'{self.verif_expname[0]}-linecolor': 'blue'})
+
+
         self.result = data_xr

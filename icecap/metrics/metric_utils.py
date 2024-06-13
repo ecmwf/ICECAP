@@ -24,12 +24,19 @@ def xr_regression_3d(ds):
     :param ds: xr DataArray with sic data
     :return: DataArray with linear regression slope and pvalue
     """
+
     ds_out = xr.apply_ufunc(xr_regression_vector,
-                            ds,
+                            ds.chunk(dict(date=-1)),
                             exclude_dims=set(('date',)),
                             input_core_dims=[["date"]],
                             output_core_dims=[['slope_intercept_pvalue']],
-                            vectorize=True)
+                            vectorize=True,
+                            dask="parallelized",
+                            output_dtypes=[ds.dtype],
+                            dask_gufunc_kwargs={'output_sizes':{"slope_intercept_pvalue": 3}}
+                            )
+
+
     return ds_out
 
 def compute_linreg(da):
@@ -47,6 +54,7 @@ def compute_linreg(da):
     # 4. merge output from 3 with dummy dataset to get dropped grid cells back
     # 5. split slope/pvalue to different xr DataArrays
 
+    # with dask.config.set(**{'array.slicing.split_large_chunks': True}):
     da_std = da.std(dim='date')
     da_tmp = xr.where(da_std == 0, np.nan, da)
     da_stack = da_tmp.stack(z=("yc", "xc"))

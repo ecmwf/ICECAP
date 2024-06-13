@@ -10,11 +10,6 @@ from .metric import BaseMetric
 xr.set_options(keep_attrs=True)
 os.environ['HDF5_USE_FILE_LOCKING']='FALSE'
 
-# computation is very slow as there are many grid cells/timesteps
-        # to make teh computation faster we do the following
-        # 1. stack array along xc and yc
-        # 2. drop all cells for which standard deviation is 0
-
 class Metric(BaseMetric):
     """ Metric object """
     def __init__(self, name, conf):
@@ -38,78 +33,78 @@ class Metric(BaseMetric):
     def compute(self):
         """ Compute metric """
 
+        average_dims = None
+        persistence = False
+
+        processed_data_dict = self.process_data_for_metric(average_dims, persistence)
+
         if self.calib:
-            raise NotImplementedError('Calibration not supported yet for this metric')
+            da_fc_verif = processed_data_dict['da_fc_verif_bc']
+        else:
+            da_fc_verif = processed_data_dict['da_fc_verif']
 
-        da_fc_verif = self.load_fc_data('verif')
-        da_verdata_verif = self.load_verif_data('verif')
-        data, lsm_full = self.mask_lsm([da_fc_verif, da_verdata_verif])
+        da_verdata_verif = processed_data_dict['da_verdata_verif'].isel(member=0)
 
-        if self.area_statistic_kind == 'data':
-            data, lsm = self.calc_area_statistics(data, lsm_full,
-                                                  minimum_value=self.area_statistic_minvalue,
-                                                  statistic=self.area_statistic_function)
-        da_fc_verif = data[0]
-        da_verdata_verif = data[1].isel(member=0)
-
-        da_rmse = np.sqrt(((da_fc_verif.mean(dim='member') - da_verdata_verif)**2).mean(dim=('inidate','date')))
-        da_spread = np.sqrt(da_fc_verif.var(dim='member').mean(dim=('inidate','date')))
+        da_rmse = np.sqrt(((da_fc_verif.mean(dim='member') - da_verdata_verif) ** 2).mean(dim=('inidate', 'date')))
+        da_spread = np.sqrt(da_fc_verif.var(dim='member').mean(dim=('inidate', 'date')))
 
         # set zero values to 1e-11 to avoid division by 0
         da_rmse = xr.where(da_rmse == 0, 1e-11, da_rmse)
         da_spread = xr.where(da_spread == 0, 1e-11, da_spread)
-        da_ser = da_spread/da_rmse
+        da_ser = da_spread / da_rmse
 
         # restore zero values before saving
         da_rmse = xr.where(da_rmse == 1e-11, 0, da_rmse)
         da_spread = xr.where(da_spread == 1e-11, 0, da_spread)
 
         if self.area_statistic_kind == 'score':
-            data, lsm = self.calc_area_statistics([da_rmse, da_spread, da_ser], lsm_full,
-                                                  minimum_value=self.area_statistic_minvalue,
+            data, lsm = self.calc_area_statistics([da_rmse, da_spread, da_ser],
+                                                  processed_data_dict['lsm_full'],
                                                   statistic=self.area_statistic_function)
             da_rmse = data[0]
             da_spread = data[1]
             da_ser = data[2]
-
-        # set projection attributes
-        data = utils.set_xarray_attribute([da_rmse, da_spread, da_ser], da_verdata_verif,
-                                          params=['projection', 'central_longitude', 'central_latitude',
-                                                  'true_scale_latitude'])
+            processed_data_dict['lsm'] = lsm
 
 
-        data = [
-            data[0].rename('fc_rmse'),
-            data[1].rename('fc_spread'),
-            data[2].rename('fc_ser'),
+        data_plot = []
+        data_plot.append(processed_data_dict['lsm_full'])
+        if 'lsm' in processed_data_dict:
+            data_plot.append(processed_data_dict['lsm'])
+
+
+        data_plot += [
+            da_rmse.rename('fc_rmse'),
+            da_spread.rename('fc_spread'),
+            da_ser.rename('fc_ser'),
         ]
 
-        if self.area_statistic_kind is not None:
-            data.append(lsm)
+        # set projection attributes
+        data_plot = utils.set_xarray_attribute(data_plot, processed_data_dict['da_coords'],
+                                                 params=['projection', 'central_longitude', 'central_latitude',
+                                                         'true_scale_latitude'])
 
-        data.append(lsm_full)
-
-        data_xr = xr.merge(data)
+        data_xr = xr.merge(data_plot)
 
         # set xarray DataArray attributes to set variable specific labels, colors,...
-        for var in ['fc_rmse','fc_spread']:
+        for var in ['fc_rmse', 'fc_spread']:
             data_xr = data_xr.assign_attrs({f'{var}-cmap': 'hot_r',
-                                            f'{var}-levels': f'{np.arange(0.05,1.05,.1)}',
+                                            f'{var}-levels': f'{np.arange(0.05, 1.05, .1)}',
                                             f'{var}-norm': 'None'})
 
-        for var in ['fc_ser','fc_rmse', 'fc_spread']:
+        for var in ['fc_ser', 'fc_rmse', 'fc_spread']:
             data_xr = data_xr.assign_attrs({f'{var}-linecolor': 'k'})
-            cmd_all = [{"attr_type" : 'cb.set_label', "label" : var.replace('fc_','').upper()}]
+            cmd_all = [{"attr_type": 'cb.set_label', "label": var.replace('fc_', '').upper()}]
             for i, cmd in enumerate(cmd_all):
                 cmd_list = [f"{key}=\"{value}\"" if isinstance(value, str) else f"{key}={value}" for key, value in
                             cmd.items()]
                 data_xr = data_xr.assign_attrs({f'{var}-{i}': cmd_list})
 
         data_xr = data_xr.assign_attrs({'fc_ser-linestyle': 'solid',
-                              'fc_rmse-linestyle': 'dashed',
-                              'fc_spread-linestyle': 'dotted'})
+                                        'fc_rmse-linestyle': 'dashed',
+                                        'fc_spread-linestyle': 'dotted'})
         var_list = list(data_xr.data_vars)
-        var_list_ser = [var for var in var_list if var not in ['fc_rmse','fc_spread']]
+        var_list_ser = [var for var in var_list if var not in ['fc_rmse', 'fc_spread']]
         var_list_rest = [var for var in var_list if var not in ['fc_ser']]
 
         self.result = [data_xr[var_list_rest], data_xr[var_list_ser]]

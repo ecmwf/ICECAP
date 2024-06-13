@@ -34,9 +34,6 @@ class TsPlot(plottypes.GenericPlot):
         if self.plottype in ['brier', 'crps']:
             self.ylabel = f'{metric.ylabel} (reference: persistence)'
 
-        self.area_statistic_minvalue = None
-        if metric.area_statistic_minvalue is not None:
-            self.area_statistic_minvalue = metric.area_statistic_minvalue
 
 
         self.plot_shading = metric.plot_shading
@@ -332,8 +329,6 @@ class TsPlot(plottypes.GenericPlot):
             _title += f' combined dates init-time {_init_time}' \
                       f' ({_verif_fromyear} - {_verif_toyear})'
 
-        if self.area_statistic_minvalue is not None:
-            _title += f'(cells wit sic>{self.area_statistic_minvalue} set to 1)'
 
 
         if self.calib:

@@ -1,8 +1,9 @@
 """ Metric calculating Spatial Probability Score (SPS) """
-
 import os
 import xarray as xr
+import utils
 from .metric import BaseMetric
+
 
 xr.set_options(keep_attrs=True)
 os.environ['HDF5_USE_FILE_LOCKING']='FALSE'
@@ -17,32 +18,48 @@ class Metric(BaseMetric):
         self.ylabel = 'SPS'
         self.levels = None
         self.use_dask = False
-        #self.use_dask = True
+        self.use_dask = True
 
     def compute(self):
         """ Compute metric """
 
-        if self.calib:
-            raise NotImplementedError('Calibration not supported yet for this metric')
+
+        self.area_statistic_kind = 'score'
         self.area_statistic_function = 'sum'
 
-        da_fc_verif = self.load_fc_data('verif')
-        da_verdata_verif = self.load_verif_data('verif')
-        data, lsm_full = self.mask_lsm([da_fc_verif, da_verdata_verif])
+        average_dims = None
+        persistence = False
+        sice_threshold = 0.15
 
-        da_fc_verif = (xr.where(data[0] > 0.15, 1, 0)).mean(dim='member')
-        da_verdata_verif = xr.where(data[1].isel(member=0) > 0.15, 1, 0)
+        processed_data_dict = self.process_data_for_metric(average_dims, persistence,
+                                                           sice_threshold)
 
 
-        da_mse = ((da_verdata_verif-da_fc_verif)**2).mean(dim=('inidate','date'))
-        data, lsm = self.calc_area_statistics([da_mse], lsm_full,
-                                              minimum_value=None,
+        if self.calib:
+            da_fc_verif= processed_data_dict['da_fc_verif_bc'].mean(dim='member')
+        else:
+            da_fc_verif = processed_data_dict['da_fc_verif'].mean(dim='member')
+
+        da_verdata_verif = processed_data_dict['da_verdata_verif'].isel(member=0)
+
+        da_mse = ((da_verdata_verif - da_fc_verif) ** 2).mean(dim=('inidate', 'date'))
+        data, lsm = self.calc_area_statistics([da_mse], processed_data_dict['lsm_full'],
                                               statistic='sum')
-        data[0] = data[0]
-        data = [data[0].rename('fc_sps')]
 
-        data.append(lsm)
-        data.append(lsm_full)
 
-        data_xr = xr.merge(data)
+        data_plot = []
+        data_plot.append(processed_data_dict['lsm_full'])
+        data_plot.append(lsm)
+        data_plot.append(data[0].rename('fc_sps'))
+
+        # set projection attributes
+        data_plot = utils.set_xarray_attribute(data_plot, processed_data_dict['da_coords'],
+                                               params=['projection', 'central_longitude', 'central_latitude',
+                                                       'true_scale_latitude'])
+
+
+
+        data_xr = xr.merge(data_plot)
+
+
         self.result = data_xr

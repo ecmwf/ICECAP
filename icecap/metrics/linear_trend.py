@@ -1,8 +1,9 @@
-""" Metric calculating mean error """
+""" Metric calculating trends """
 import os
 import numpy as np
 import xarray as xr
 import utils
+import metrics.metric_utils as mutils
 from .metric import BaseMetric
 
 
@@ -14,21 +15,16 @@ class Metric(BaseMetric):
     def __init__(self, name, conf):
         super().__init__(name, conf)
         self.use_metric_name = True
-        self.plottext = f'bias to {self.verif_name}'
-        self.legendtext = 'bias'
-        self.default_cmap = 'bwr'
-        self.levels = np.arange(-1.05, 1.15, .1)
-        self.levels = [-.25, -.2, -.15, -.1, -.05, .05, .1, .15, .2, .25]
-        self.default_cmap = 'RdBu_r'
+        self.plottext = ''
+        self.legendtext = 'linear trend in % per decade'
         self.ylabel = 'sic'
+        self.default_cmap = 'seismic_r'
+        self.levels = np.arange(-31.5, 33, 3)
         self.use_dask = False
 
     def compute(self):
         """ Compute metric """
 
-        # averaging over data or score the same for forecast_error. data is faster
-        if self.area_statistic_kind is not None:
-            self.area_statistic_kind = 'data'
 
         average_dims = ['member','inidate']
         persistence = False
@@ -39,14 +35,27 @@ class Metric(BaseMetric):
         data_plot.append(processed_data_dict['lsm_full'])
         if 'lsm' in processed_data_dict:
             data_plot.append(processed_data_dict['lsm'])
-        if self.calib:
-            da_fc_verif_plot = processed_data_dict['da_fc_verif_bc'].mean(dim='date')
-        else:
-            da_fc_verif_plot = processed_data_dict['da_fc_verif'].mean(dim='date')
 
-        da_verdata_verif = processed_data_dict['da_verdata_verif'].mean(dim='date')
-        bias = (da_fc_verif_plot - da_verdata_verif).rename(f'{self.verif_expname[0]}-bias')
-        data_plot.append(bias)
+        if self.calib:
+            da_fc_verif= processed_data_dict['da_fc_verif_bc']
+        else:
+            da_fc_verif = processed_data_dict['da_fc_verif']
+
+        da_verdata_verif = processed_data_dict['da_verdata_verif']
+
+        data = [da_verdata_verif, da_fc_verif]
+        for di in range(len(data)):
+            if 'xc' not in data[di].dims:
+                data[di] = data[di].expand_dims(['xc', 'yc'])
+
+        if self.add_verdata == "yes":
+            da_slope_verdata, da_intercept_verdata, da_pvalue_verdata = mutils.compute_linreg(data[0])
+            data_plot.append(da_slope_verdata.rename('verdata-verif-value').squeeze()*1000)
+            data_plot.append(da_pvalue_verdata.rename('verdata-verif-pvalue').squeeze())
+
+        da_slope_fc, da_intercept_fc, da_pvalue_fc = mutils.compute_linreg(data[1])
+        data_plot.append(da_slope_fc.rename('fc-verif-value').squeeze()*1000)
+        data_plot.append(da_pvalue_fc.rename('fc-verif-pvalue').squeeze())
 
 
 

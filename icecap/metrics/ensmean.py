@@ -2,8 +2,9 @@
 import os
 import numpy as np
 import xarray as xr
-from .metric import BaseMetric
 import utils
+from .metric import BaseMetric
+
 
 xr.set_options(keep_attrs=True)
 os.environ['HDF5_USE_FILE_LOCKING']='FALSE'
@@ -57,7 +58,7 @@ class Metric(BaseMetric):
 
 
         # set projection attributes
-        data_plot = utils.set_xarray_attribute(data_plot, processed_data_dict['da_verdata_verif'],
+        data_plot = utils.set_xarray_attribute(data_plot, processed_data_dict['da_coords'],
                                                  params=['projection', 'central_longitude', 'central_latitude',
                                                          'true_scale_latitude'])
 

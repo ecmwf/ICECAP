@@ -92,7 +92,6 @@ class BaseMetric(dataobjects.DataObject):
         self.area_statistic = None
         self.area_statistic_function = None
         self.area_statistic_unit = None
-        self.area_statistic_minvalue = None
         self.area_statistic_kind = None
 
         if conf.plotsets[name].area_statistic is not None:
@@ -119,11 +118,6 @@ class BaseMetric(dataobjects.DataObject):
                     utils.print_info('Setting the unit of area_statistics to fraction has no effect when using sum as function')
                     self.area_statistic_unit = 'total'
 
-            if len(self.area_statistic)>3:
-                self.area_statistic_minvalue = float(self.area_statistic[3])
-                if self.area_statistic_minvalue <0 or self.area_statistic_minvalue>1:
-                    raise ValueError('4th argument of area_statistic (minimum sic value)'
-                                     'needs to be between 0 and 1')
 
         self.region_extent = conf.plotsets[name].region_extent
         self.nsidc_region = conf.plotsets[name].nsidc_region
@@ -467,12 +461,11 @@ class BaseMetric(dataobjects.DataObject):
         return _da_file
 
 
-    def calc_area_statistics(self, datalist, ds_mask, minimum_value=0, statistic='mean'):
+    def calc_area_statistics(self, datalist, ds_mask, statistic='mean'):
         """
         Calculate area statistics (mean/sum) for verif and fc using a combined land-sea-mask from both datasets
         :param datalist: list of xarray objects for verif and fc
         :param ds_mask: combined land-sea-mask from fc and verif (using mask_lsm function)
-        :param minimum_value: only count grid cells with sea-ice larger than this value
         :param statistic: derive mean or sum
         :return: list of xarray objects (verif and fc) for which statistic has been applied to
         """
@@ -507,11 +500,8 @@ class BaseMetric(dataobjects.DataObject):
             ds_mask_reg = ds_mask
 
 
-        if minimum_value:
-            utils.print_info(f'Setting grid cells with sic>{minimum_value} to 1')
-            datalist_mask = [xr.where(d > minimum_value, 1, 0) for d in datalist]
-        else:
-            datalist_mask = datalist
+
+        datalist_mask = datalist
 
 
         # CELL AREA
@@ -571,8 +561,37 @@ class BaseMetric(dataobjects.DataObject):
 
         return datalist_mask, ds_mask.rename('lsm-full')
 
+    def mask_lsm_new(self, ds_obs, ds_fc):
+        """ Create land-sea mask from two datasets (usually observations and fc)
+        :param datalist: list of dataArrays (first two will be used to generate combined lsm)
+        :return: list masked dataArrays from datalist
+        """
+        alldims = ['member', 'date', 'inidate']
 
-    def process_data_for_metric(self, average_dims):
+        # remove unnecessary dimensions
+        fc_dims = {d:0 for d in alldims if d in ds_fc.dims}
+        fc_dims['time'] = [0]
+        ds_fc = ds_fc.isel(fc_dims)
+        obs_dims = {d: 0 for d in alldims if d in ds_obs.dims}
+        obs_dims['time'] = [0]
+        ds_obs = ds_obs.isel(obs_dims)
+
+        ds_mask = mutils.create_combined_mask(ds_obs,
+                                             ds_fc)
+
+        if self.additonal_mask:
+            utils.print_info('APPLYING ADDITIONAL MASK')
+            ds_additonal_mask = xr.open_dataarray(self.additonal_mask)
+
+            #datalist = [d.where(~np.isnan(ds_additonal_mask)) for d in datalist]
+            ds_mask = ds_mask.where(~np.isnan(ds_additonal_mask))
+
+        return ds_mask.rename('lsm-full'), ds_obs
+
+
+    def process_data_for_metric(self, average_dims,
+                                persistence=False,
+                                sice_threshold=None):
         """
         Process forecast/observation data for metric (load data, calibrate forecast etc)
         :param average_dims: dimesnions over which to average when loading data
@@ -587,47 +606,97 @@ class BaseMetric(dataobjects.DataObject):
                                                 average_dim=average_dims)
         data = [da_fc_verif, da_verdata_verif]
 
-
         # read verdata/fc data for calib
         if self.calib:
             da_fc_calib = self.load_fc_data('calib', average_dim=average_dims)
-            da_verdata_calib = self.load_verif_data('calib', average_dim=average_dims)
+            da_verdata_calib = self.load_verif_data('calib', average_dim=['member'])
             data.append(da_fc_calib)
             data.append(da_verdata_calib)
 
+        if persistence:
+            da_persistence = self.load_verif_data('verif', target='i:0').isel(member=0, time=0)
+            data.append(da_persistence)
 
-
-
-        # mask land-sea (only first two items will be used for combined mask)
-        data, lsm_full = self.mask_lsm(data)
+        lsm_full, da_coords = self.mask_lsm_new(da_verdata_verif, da_fc_verif)
+        data = [d.where(~np.isnan(lsm_full)) for d in data]
         dict_out['lsm_full'] = lsm_full
 
-        # derive area statistics if desired for data itself
-        if self.area_statistic_kind == 'data':
-            data, lsm = self.calc_area_statistics(data, lsm_full,
-                                                  minimum_value=self.area_statistic_minvalue,
-                                                  statistic=self.area_statistic_function)
-            dict_out['lsm'] = lsm
-            # reassign data list items to individual xarray objects
 
+
+        if sice_threshold is not None:
+            # 1. calibrate first for each grid cell
+            # 2. set values to 1
+            # 3. average
+
+            datalist = [da_fc_verif, da_verdata_verif]
+            # now calibrate if desired
+            if self.calib:
+                da_fc_calib = data[2]
+                da_verdata_calib = data[3]
+                da_fc_verif_bc = self.calibrate(da_verdata_calib, da_fc_calib,
+                                                da_fc_verif,
+                                                method=self.calib_method)
+
+                datalist += [da_fc_calib, da_verdata_calib, da_fc_verif_bc]
+
+            if persistence:
+                datalist.append(da_persistence)
+
+            # 2nd step
+            utils.print_info(f'Setting all grid cells with sea ice > {sice_threshold} to 1')
+            datalist = [xr.where(d > sice_threshold, 1, 0) for d in datalist]
+
+            # 3rd
+            if self.area_statistic_kind == 'data':
+                datalist, lsm = self.calc_area_statistics(datalist, lsm_full,
+                                                      statistic=self.area_statistic_function)
+                dict_out['lsm'] = lsm
+
+            dict_out['da_fc_verif'] = datalist[0]
+            dict_out['da_verdata_verif'] = datalist[1]
+
+            if self.calib:
+                dict_out['da_fc_calib'] = datalist[2]
+                dict_out['da_verdata_calib'] = datalist[3]
+                dict_out['da_fc_verif_bc'] = datalist[4]
+
+            if persistence:
+                dict_out['da_verdata_persistence'] = datalist[-1]
+        else:
+            # 1. average
+            # 2. calibrate
+
+            # derive area statistics if desired for data itself
+            if self.area_statistic_kind == 'data':
+                data, lsm = self.calc_area_statistics(data, lsm_full,
+                                                      statistic=self.area_statistic_function)
+                dict_out['lsm'] = lsm
+
+            # reassign data list items to individual xarray objects
             da_fc_verif = data[0]
             da_verdata_verif = data[1]
             dict_out['da_verdata_verif'] = da_verdata_verif
             dict_out['da_fc_verif'] = da_fc_verif
 
+            # now calibrate if desired
+            if self.calib:
+                da_fc_calib = data[2]
+                da_verdata_calib = data[3]
+                da_fc_verif_bc = self.calibrate(da_verdata_calib, da_fc_calib,
+                                                da_fc_verif,
+                                                method=self.calib_method)
+
+                dict_out['da_fc_verif_bc'] = da_fc_verif_bc
+                dict_out['da_verdata_calib'] = da_verdata_calib
+                dict_out['da_fc_calib'] = da_fc_calib
 
 
+            if persistence:
+                dict_out['da_verdata_persistence'] = data[-1]
 
-        # now calibrate if desired
-        method = 'mean+trend'
-        if self.calib:
-            da_fc_calib = data[2]
-            da_verdata_calib = data[3]
-            da_fc_verif_bc = self.calibrate(da_verdata_calib, da_fc_calib, da_fc_verif, method=method)
+        # return this array as it definitely still has all attributes needed for plotting
+        dict_out['da_coords'] = da_coords
 
-            dict_out['da_fc_verif_bc'] = da_fc_verif_bc
-            dict_out['da_verdata_calib'] = da_verdata_calib
-            dict_out['da_fc_calib'] = da_fc_calib
         return dict_out
 
 
@@ -646,18 +715,32 @@ class BaseMetric(dataobjects.DataObject):
             raise ValueError(f'Method calibration needs to be one of {allowed_methods}')
 
         if method == 'mean':
+            for dim in ['inidate', 'date','member']:
+                if dim in da_fc_calib.dims:
+                    da_fc_calib = da_fc_calib.mean(dim=dim)
+                if dim in da_verdata_calib.dims:
+                    da_verdata_calib = da_verdata_calib.mean(dim=dim)
+
             bias_calib = da_fc_calib - da_verdata_calib
-            if 'date' in bias_calib.dims:
-                bias_calib = bias_calib.mean(dim='date')
+
+
             fc_verif_bc = da_fc_verif - bias_calib
             return fc_verif_bc
 
         if method == 'mean+trend':
             utils.print_info('Calibration mean+trend')
+            for dim in ['inidate', 'member']:
+                if dim in da_fc_calib.dims:
+                    da_fc_calib = da_fc_calib.mean(dim=dim)
+                if dim in da_verdata_calib.dims:
+                    da_verdata_calib = da_verdata_calib.mean(dim=dim)
+
             bias_calib = da_fc_calib - da_verdata_calib
 
             if 'xc' not in bias_calib.dims:
                 bias_calib = bias_calib.expand_dims(['xc', 'yc'])
+
+
             da_slope, da_intercept, da_pvalue = mutils.compute_linreg(bias_calib)
 
             years_calib = np.arange(int(self.calib_fromyear), int(self.calib_toyear) + 100)
@@ -676,6 +759,6 @@ class BaseMetric(dataobjects.DataObject):
             correction = da_slope*da_fc_verif['date'] + da_intercept
             fc_verif_bc = da_fc_verif - correction
             fc_verif_bc['date'] = orgdates
-            fc_verif_bc = fc_verif_bc.squeeze()
+            #fc_verif_bc = fc_verif_bc.squeeze()
 
             return fc_verif_bc

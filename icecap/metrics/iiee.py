@@ -1,9 +1,10 @@
 """ Metric calculating Integrated Ice Edge Error (IIEE) """
-
 import os
 import numpy as np
 import xarray as xr
+import utils
 from .metric import BaseMetric
+
 
 xr.set_options(keep_attrs=True)
 os.environ['HDF5_USE_FILE_LOCKING']='FALSE'
@@ -18,30 +19,46 @@ class Metric(BaseMetric):
         self.ylabel = 'IIEE'
         self.levels = None
         self.use_dask = False
-        #self.use_dask = True
 
     def compute(self):
         """ Compute metric """
 
-        if self.calib:
-            raise NotImplementedError('Calibration not supported yet for this metric')
+        # IEE is always spatially aggregated over score
+        self.area_statistic_kind = 'score'
         self.area_statistic_function = 'sum'
 
-        da_fc_verif = self.load_fc_data('verif', average_dim=['member'])
-        da_verdata_verif = self.load_verif_data('verif')
-        data, lsm_full = self.mask_lsm([da_fc_verif, da_verdata_verif])
+        average_dims = ['member']
+        persistence = False
+        sice_threshold = 0.15
 
-        da_fc_verif = xr.where(data[0]>0.15,1,0)
-        da_verdata_verif = xr.where(data[1].isel(member=0)>0.15,1,0)
+        processed_data_dict = self.process_data_for_metric(average_dims, persistence,
+                                                           sice_threshold)
 
-        da_mae = (np.abs(da_verdata_verif-da_fc_verif)).mean(dim=('inidate','date'))
-        data, lsm = self.calc_area_statistics([da_mae], lsm_full,
-                                              minimum_value=None,
-                                              statistic='sum')
-        data = [data[0].rename('fc_iiee')]
+        data_plot = []
+        data_plot.append(processed_data_dict['lsm_full'])
+        if self.calib:
+            da_fc_verif= processed_data_dict['da_fc_verif_bc']
+        else:
+            da_fc_verif = processed_data_dict['da_fc_verif']
 
-        data.append(lsm)
-        data.append(lsm_full)
+        da_verdata_verif = processed_data_dict['da_verdata_verif']
+        da_mae = (np.abs(da_verdata_verif - da_fc_verif)).mean(dim=('inidate', 'date'))
 
-        data_xr = xr.merge(data)
+        data, lsm = self.calc_area_statistics([da_mae], processed_data_dict['lsm_full'],
+                                              statistic=self.area_statistic_function)
+        data_plot.append(data[0].rename('fc_iiee'))
+        data_plot.append(lsm)
+
+
+
+        # set projection attributes
+        data_plot = utils.set_xarray_attribute(data_plot, processed_data_dict['da_coords'],
+                                               params=['projection', 'central_longitude', 'central_latitude',
+                                                       'true_scale_latitude'])
+
+
+
+        data_xr = xr.merge(data_plot)
+
+
         self.result = data_xr
