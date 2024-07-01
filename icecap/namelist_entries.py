@@ -152,7 +152,7 @@ config_optnames = {
     'plot' : {
         'verif_expname' : {
             'printname':'experiment name for plotting',
-            'optional' : False,
+            'optional' : True,
         },
         'plottype' : {
             'printname':'plot type',
@@ -161,31 +161,32 @@ config_optnames = {
                                 "ice_distance", "plume", "freeze-up", 'brier',
                                 'crps', 'rmse', 'ser','iiee','sps',
                                 'brier_edge','linear_trend',
+                                'rmse_edge',
                                 'test', 'test2']
         },
         'verif_mode':{
             'printname': 'forcast or hindcast mode for plotting',
-            'optional' : False,
+            'optional' : True,
         },
         'verif_fromyear':{
             'printname' : 'first year',
-            'optional' : ['verif_mode:hc']
+            'optional' : True
         },
         'verif_toyear':{
             'printname' : 'last year',
-            'optional' : ['verif_mode:hc']
+            'optional' : True
         },
         'target':{
             'printname' : 'target time for plotting',
-            'optional' : False,
+            'optional' : True,
         },
         'verif_enssize':{
             'printname' : 'ensemble size used for metrics',
-            'optional' : False
+            'optional' : True
         },
         'verif_fcsystem':{
             'printname' : 'forecast system specification',
-            'optional' : False,
+            'optional' : True,
             'allowed_values' : ["medium-range", "extended-range","long-range", 's2s']
         },
         'verif_dates' : {
@@ -217,7 +218,7 @@ config_optnames = {
         'nsidc_region':{
             'printname' : 'NSIDC region identifier',
             'optional' : True,
-            'allowed_values' : ['CARC','BEAS','CHUS','ESS','LS',
+            'allowed_values' : ['None', 'CARC','BEAS','CHUS','ESS','LS',
                                 'KS','BARS','EGS','BBLS','GOSL','HB','CAA',
                                 'BERS','SOO','SOJ','BYS','BALS','GOA',
                                 'carc', 'beas', 'chus', 'ess', 'ls', 'ks', 'bars', 'egs', 'bbls',
@@ -302,6 +303,10 @@ config_optnames = {
             'printname':'Method used for calibration',
             'optional' : True,
             'allowed_values' : ["mean", "mean+trend"]
-        }
+        },
+        'copy_id' : {
+            'printname':'Copy config from different plotset',
+            'optional' : True
+        },
     }
 }

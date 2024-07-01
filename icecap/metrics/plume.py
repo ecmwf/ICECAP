@@ -33,8 +33,9 @@ class Metric(BaseMetric):
 
         average_dims = ['inidate']
         persistence = False
+        sic_threshold = None
 
-        processed_data_dict = self.process_data_for_metric(average_dims, persistence)
+        processed_data_dict = self.process_data_for_metric(average_dims, persistence, sic_threshold)
 
         data_plot = []
         data_plot.append(processed_data_dict['lsm_full'])

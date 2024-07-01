@@ -3,7 +3,7 @@
 import numpy as np
 import xarray as xr
 from scipy import stats
-
+import utils
 def xr_regression_vector(y):
     """
     Derive linear regression slope and pvalue for a single vector and return as DataArray
@@ -164,6 +164,13 @@ def detect_edge(ds, threshold=0.15):
     else:
         ds_bool = xr.where(ds > threshold, 1, 0)
 
+
+    for dim in ('inidate', 'date', 'member','time'):
+        if dim not in ds_bool.dims:
+            ds_bool = ds_bool.expand_dims(dim)
+
+
+
     ds_center = ds_bool.isel(xc=slice(1, -1), yc=slice(1, -1))
     ds_left_center = ds_bool.isel(xc=slice(None, -2), yc=slice(1, -1))
     ds_right_center = ds_bool.isel(xc=slice(2, None), yc=slice(1, -1))
@@ -187,7 +194,7 @@ def detect_edge(ds, threshold=0.15):
 
     edge_arr = np.logical_and(ds_merged_min == 0, ds_center > 0)
     ds_bool_np = np.zeros(ds_bool.shape)
-    ds_bool_np[:,:,:, 1:-1, 1:-1] = edge_arr
+    ds_bool_np[:,:,:,:, 1:-1, 1:-1] = edge_arr
     ds_edge = ds_bool.copy(deep=True, data=ds_bool_np)
 
     return ds_edge
@@ -200,10 +207,12 @@ def detect_extended_edge(ds_edge, max_extent=200):
     :return: xr DataArray with position of extended sea ice edge
     """
 
+    utils.print_info(f'Extended Edge detection algorithm')
 
-    # use grid spacing to derive number of cells ussssssssing max_extent
+    # use grid spacing to derive number of cells using max_extent
     dx = np.diff(ds_edge.xc)[0]/1000
     cells_add = np.round((max_extent / dx)).astype(int)
+
 
     ds_new = ds_edge.values.copy()
 
@@ -214,22 +223,22 @@ def detect_extended_edge(ds_edge, max_extent=200):
             # derive distance and check it's not larger than cells_add
             if np.sqrt(np.abs(xi) ** 2 + np.abs(yi) ** 2) <= cells_add:
                 if xi > 0 and yi > 0:
-                    ds_tmp[:,:,:, :-yi, :-xi] = ds_edge.isel(xc=slice(xi, None), yc=slice(yi, None)).values
+                    ds_tmp[:,:,:,:, :-yi, :-xi] = ds_edge.isel(xc=slice(xi, None), yc=slice(yi, None)).values
                 elif xi > 0 and yi < 0:
-                    ds_tmp[:,:,:, np.abs(yi):, :-xi] = ds_edge.isel(xc=slice(xi, None), yc=slice(None, yi)).values
+                    ds_tmp[:,:,:,:, np.abs(yi):, :-xi] = ds_edge.isel(xc=slice(xi, None), yc=slice(None, yi)).values
                 elif xi < 0 and yi < 0:
-                    ds_tmp[:,:,:, np.abs(yi):, np.abs(xi):] = ds_edge.isel(xc=slice(None, xi), yc=slice(None, yi)).values
+                    ds_tmp[:,:,:,:, np.abs(yi):, np.abs(xi):] = ds_edge.isel(xc=slice(None, xi), yc=slice(None, yi)).values
                 elif xi < 0 and yi > 0:
-                    ds_tmp[:,:,:, :-yi, np.abs(xi):] = ds_edge.isel(xc=slice(None, xi), yc=slice(yi, None)).values
+                    ds_tmp[:,:,:,:, :-yi, np.abs(xi):] = ds_edge.isel(xc=slice(None, xi), yc=slice(yi, None)).values
 
                 elif xi == 0 and yi > 0:
-                    ds_tmp[:,:,:, :-yi, :] = ds_edge.isel(yc=slice(yi, None)).values
+                    ds_tmp[:,:,:,:, :-yi, :] = ds_edge.isel(yc=slice(yi, None)).values
                 elif xi == 0 and yi < 0:
-                    ds_tmp[:,:,:, np.abs(yi):, :] = ds_edge.isel(yc=slice(None, yi)).values
+                    ds_tmp[:,:,:,:, np.abs(yi):, :] = ds_edge.isel(yc=slice(None, yi)).values
                 elif yi == 0 and xi > 0:
-                    ds_tmp[:,:,:, :, :-xi] = ds_edge.isel(xc=slice(xi, None)).values
+                    ds_tmp[:,:,:,:, :, :-xi] = ds_edge.isel(xc=slice(xi, None)).values
                 elif yi == 0 and xi < 0:
-                    ds_tmp[:,:,:, :, np.abs(xi):] = ds_edge.isel(xc=slice(None, xi)).values
+                    ds_tmp[:,:,:,:, :, np.abs(xi):] = ds_edge.isel(xc=slice(None, xi)).values
 
                 ds_new = ds_new + ds_tmp
 

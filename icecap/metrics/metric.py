@@ -11,6 +11,7 @@ import os.path
 import datetime as dt
 import xarray as xr
 import numpy as np
+import pandas as pd
 
 import metrics.metric_utils as mutils
 import dataobjects
@@ -23,12 +24,10 @@ class BaseMetric(dataobjects.DataObject):
     def __init__(self, name, conf):
         super().__init__(conf)
         self.metricname = name
+
         self.target = conf.plotsets[name].target
         self.plottype = conf.plotsets[name].plottype
         self.metricdir = conf.metricdir
-
-
-
 
         #initialise verification attributes
 
@@ -47,6 +46,55 @@ class BaseMetric(dataobjects.DataObject):
         self.verif_refdate = utils.confdates_to_list(conf.plotsets[name].verif_refdate)
 
         self.verif_enssize = utils.csv_to_list(conf.plotsets[name].verif_enssize)
+
+
+
+        self.use_metric_name = False
+        self.result = None
+        self.default_cmap = None
+
+        # initialize metric arguments important for plotting
+        self.clip = False
+        self.ofile = conf.plotsets[name].ofile
+
+        self.use_dask = False
+
+        self.points = None
+
+        self.add_verdata = conf.plotsets[name].add_verdata
+
+        self.area_statistic_conf = conf.plotsets[name].area_statistic
+        self.area_statistic = None
+        self.area_statistic_function = None
+        self.area_statistic_unit = None
+        self.area_statistic_kind = None
+
+        self.region_extent = conf.plotsets[name].region_extent
+        self.nsidc_region = conf.plotsets[name].nsidc_region
+        self.plot_shading = conf.plotsets[name].plot_shading
+        self.inset_position = conf.plotsets[name].inset_position
+        self.additonal_mask = conf.plotsets[name].additonal_mask
+
+        self.etcdir = conf.etcdir
+
+        self.ticks = None
+        self.ticklabels = None
+        self.norm = None
+
+        self.time_average = None
+
+        # copy attributes from entry
+        if conf.plotsets[name].copy_id is not None:
+            copy_metric = BaseMetric(conf.plotsets[name].copy_id, conf)
+
+
+            for key,value in self.__dict__.items():
+                if value is None or value == [None]:
+                    setattr(self, key, getattr(copy_metric, key))
+                elif value == 'None':
+                    setattr(self, key, None)
+
+
 
         if len(self.verif_enssize) != 1:
             raise ValueError('enssize can be either length 1 (all dates/systems with same ensemble size)')
@@ -69,36 +117,16 @@ class BaseMetric(dataobjects.DataObject):
             self.calib_enssize = utils.csv_to_list(conf.plotsets[name].calib_enssize)
             self.fccalibsets = self._init_fc(name='calib')
 
-        self.use_metric_name = False
-        self.result = None
-        self.default_cmap = None
-
-
-        self.fcverifsets = self._init_fc(name='verif')
-
-        # initialize metric arguments important for plotting
-        self.clip = False
-        self.ofile = conf.plotsets[name].ofile
-
-        self.use_dask = False
-
-        self.points = None
         if conf.plotsets[name].points is not None:
             tmp_points = utils.csv_to_list(conf.plotsets[name].points, ';')
             self.points = [list(map(float,utils.csv_to_list(point,','))) for point in tmp_points]
 
-        self.add_verdata = conf.plotsets[name].add_verdata
 
-        self.area_statistic = None
-        self.area_statistic_function = None
-        self.area_statistic_unit = None
-        self.area_statistic_kind = None
-
-        if conf.plotsets[name].area_statistic is not None:
+        if self.area_statistic_conf is not None:
             self.area_statistic_function = 'mean'
             self.area_statistic_unit = 'fraction'
 
-            self.area_statistic = conf.plotsets[name].area_statistic.split(':')
+            self.area_statistic = self.area_statistic_conf.split(':')
             self.area_statistic_kind = self.area_statistic[0]
             if self.area_statistic_kind not in ['data', 'score']:
                 raise ValueError('area_statistic need to provide information if statistic '
@@ -117,21 +145,14 @@ class BaseMetric(dataobjects.DataObject):
                 if self.area_statistic_unit == 'fraction' and self.area_statistic_function == 'sum':
                     utils.print_info('Setting the unit of area_statistics to fraction has no effect when using sum as function')
                     self.area_statistic_unit = 'total'
+        else:
+            self.area_statistic = None
+            self.area_statistic_function = None
+            self.area_statistic_unit = None
+            self.area_statistic_kind = None
 
+        self.fcverifsets = self._init_fc(name='verif')
 
-        self.region_extent = conf.plotsets[name].region_extent
-        self.nsidc_region = conf.plotsets[name].nsidc_region
-        self.plot_shading = conf.plotsets[name].plot_shading
-        self.inset_position = conf.plotsets[name].inset_position
-        self.additonal_mask = conf.plotsets[name].additonal_mask
-
-        self.etcdir = conf.etcdir
-
-        self.ticks = None
-        self.ticklabels = None
-        self.norm = None
-
-        self.time_average = None
 
 
 
@@ -165,7 +186,11 @@ class BaseMetric(dataobjects.DataObject):
                 'modelname': getattr(self, f'{name}_modelname')[0],
                 'mode': getattr(self, f'{name}_mode')[0]
             }
-            _cycles = [forecast_info.get_cycle(**kwargs, thisdate=_date) for _date in fcsets[date]['sdates']]
+            if 'hc' in getattr(self, f'{name}_mode'):
+                _refdates = getattr(self, f'{name}_refdate')
+                _cycles = [forecast_info.get_cycle(**kwargs, thisdate=_date) for _date in _refdates]
+            else:
+                _cycles = [forecast_info.get_cycle(**kwargs, thisdate=_date) for _date in fcsets[date]['sdates']]
             if len(set(_cycles)) != 1:
                 raise ValueError('Forecast dates are pooled from different model cycles')
 
@@ -180,6 +205,8 @@ class BaseMetric(dataobjects.DataObject):
             }
 
             fcsets[date]['cachedir'] = dataobjects.define_fccachedir(**kwargs)
+
+
             fcsets[date]['enssize'] = getattr(self, f'{name}_enssize')[0]
 
 
@@ -306,9 +333,21 @@ class BaseMetric(dataobjects.DataObject):
                         for _seldate in _seldates:
                             _filename = f"{self.obscachedir}/" \
                                         f"{filename.format(_seldate, self.params, self.grid)}"
-                            _da_file = self._load_file(_filename)
+                            if os.path.isfile(_filename):
+                                _da_file = self._load_file(_filename)
+                            else:
+                                if not _da_seldate_list:
+                                    raise ValueError('No verification data found')
+                                else:
+                                    _da_file = xr.full_like(_da_seldate_list[0],
+                                                            np.nan)
+                                    _da_file['time'] = [pd.to_datetime(_seldate).to_numpy()]
+
                             _da_seldate_list.append(_da_file)
                         _da_file = xr.concat(_da_seldate_list, dim='time')
+
+
+
 
                     elif datatype == 'fc':
                         _filename = f"{fcset[fcname]['cachedir']}/" \
@@ -410,10 +449,10 @@ class BaseMetric(dataobjects.DataObject):
         if isinstance(result, list):
             for fi, file in enumerate(result):
                 utils.print_info(f'Saving metric file {_ofile.replace(".nc",f"_{fi}.nc")}')
-                file.to_netcdf(_ofile.replace('.nc',f'_{fi}.nc'))
+                file.load().to_netcdf(_ofile.replace('.nc',f'_{fi}.nc'))
         else:
             utils.print_info(f'Saving metric file {_ofile}')
-            result.to_netcdf(_ofile)
+            result.load().to_netcdf(_ofile)
     def gettype(self):
         """ Determine typ of plot (timeseries or mapplot) """
         if self.area_statistic or self.plottype in ['ice_distance']:
@@ -498,8 +537,7 @@ class BaseMetric(dataobjects.DataObject):
 
         else:
             ds_mask_reg = ds_mask
-
-
+            datalist = [d.where(~np.isnan(ds_mask_reg)) for d in datalist]
 
         datalist_mask = datalist
 
@@ -519,7 +557,7 @@ class BaseMetric(dataobjects.DataObject):
             if self.area_statistic_unit == 'total':
                 datalist_out = [d*cell_area for d in datalist_out]
         elif statistic == 'sum':
-            datalist_out = [d.sum(dim=('xc', 'yc'), skipna=True)*cell_area for d in datalist_mask]
+            datalist_out = [d.sum(dim=('xc', 'yc'), skipna=True, min_count=1)*cell_area for d in datalist_mask]
         elif statistic == 'median':
             datalist_out = [d.median(dim=('xc', 'yc'), skipna=True) for d in datalist_mask]
         else:
@@ -597,6 +635,7 @@ class BaseMetric(dataobjects.DataObject):
         :param average_dims: dimesnions over which to average when loading data
         :return: dictionary of forecast/observation data
         """
+
         dict_out = {}
 
         # read verdata/fc data for verif
@@ -604,6 +643,7 @@ class BaseMetric(dataobjects.DataObject):
                                         average_dim=average_dims)
         da_verdata_verif = self.load_verif_data('verif',
                                                 average_dim=average_dims)
+
         data = [da_fc_verif, da_verdata_verif]
 
         # read verdata/fc data for calib
@@ -621,12 +661,18 @@ class BaseMetric(dataobjects.DataObject):
         data = [d.where(~np.isnan(lsm_full)) for d in data]
         dict_out['lsm_full'] = lsm_full
 
+        # assign back to xarray objects
+        da_fc_verif = data[0]
+        da_verdata_verif = data[1]
+        if persistence:
+            da_persistence = data[2]
 
 
         if sice_threshold is not None:
-            # 1. calibrate first for each grid cell
-            # 2. set values to 1
-            # 3. average
+            # 1. calibrate first for each grid cell and add to datalist
+            # 2. add persistence to datalist
+            # 3. set values to 1
+            # 3. average all data in list
 
             datalist = [da_fc_verif, da_verdata_verif]
             # now calibrate if desired
@@ -644,7 +690,16 @@ class BaseMetric(dataobjects.DataObject):
 
             # 2nd step
             utils.print_info(f'Setting all grid cells with sea ice > {sice_threshold} to 1')
-            datalist = [xr.where(d > sice_threshold, 1, 0) for d in datalist]
+            datalist = [xr.where(d > sice_threshold, 1, d) for d in datalist]
+
+
+
+            if 'edge' in self.plottype:
+                utils.print_info('Edge detection algorithm')
+                da_verdata_verif_ice_edge = mutils.detect_edge(da_verdata_verif, None)
+                da_verdata_verif_ice_ext_edge = mutils.detect_extended_edge(da_verdata_verif_ice_edge)
+                datalist = [d.where(da_verdata_verif_ice_ext_edge == 1) for d in datalist]
+
 
             # 3rd
             if self.area_statistic_kind == 'data':
@@ -663,25 +718,35 @@ class BaseMetric(dataobjects.DataObject):
             if persistence:
                 dict_out['da_verdata_persistence'] = datalist[-1]
         else:
-            # 1. average
+            # 1. use datalist directly
+            # 2. average all data in list
             # 2. calibrate
+
+            datalist = data
+
+            if 'edge' in self.plottype:
+                utils.print_info('Edge detection algorithm')
+                da_verdata_verif_ice_edge = mutils.detect_edge(da_verdata_verif)
+                da_verdata_verif_ice_ext_edge = mutils.detect_extended_edge(da_verdata_verif_ice_edge)
+                datalist = [d.where(da_verdata_verif_ice_ext_edge == 1) for d in datalist]
+
 
             # derive area statistics if desired for data itself
             if self.area_statistic_kind == 'data':
-                data, lsm = self.calc_area_statistics(data, lsm_full,
+                datalist, lsm = self.calc_area_statistics(datalist, lsm_full,
                                                       statistic=self.area_statistic_function)
                 dict_out['lsm'] = lsm
 
             # reassign data list items to individual xarray objects
-            da_fc_verif = data[0]
-            da_verdata_verif = data[1]
+            da_fc_verif = datalist[0]
+            da_verdata_verif = datalist[1]
             dict_out['da_verdata_verif'] = da_verdata_verif
             dict_out['da_fc_verif'] = da_fc_verif
 
             # now calibrate if desired
             if self.calib:
-                da_fc_calib = data[2]
-                da_verdata_calib = data[3]
+                da_fc_calib = datalist[2]
+                da_verdata_calib = datalist[3]
                 da_fc_verif_bc = self.calibrate(da_verdata_calib, da_fc_calib,
                                                 da_fc_verif,
                                                 method=self.calib_method)
@@ -691,8 +756,9 @@ class BaseMetric(dataobjects.DataObject):
                 dict_out['da_fc_calib'] = da_fc_calib
 
 
+
             if persistence:
-                dict_out['da_verdata_persistence'] = data[-1]
+                dict_out['da_verdata_persistence'] = datalist[-1]
 
         # return this array as it definitely still has all attributes needed for plotting
         dict_out['da_coords'] = da_coords
@@ -759,6 +825,6 @@ class BaseMetric(dataobjects.DataObject):
             correction = da_slope*da_fc_verif['date'] + da_intercept
             fc_verif_bc = da_fc_verif - correction
             fc_verif_bc['date'] = orgdates
-            #fc_verif_bc = fc_verif_bc.squeeze()
+            fc_verif_bc = fc_verif_bc.squeeze()
 
             return fc_verif_bc

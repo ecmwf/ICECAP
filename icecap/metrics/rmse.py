@@ -27,9 +27,10 @@ class Metric(BaseMetric):
         """ Compute metric """
 
         average_dims = ['member']
-        persistence = False
+        persistence = True
+        sice_threshold = None
 
-        processed_data_dict = self.process_data_for_metric(average_dims, persistence)
+        processed_data_dict = self.process_data_for_metric(average_dims, persistence, sice_threshold)
 
 
         if self.calib:
@@ -41,11 +42,21 @@ class Metric(BaseMetric):
 
         da_rmse = np.sqrt(((da_fc_verif - da_verdata_verif) ** 2).mean(dim=('inidate', 'date')))
 
+        data = [da_rmse]
+
+
+        da_persistence = processed_data_dict['da_verdata_persistence']
+        da_pers_rmse = np.sqrt(((da_persistence - da_verdata_verif) ** 2).mean(dim=('inidate', 'date')))
+        data.append(da_pers_rmse)
+
+
         if self.area_statistic_kind == 'score':
-            data, lsm = self.calc_area_statistics([da_rmse], processed_data_dict['lsm_full'],
+            data, lsm = self.calc_area_statistics(data, processed_data_dict['lsm_full'],
                                                   statistic=self.area_statistic_function)
             da_rmse = data[0]
+            da_pers_rmse = data[1]
             processed_data_dict['lsm'] = lsm
+
 
         data_plot = []
         data_plot.append(processed_data_dict['lsm_full'])
@@ -54,6 +65,7 @@ class Metric(BaseMetric):
 
         data_plot += [
             da_rmse.rename('fc_rmse'),
+            da_pers_rmse.rename('persistence')
         ]
 
         # set projection attributes

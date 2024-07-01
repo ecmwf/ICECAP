@@ -31,7 +31,7 @@ class Metric(BaseMetric):
             self.area_statistic_kind = 'data'
 
         average_dims = ['member','inidate']
-        persistence = False
+        persistence = True
 
         processed_data_dict = self.process_data_for_metric(average_dims, persistence)
 
@@ -45,9 +45,13 @@ class Metric(BaseMetric):
             da_fc_verif_plot = processed_data_dict['da_fc_verif'].mean(dim='date')
 
         da_verdata_verif = processed_data_dict['da_verdata_verif'].mean(dim='date')
-        bias = (da_fc_verif_plot - da_verdata_verif).rename(f'{self.verif_expname[0]}-bias')
+        bias = (da_fc_verif_plot - da_verdata_verif).rename(f'{self.verif_expname[0]}')
         data_plot.append(bias)
 
+        if persistence:
+            da_persistence = processed_data_dict['da_verdata_persistence'].mean(dim=('date','inidate'))
+            bias_persistence = (da_persistence - da_verdata_verif).rename(f'{self.verif_expname[0]}')
+            data_plot.append(bias_persistence.rename('persistence'))
 
 
         # set projection attributes

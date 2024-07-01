@@ -229,6 +229,8 @@ class Metric(BaseMetric):
                 bias_list.append(tmp_fc_dist.mean(dim='member')-tmp_verdata_dist.mean(dim='member'))
                 verdata_list.append(tmp_verdata_dist)
 
+
+            # end new
             bias_dist_calib = xr.concat(bias_list, dim='newdim')
             bias_dist_calib = bias_dist_calib.mean(dim='newdim')
             verdata_dist_calib = xr.concat(verdata_list, dim='date')

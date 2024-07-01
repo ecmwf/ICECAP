@@ -18,12 +18,15 @@ class Metric(BaseMetric):
         self.legendtext = ''
         self.ylabel = 'sic'
         self.levels = np.arange(0, 1.1, .1)
-        self.use_dask = False
+        self.use_dask = True
         if self.area_statistic_kind is None or self.area_statistic_function == 'mean':
             self.clip = True
 
     def compute(self):
         """ Compute metric """
+
+        persistence = False
+        sice_threshold = None
 
         # averaging over data or score the same for ensmean. data is faster
         if self.area_statistic_kind is not None:
@@ -31,7 +34,7 @@ class Metric(BaseMetric):
 
         average_dims = ['member', 'inidate']
 
-        processed_data_dict = self.process_data_for_metric(average_dims)
+        processed_data_dict = self.process_data_for_metric(average_dims, persistence, sice_threshold)
 
         data_plot = []
         data_plot.append(processed_data_dict['lsm_full'])
@@ -48,6 +51,10 @@ class Metric(BaseMetric):
 
 
         data_plot.append(da_fc_verif_plot.rename(f'{self.verif_expname[0]}'))
+
+        if persistence:
+            da_persistence = processed_data_dict['da_verdata_persistence']
+            data_plot.append(da_persistence.rename('persistence'))
 
         if self.add_verdata == "yes":
             da_verdata_verif = processed_data_dict['da_verdata_verif']

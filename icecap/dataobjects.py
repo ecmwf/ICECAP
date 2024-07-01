@@ -329,7 +329,7 @@ class ForecastConfigObject:
 
             # add previous day for persistence calculation
             prev_day = self.dtdates[0] - relativedelta(days=1)
-            dtdates_prev = [prev_day] + self.dtdates
+            self.dtdates_all = [prev_day] + self.dtdates
 
 
         # for hindcast mode dates need to be given in MMDD format
@@ -369,6 +369,7 @@ class ForecastConfigObject:
                 shc_date_dict = {}
 
             _dates_list_yyyymmdd = []
+            _dates_list_yyyymmdd_all = []
             for di, date in enumerate(_dates_list):
                 _dates_tmp = [f'{_year}{date}' for _year in range(int(getattr(self, 'fromyear')),
                                                                   int(getattr(self, 'toyear')) + 1)]
@@ -377,16 +378,18 @@ class ForecastConfigObject:
 
                 # remove dates which are not defined, e.g. 29.2 for non-leap years
                 _dates = []
+                _dates_all = []
                 for d in _dates_tmp:
                     try:
                         _dates.append(dt.datetime.strptime(d, '%Y%m%d'))
                     except:
                         pass
                 if _dates:
-                    # dates including previosu day for persistence scores
+                    # dates including previous day for persistence scores
                     dtdates_prev = [ fcday - relativedelta(days=1) for fcday in _dates] + _dates
 
-                    _dates_list_yyyymmdd += dtdates_prev #_dates
+                    _dates_list_yyyymmdd += _dates
+                    _dates_list_yyyymmdd_all += dtdates_prev  # _dates
                     if self.mode == 'hc':
                         hc_date_dict[self.shcrefdate_loop[di]] = _dates
                         shc_date_dict[self.shcrefdate_loop[di]] = [d.strftime('%Y%m%d') for d in _dates]
@@ -396,6 +399,8 @@ class ForecastConfigObject:
 
             self.dtdates = _dates_list_yyyymmdd
             self.sdates = [d.strftime('%Y%m%d') for d in self.dtdates]
+            self.dtdates_all = _dates_list_yyyymmdd_all
+
 
             if self.mode == 'hc':
                 self.hcdates = hc_date_dict
@@ -404,7 +409,8 @@ class ForecastConfigObject:
 
         # all forecast days calculated from init-day + ndays parameter
         #self.dtalldates = utils.make_days_datelist(self.dtdates, self.ndays)
-        self.dtalldates = utils.make_days_datelist(self.dtdates, self.ndays)
+        #self.dtalldates = utils.make_days_datelist(self.dtdates, self.ndays)
+        self.dtalldates = utils.make_days_datelist(self.dtdates_all, self.ndays)
         self.salldates = sorted(list(dict.fromkeys([d.strftime('%Y%m%d')
                                                     for d in self.dtalldates])))
 
@@ -447,3 +453,4 @@ class PlotConfigObject:
         self.inset_position = kwargs['inset_position']
         self.additonal_mask = kwargs['additonal_mask']
         self.calib_method = kwargs['calib_method']
+        self.copy_id = kwargs['copy_id']

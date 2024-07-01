@@ -24,7 +24,7 @@ class MapPlot(plottypes.GenericPlot):
         self.projection = conf.plotsets[secname].projection
         self.proj_options = conf.plotsets[secname].proj_options
         self.circle_border = conf.plotsets[secname].circle_border
-        self.region_extent = conf.plotsets[secname].region_extent
+        self.region_extent = metric.region_extent
         self.cmap = conf.plotsets[secname].cmap
         self.units = ''
         self.shortname = ''
@@ -115,7 +115,7 @@ class MapPlot(plottypes.GenericPlot):
                         _var_list_new.append(_var_strip + '-value')
                         sig_list.append(1)
                     else:
-                        var_list.append(_var_strip)
+                        _var_list_new.append(_var_strip)
                         sig_list.append(0)
 
             var_list = _var_list_new

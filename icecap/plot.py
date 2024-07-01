@@ -20,7 +20,6 @@ def plot_api(conf, args):
     utils.print_banner(conf.plotsets[args.plotid].plottype)
 
     m = metrics.factory.create(args.plotid, conf)
-
     m.compute()
     m.save()
 

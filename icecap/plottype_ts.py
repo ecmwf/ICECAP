@@ -98,10 +98,21 @@ class TsPlot(plottypes.GenericPlot):
                      for i in range(50)]
             colors[0] = 'k'
 
+            norm = matplotlib.colors.Normalize(vmin=0, vmax=1000)
+
+            # colormap possible values = viridis, jet, spectral
+            colors = matplotlib.cm.jet(norm(np.linspace(0,1,len(var_list))), bytes=False)
+
+
             for _vi, _var in enumerate(var_list):
                 _ds_file_var = _ds_file[_var]
 
-                color = colors[_vi]
+                if 'obs' in _var:
+                    color='k'
+                else:
+                    color = colors[_vi]
+                    color = 'blue'
+
                 linestyle = 'solid'
 
                 # check if attributes for colors are set
@@ -123,6 +134,14 @@ class TsPlot(plottypes.GenericPlot):
                 _ds_file_var = _ds_file_var*self.mul_factor
 
                 label = _var
+
+                if 'persistence' in _var:
+                    color = 'grey'
+                    linestyle = 'dotted'
+                    if len(_ds_file_var.values) == 1:
+                        ax.axhline(y=_ds_file_var.values, color=color,
+                                   linestyle=linestyle, label='persistence')
+                        continue
 
                 if not multi_member:
                     ax.plot(_ds_file_var.time+1, _ds_file_var.values,
@@ -180,7 +199,7 @@ class TsPlot(plottypes.GenericPlot):
                 _ylim = ax.get_ylim()
 
                 ax.set_ylim([_ylim[0],_ylim[1]+.3*(_ylim[1]-_ylim[0])])
-                #ax.set_ylim([0,260])
+                # ax.set_ylim([0,260])
 
 
                 ax2 = plt.axes([0, 0, 1, 1],

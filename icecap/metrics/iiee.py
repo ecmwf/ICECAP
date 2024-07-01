@@ -28,7 +28,7 @@ class Metric(BaseMetric):
         self.area_statistic_function = 'sum'
 
         average_dims = ['member']
-        persistence = False
+        persistence = True
         sice_threshold = 0.15
 
         processed_data_dict = self.process_data_for_metric(average_dims, persistence,
@@ -44,9 +44,13 @@ class Metric(BaseMetric):
         da_verdata_verif = processed_data_dict['da_verdata_verif']
         da_mae = (np.abs(da_verdata_verif - da_fc_verif)).mean(dim=('inidate', 'date'))
 
-        data, lsm = self.calc_area_statistics([da_mae], processed_data_dict['lsm_full'],
+        da_persistence = processed_data_dict['da_verdata_persistence']
+        da_pers_mae = (np.abs(da_persistence - da_fc_verif)).mean(dim=('inidate', 'date'))
+
+        data, lsm = self.calc_area_statistics([da_mae, da_pers_mae], processed_data_dict['lsm_full'],
                                               statistic=self.area_statistic_function)
         data_plot.append(data[0].rename('fc_iiee'))
+        #data_plot.append(data[1].rename('persistence'))
         data_plot.append(lsm)
 
 

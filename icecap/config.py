@@ -144,6 +144,7 @@ class Configuration():
         self.additonal_mask = None
         self.calib_method =None
         self.nsidc_region = None
+        self.copy_id = None
 
 
 
@@ -241,15 +242,13 @@ class Configuration():
             self._init_config(conf_parser, section, 'plot', init=True)
 
 
-            if (self.verif_mode in ['hc'] or self.calib_mode in ['hc']) and self.source != 'ecmwf':
+            if (self.verif_mode in ['hc'] or self.calib_mode in ['hc']) and self.source not in [None, 'ecmwf']:
                 raise ValueError('verif_mode=hc/calib_mode=hc only works for ECMWF internal data so far')
 
-
-
-            if self.source is None:
-                self.source = self.machine
-
-            if self.region_extent is not None and self.nsidc_region is not None:
+            reg_list = [self.region_extent,self.nsidc_region]
+            reg_list_len = len([i for i in reg_list if (i is not None and i != 'None')])
+            #if self.region_extent is not None and self.nsidc_region is not None:
+            if reg_list_len > 1:
                 raise ValueError('Selecting a region via nsidc_region and region_extent is not allowed')
 
 
@@ -285,7 +284,8 @@ class Configuration():
                 plot_shading = self.plot_shading,
                 inset_position = self.inset_position,
                 additonal_mask = self.additonal_mask,
-                calib_method=self.calib_method
+                calib_method=self.calib_method,
+                copy_id = self.copy_id
                 )
 
     @property
@@ -427,7 +427,6 @@ class Configuration():
                 raise InvalidOption(section, name)
         # else if config entry not specified --> check if optional
         else:
-
             # optional can be True/False but also depend on other config entries
             _optional =  np.atleast_1d(config_optnames[section_config_name][name]['optional']).tolist()
 
