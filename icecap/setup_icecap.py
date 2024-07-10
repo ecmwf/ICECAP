@@ -16,8 +16,10 @@ def create_flow(conf):
     """
     if conf.machine is None:
         return flow.ProcessTree(conf)
-    if conf.machine == 'ecmwf':
+    elif conf.machine == 'ecmwf':
         return ecmwf.EcmwfTree(conf)
+    elif conf.machine == 'jupyter':
+        return
 
     raise ValueError(f'Machine name {conf.machine} is not allowed. ')
 
@@ -51,7 +53,7 @@ class ExecutionHost:
 
         # this is to make sure machine = ecmwf is set if needed (to avoid using wrong head.h settings)
         # this will cause problems if ecflow_host starts with 'ecflow-gen-' on other machine as well
-        if 'ecflow-gen-' in conf.ecflow_host:
+        if conf.ecflow_host is not None and 'ecflow-gen-' in conf.ecflow_host:
             if not self.machine == 'ecmwf':
                 raise ValueError('It seems that you are working on ECMWF..so please set machine to ecmwf')
 
@@ -89,7 +91,7 @@ class ExecutionHost:
         fromdir = self.sourcedir + '/icecap'
         self._copy_python_scripts(fromdir, args)
 
-        fromdir = self.sourcedir + f'/etc'
+        fromdir = self.sourcedir + '/etc'
         self._copy_nsidc_files(fromdir, args)
 
         if self.ecflow == 'yes':

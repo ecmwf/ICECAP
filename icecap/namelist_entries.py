@@ -13,7 +13,7 @@ config_optnames = {
         'machine': {
             'printname' : 'machine',
             'optional' : True,
-            'allowed_values' : ['ecmwf']
+            'allowed_values' : ['ecmwf','jupyter']
         },
         'ecflow': {
             'printname' : 'use ecflow',
