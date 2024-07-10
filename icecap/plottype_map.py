@@ -31,11 +31,6 @@ class MapPlot(plottypes.GenericPlot):
         self.points = metric.points
 
 
-
-
-
-
-
         if self.cmap is None:
             if metric.default_cmap is None:
                 self.cmap = 'cmo.ice'

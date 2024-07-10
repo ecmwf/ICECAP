@@ -1,6 +1,6 @@
 # ICECAP - sea-Ice Calibration, vErifiCAtion and Products
 
-ICECAP  is a python-based software tool developed within the EU Horizon 2020 project ACCIBERG. \ice is developed to handle validation and calibration of Northern-hemisphere sea-ice forecasts provided by the project partners, CMEMS and C3S.
+ICECAP  is a python-based software tool developed within the EU Horizon 2020 project ACCIBERG. ICECAP is developed to handle validation and calibration of Northern-hemisphere sea-ice forecasts provided by the project partners, CMEMS and C3S.
 
 **DISCLAIMER**
 This project is **BETA** and will be **Experimental** for the foreseeable future.
@@ -34,7 +34,7 @@ The user guide is located in the doc/ directory. Compile with
 
 ### License
 
-Copyright 2023 European Centre for Medium-Range Weather Forecasts (ECMWF)
+Copyright 2024 European Centre for Medium-Range Weather Forecasts (ECMWF)
 
 Licensed under the Apache License, Version 2.0 (the "License");
 you may not use this file except in compliance with the License.

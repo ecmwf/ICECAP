@@ -23,7 +23,12 @@ class BaseMetric(dataobjects.DataObject):
 
     def __init__(self, name, conf):
         super().__init__(conf)
+
+
+
         self.metricname = name
+        if conf.plotsets[name].verif_ref is not None:
+            self.verif_name = conf.plotsets[name].verif_ref
 
         self.target = conf.plotsets[name].target
         self.plottype = conf.plotsets[name].plottype
@@ -690,7 +695,8 @@ class BaseMetric(dataobjects.DataObject):
 
             # 2nd step
             utils.print_info(f'Setting all grid cells with sea ice > {sice_threshold} to 1')
-            datalist = [xr.where(d > sice_threshold, 1, d) for d in datalist]
+            datalist_thresh = [xr.where(d > sice_threshold, 1, 0) for d in datalist]
+            datalist = [datalist_thresh[d].where(~np.isnan(datalist[d])) for d in range(len(datalist))]
 
 
 

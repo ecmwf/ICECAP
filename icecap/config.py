@@ -112,6 +112,7 @@ class Configuration():
 
         # the following attributes are only temporally allocated
         # but later saved for each plotID in the config file
+        self.verif_ref = None
         self.verif_expname = None
         self.plottype = None
         self.verif_mode = None
@@ -253,6 +254,7 @@ class Configuration():
 
 
             self.plotsets[plotid] = dataobjects.PlotConfigObject(
+                verif_ref = self.verif_ref,
                 verif_expname=self.verif_expname,
                 plottype =self.plottype,
                 verif_mode = self.verif_mode,

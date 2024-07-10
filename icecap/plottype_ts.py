@@ -176,10 +176,10 @@ class TsPlot(plottypes.GenericPlot):
                             ax.plot(_ds_file_var.time+1, _ds_file_var.sel(member=m).values,
                                     color=color, alpha=.1, linewidth=1,
                                     linestyle = linestyle)
-                    for m in _ds_file_var['member'].values:
-                        ax.plot(_ds_file_var.time + 1, _ds_file_var.sel(member=m).values,
-                                color=color, alpha=.1, linewidth=1,
-                                linestyle=linestyle)
+                    # for m in _ds_file_var['member'].values:
+                    #     ax.plot(_ds_file_var.time + 1, _ds_file_var.sel(member=m).values,
+                    #             color=color, alpha=.1, linewidth=1,
+                    #             linestyle=linestyle)
 
                 # check for timeseries plot attributes
                 for i in _ds_file.attrs:
@@ -323,7 +323,6 @@ class TsPlot(plottypes.GenericPlot):
 
 
     def _create_title(self):
-
         _title = f'{self.verif_source} {self.verif_fcsystem} ' \
                  f'{self.verif_expname} {self.verif_mode} (enssize = {self.verif_enssize}) \n'
 

@@ -10,6 +10,27 @@ import utils
 
 os.environ['HDF5_USE_FILE_LOCKING']='FALSE'
 
+def cds_api(conf, args):
+    """
+    API running all steps to retrieve CDS data
+    (can e.g also called from jupyter notebook)
+    :param conf: configuration object
+    :param args: command line arguments
+    :return: N/A
+    """
+    data = cds.CdsData(conf, args)
+
+    if args.exptype == 'INIT':
+        data.create_folders()
+        data.process_lsm()
+    elif args.exptype == 'WIPE':
+        data.remove_native_files()
+    else:
+        if not data.check_cache(verbose=args.verbose):
+            data.get_from_tape(dryrun=False)
+            data.process()
+            data.clean_up()
+
 if __name__ == '__main__':
     description = 'Stage forecast or analysis from MARS tape archive'
     parser = argparse.ArgumentParser(description=description,
@@ -25,19 +46,5 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     conf = config.Configuration(file=args.configfile)
-
-    data = cds.CdsData(conf, args)
-
-    if args.exptype == 'INIT':
-        data.create_folders()
-        data.process_lsm()
-    elif args.exptype == 'WIPE':
-        data.remove_native_files()
-    else:
-        if not data.check_cache(verbose=args.verbose):
-            data.get_from_tape(dryrun=False)
-            data.process()
-            data.clean_up()
-
-
+    cds_api(conf, args)
     utils.print_banner('ALL DONE')

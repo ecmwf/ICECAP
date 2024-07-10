@@ -150,6 +150,11 @@ config_optnames = {
         },
     }, # end fc
     'plot' : {
+        'verif_ref' : {
+            'printname':'experiment name for plotting',
+            'optional' : True,
+            'allowed_values': ["osi-cdr", 'osi-401-b']
+        },
         'verif_expname' : {
             'printname':'experiment name for plotting',
             'optional' : True,
@@ -162,7 +167,7 @@ config_optnames = {
                                 'crps', 'rmse', 'ser','iiee','sps',
                                 'brier_edge','linear_trend',
                                 'rmse_edge',
-                                'test', 'test2']
+                                'ice_extent', 'test2']
         },
         'verif_mode':{
             'printname': 'forcast or hindcast mode for plotting',

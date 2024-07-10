@@ -23,7 +23,6 @@ class DataObject:
         self.filelist = None
         self.verif_name = conf.verdata
         self.cacherootdir = conf.cachedir
-        self.obscachedir = f'{conf.cachedir}/{conf.verdata.replace("-grid","")}/'
         self.salldates = conf.salldates
         self.linterp = False
         self.regridder = None
@@ -33,6 +32,11 @@ class DataObject:
         self.tmptargetfile = None
         self.periodic = None
         self.ndays = None
+
+    @property
+    def obscachedir(self):
+        """ init permdir """
+        return f'{self.cacherootdir }/{self.verif_name.replace("-grid","")}/'
 
     def check_cache(self, check_level=2, verbose=False):
         """
@@ -53,7 +57,7 @@ class DataObject:
 
         self.files_to_retrieve = []
         if verbose:
-            print(f'files to check {files_to_check}')
+            print(f'files to check {files_to_check} ({len(files_to_check)})')
 
         for file in files_to_check:
             # quick check if exist
@@ -421,6 +425,7 @@ class ForecastConfigObject:
 class PlotConfigObject:
     """A plot config object corresponds to a single numerical plotID (used in config.py)."""
     def __init__(self, **kwargs):
+        self.verif_ref = kwargs['verif_ref']
         self.verif_expname = kwargs['verif_expname']
         self.plottype = kwargs['plottype']
         self.verif_mode = kwargs['verif_mode']
