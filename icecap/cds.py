@@ -167,7 +167,7 @@ class CdsData(dataobjects.ForecastObject):
             if not dryrun:
                 file = self.tmptargetfile
                 ds_in = xr.open_dataset(file, engine='cfgrib')
-                ds_lsm = xr.where(ds_in==0,0,1)
+                ds_lsm = xr.where(ds_in<=0.5,0,1)
                 ds_lsm.to_netcdf(f'{self.fccachedir}/lsm.nc')
                 print(f'{self.fccachedir}/lsm.nc')
 

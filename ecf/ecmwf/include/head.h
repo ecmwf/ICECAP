@@ -57,7 +57,7 @@ module load ecflow/%ECF_VERSION%
 # To allow personal conda environments
 if [ $ECF_PYTHON == 'None' ]; then
     cd %ETCDIR%
-    source ./load_modules python3
+    source ./load_modules python3 ecmwf-toolbox
     export ECF_PYTHON=python3
 else
     # see https://github.com/ks905383/xagg/issues/47

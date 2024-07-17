@@ -273,7 +273,13 @@ config_optnames = {
             'optional' : True
         },
         'add_verdata' : {
-            'printname' : 'add observations to plot (only ice distance currently)',
+            'printname' : 'add observations to plot',
+            'optional' : True,
+            'default_value' : ["no"],
+            'allowed_values' : ["yes", "no"]
+        },
+        'add_verdata_nomask' : {
+            'printname' : 'add non-masked observations to plot (only ice_extent)',
             'optional' : True,
             'default_value' : ["no"],
             'allowed_values' : ["yes", "no"]
@@ -307,7 +313,7 @@ config_optnames = {
         'calib_method' : {
             'printname':'Method used for calibration',
             'optional' : True,
-            'allowed_values' : ["mean", "mean+trend"]
+            'allowed_values' : ["mean", "mean+trend", "anom"]
         },
         'copy_id' : {
             'printname':'Copy config from different plotset',

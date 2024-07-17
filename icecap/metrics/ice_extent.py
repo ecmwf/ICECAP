@@ -59,7 +59,12 @@ class Metric(BaseMetric):
 
         if self.add_verdata == "yes":
             da_verdata_verif = processed_data_dict['da_verdata_verif'].squeeze()
-            data_plot.append(da_verdata_verif.rename('obs'))
+            data_plot.append(da_verdata_verif.rename(self.verif_name))
+
+        if self.add_verdata_nomask == 'yes':
+            da_verdata_verif = processed_data_dict['da_verdata_verif_raw'].squeeze()
+            data_plot.append(da_verdata_verif.rename(f'{self.verif_name} (no masking)'))
+
 
 
         # set projection attributes
@@ -71,7 +76,9 @@ class Metric(BaseMetric):
 
         data_xr = xr.merge(data_plot)
 
-        data_xr = data_xr.assign_attrs({'obs-linecolor': 'k'})
+        data_xr = data_xr.assign_attrs({f'{self.verif_name}-linecolor': 'k'})
+        data_xr = data_xr.assign_attrs({f'{self.verif_name} (no masking)-linestyle': 'dashed',
+                                        f'{self.verif_name} (no masking)-linecolor': 'k'})
         data_xr = data_xr.assign_attrs({f'{self.verif_expname[0]}-linecolor': 'blue'})
 
 

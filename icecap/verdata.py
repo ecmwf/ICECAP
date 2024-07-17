@@ -14,9 +14,7 @@ params_verdata = {
     'sic' : {
         'osi-450-a' : 'ice_conc',
         'osi-401-b' : 'ice_conc',
-        'osi-401-b-grid' : 'ice_conc',
         'osi-cdr' : 'ice_conc',
-        'osi-cdr-grid' : 'ice_conc',
     }
 }
 
@@ -31,8 +29,6 @@ def VerifData(conf):
         'osi-450-a': _OSIThreddsRetrieval(conf),
         'osi-401-b': _OSIThreddsRetrieval(conf),
         'osi-cdr': _OSIThreddsRetrieval(conf), # was osi-450-a_osi-430-a_mixed'
-        'osi-401-b-grid': _OSIThreddsRetrieval(conf),
-        'osi-cdr-grid': _OSIThreddsRetrieval(conf),
     }
 
     return selector[conf.verdata]
@@ -69,11 +65,16 @@ class _OSIThreddsRetrieval(VerifyingData):
             self.server = [self.root_server+"reprocessed/ice/conc_450a_files/"]
             self.filebase = ["ice_conc_nh_ease2-250_cdr-v3p0_"]
             self.fileext = ["1200.nc"]
+            if '20171130' not in self.loopdates:
+                self.loopdates.append('20171130')
 
         if self.verif_name == 'osi-401-b':
             self.server = [self.root_server+"ice/conc/"]
             self.filebase = ["ice_conc_nh_polstere-100_multi_"]
             self.fileext = ["1200.nc"]
+
+            if '20171130' not in self.loopdates:
+                self.loopdates.append('20171130')
 
         if self.verif_name == 'osi-cdr':
             self.server = self.root_server+"reprocessed/ice/conc_450a_files/"
@@ -84,28 +85,20 @@ class _OSIThreddsRetrieval(VerifyingData):
             self.filebase = [self.filebase, "ice_conc_nh_ease2-250_icdr-v3p0_"]
             self.fileext = [self.fileext, "1200.nc"]
 
-        if self.verif_name == 'osi-401-b-grid':
-            self.loopdates = ['20171130']
-            self.server = [self.root_server + "ice/conc/"]
-            self.filebase = ["ice_conc_nh_polstere-100_multi_"]
-            self.fileext = ["1200.nc"]
+            if '20171130' not in self.loopdates:
+                self.loopdates.append('20171130')
 
-        if self.verif_name == 'osi-cdr-grid':
-            self.loopdates = ['20171130']
-            self.server = [self.root_server + "reprocessed/ice/conc_450a_files/"]
-            self.filebase = ["ice_conc_nh_ease2-250_cdr-v3p0_"]
-            self.fileext = ["1200.nc"]
-
+        if not self.loopdates:
+            utils.print_info(f'No verification data to be downloaded for {self.verif_name}.\n'
+                             f'This also means that no dummy data has been specified for this dataset \n'
+                             f'(Please check the manual how to specify such a dummy observation file for a new dataset)')
 
 
     def make_filelist(self):
         """Generate a list of files which are expected to be staged"""
-        if 'grid' in self.verif_name:
-            files = [f'{self.obscachedir}/{self.verif_name}.nc']
-        else:
-            filename = self._filenaming_convention('verif')
-            files = [self.obscachedir +'/' + filename.format(date, self.params)
-                     for date in self.loopdates]
+        filename = self._filenaming_convention('verif')
+        files = [self.obscachedir +'/' + filename.format(date, self.params)
+                 for date in self.loopdates]
         return files
 
     def process(self, verbose):
@@ -116,11 +109,11 @@ class _OSIThreddsRetrieval(VerifyingData):
         filename = self._filenaming_convention('verif')
         utils.make_dir(self.obscachedir)
 
+
+
         for _date in self.loopdates:
             _ofile = f'{self.obscachedir}/{filename.format(_date, self.params)}'
 
-            if 'grid' in self.verif_name:
-                _ofile = f'{self.obscachedir}/{self.verif_name}.nc'
 
             if _ofile in self.files_to_retrieve:
                 try:

@@ -125,7 +125,10 @@ class ExecutionHost:
         files = ['nsidc_osi-401-b.nc', 'nsidc_osi-cdr.nc']
         target_dir = self.etcdir
         for file in files:
-            self._safe_copy(args, file, fromdir, target_dir)
+            if os.path.isfile(f'{fromdir}/{file}'):
+                self._safe_copy(args, file, fromdir, target_dir)
+            else:
+                utils.print_info(f'NSIDC file {file} not found. NSIDC selection not possible')
 
 
     def _copy_ecflow_files(self, fromdir, args, base_level_files_only=False):

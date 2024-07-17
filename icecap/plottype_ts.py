@@ -195,7 +195,8 @@ class TsPlot(plottypes.GenericPlot):
 
 
 
-            if self.points is not None or metric.region_extent or metric.nsidc_region:
+            if self.points is not None or metric.area_statistic_function is not None:
+                #metric.region_extent or metric.nsidc_region:
                 _ylim = ax.get_ylim()
 
                 ax.set_ylim([_ylim[0],_ylim[1]+.3*(_ylim[1]-_ylim[0])])

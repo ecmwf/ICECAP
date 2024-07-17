@@ -67,6 +67,11 @@ class BaseMetric(dataobjects.DataObject):
         self.points = None
 
         self.add_verdata = conf.plotsets[name].add_verdata
+        self.add_verdata_nomask = conf.plotsets[name].add_verdata_nomask
+
+        if self.add_verdata_nomask == 'yes' and self.plottype != 'ice_extent':
+            utils.print_info('Setting add_verdata_nomask is only possible for ice_extent')
+            self.add_verdata_nomask = 'no'
 
         self.area_statistic_conf = conf.plotsets[name].area_statistic
         self.area_statistic = None
@@ -275,15 +280,18 @@ class BaseMetric(dataobjects.DataObject):
 
     def _load_verif_dummy(self, average_dim=None):
         """
-        Load the dummy verification file in case dates are not available for forecast
+        Load the dummy verification file (specific date for obs))
         :return: xr DataArray
         """
-
-        _filename = f'{self.obscachedir}/{self.verif_name}.nc'
-        if '-grid' not in _filename:
-            _filename = _filename.replace('.nc','-grid.nc')
-        da = xr.open_dataarray(_filename)
-        da = da.expand_dims(dim={"member": [1], "date":[1], "inidate":[1]})
+        if self.verif_name in ['osi-cdr', 'osi-401-b']:
+            filename = self._filenaming_convention('verif')
+            _filename = f"{self.obscachedir}/" \
+                        f"{filename.format('20171130', self.params, self.grid)}"
+            da = xr.open_dataarray(_filename)
+            da = da.expand_dims(dim={"member": [1], "date": [1], "inidate": [1]})
+            da['time'] = ['dummy']
+        else:
+            raise NotImplementedError(f'No dummy observations specified for {self.verif_name}')
 
 
         if None not in average_dim :
@@ -323,6 +331,8 @@ class BaseMetric(dataobjects.DataObject):
                 _dtdate = [utils.string_to_datetime(_date)]
                 _dtseldates = utils.create_list_target_verif(target, _dtdate)
                 _seldates = [utils.datetime_to_string(dtdate) for dtdate in _dtseldates]
+                if sorted(_seldates) != _seldates:
+                    raise ValueError('Target needs to be sorted')
 
 
                 if datatype == 'fc':
@@ -342,7 +352,8 @@ class BaseMetric(dataobjects.DataObject):
                                 _da_file = self._load_file(_filename)
                             else:
                                 if not _da_seldate_list:
-                                    raise ValueError('No verification data found')
+                                    utils.print_info('No verification data found')
+                                    return None
                                 else:
                                     _da_file = xr.full_like(_da_seldate_list[0],
                                                             np.nan)
@@ -423,11 +434,6 @@ class BaseMetric(dataobjects.DataObject):
         """
         utils.print_info(f"READING OBSERVATION DATA FOR {name}")
         average_dim = [average_dim] if not (isinstance(average_dim, list)) else average_dim
-
-        if name != 'calib':
-            if 'grid' in self.verif_name:# or self.add_verdata == 'no':
-                utils.print_info(f"READING DUMMY observation DATA FOR {name}")
-                return self._load_verif_dummy(average_dim)
 
         return self._load_data(getattr(self,f'fc{name}sets'), datatype='verif',
                                average_dim=average_dim, target=target)
@@ -646,10 +652,16 @@ class BaseMetric(dataobjects.DataObject):
         # read verdata/fc data for verif
         da_fc_verif = self.load_fc_data('verif',
                                         average_dim=average_dims)
-        da_verdata_verif = self.load_verif_data('verif',
+        da_verdata_verif_raw = self.load_verif_data('verif',
                                                 average_dim=average_dims)
 
-        data = [da_fc_verif, da_verdata_verif]
+        if da_verdata_verif_raw is None:
+            da_verdata_verif_raw = self._load_verif_dummy(average_dim=average_dims)
+            if self.add_verdata == 'yes':
+                utils.print_info('No verification data found --> add_verdata set to no')
+                self.add_verdata = 'no'
+
+        data = [da_fc_verif, da_verdata_verif_raw.copy(deep=True)]
 
         # read verdata/fc data for calib
         if self.calib:
@@ -662,13 +674,16 @@ class BaseMetric(dataobjects.DataObject):
             da_persistence = self.load_verif_data('verif', target='i:0').isel(member=0, time=0)
             data.append(da_persistence)
 
-        lsm_full, da_coords = self.mask_lsm_new(da_verdata_verif, da_fc_verif)
+        lsm_full, da_coords = self.mask_lsm_new(da_verdata_verif_raw, da_fc_verif)
         data = [d.where(~np.isnan(lsm_full)) for d in data]
         dict_out['lsm_full'] = lsm_full
 
         # assign back to xarray objects
         da_fc_verif = data[0]
         da_verdata_verif = data[1]
+
+
+
         if persistence:
             da_persistence = data[2]
 
@@ -690,6 +705,7 @@ class BaseMetric(dataobjects.DataObject):
 
                 datalist += [da_fc_calib, da_verdata_calib, da_fc_verif_bc]
 
+
             if persistence:
                 datalist.append(da_persistence)
 
@@ -697,6 +713,7 @@ class BaseMetric(dataobjects.DataObject):
             utils.print_info(f'Setting all grid cells with sea ice > {sice_threshold} to 1')
             datalist_thresh = [xr.where(d > sice_threshold, 1, 0) for d in datalist]
             datalist = [datalist_thresh[d].where(~np.isnan(datalist[d])) for d in range(len(datalist))]
+
 
 
 
@@ -713,6 +730,7 @@ class BaseMetric(dataobjects.DataObject):
                                                       statistic=self.area_statistic_function)
                 dict_out['lsm'] = lsm
 
+
             dict_out['da_fc_verif'] = datalist[0]
             dict_out['da_verdata_verif'] = datalist[1]
 
@@ -721,8 +739,20 @@ class BaseMetric(dataobjects.DataObject):
                 dict_out['da_verdata_calib'] = datalist[3]
                 dict_out['da_fc_verif_bc'] = datalist[4]
 
+
             if persistence:
                 dict_out['da_verdata_persistence'] = datalist[-1]
+                if self.plottype == 'ice_extent':
+                    dict_out['da_verdata_verif_raw'] = datalist[-2]
+
+            if self.plottype == 'ice_extent':
+                da_verdata_verif_raw_thresh = xr.where(da_verdata_verif_raw > sice_threshold, 1, 0)
+                da_verdata_verif_raw_thresh = da_verdata_verif_raw_thresh.where(~np.isnan(da_verdata_verif_raw))
+                lsm_obs, _ = self.mask_lsm_new(da_verdata_verif_raw, da_verdata_verif_raw)
+                data_raw, _ = self.calc_area_statistics([da_verdata_verif_raw_thresh], lsm_obs,
+                                                          statistic=self.area_statistic_function)
+                dict_out['da_verdata_verif_raw'] = data_raw[0]
+
         else:
             # 1. use datalist directly
             # 2. average all data in list
@@ -782,22 +812,27 @@ class BaseMetric(dataobjects.DataObject):
         :return: calibrated forecast
         """
         utils.print_info(f'Calibrating using method: {method}')
-        allowed_methods = ['mean', 'mean+trend']
+        allowed_methods = ['mean', 'mean+trend','anom']
         if method not in allowed_methods:
             raise ValueError(f'Method calibration needs to be one of {allowed_methods}')
 
-        if method == 'mean':
+        if method == 'mean' or method == 'anom':
             for dim in ['inidate', 'date','member']:
                 if dim in da_fc_calib.dims:
                     da_fc_calib = da_fc_calib.mean(dim=dim)
                 if dim in da_verdata_calib.dims:
                     da_verdata_calib = da_verdata_calib.mean(dim=dim)
 
-            bias_calib = da_fc_calib - da_verdata_calib
+            if method == 'mean':
+                utils.print_info('Calibration mean')
+                bias_calib = da_fc_calib - da_verdata_calib
+                fc_verif_bc = da_fc_verif - bias_calib
+            elif method == 'anom':
+                utils.print_info('Calibration anomalies')
+                fc_verif_bc = da_fc_verif - da_fc_calib
 
-
-            fc_verif_bc = da_fc_verif - bias_calib
             return fc_verif_bc
+
 
         if method == 'mean+trend':
             utils.print_info('Calibration mean+trend')
