@@ -271,8 +271,11 @@ class MapPlot(plottypes.GenericPlot):
                         cb.set_ticklabels(self.ticklabels)
 
                     cblabelstr = f'{self.shortname} {metric.legendtext} in {self.units}'
-                    if metric.legendtext != '':
-                        cblabelstr = metric.legendtext
+
+                    if self.plottype in ['brier', 'crps']:
+                        cblabelstr = f'{metric.legendtext} (reference: persistence)'
+
+
                     cb.set_label(cblabelstr, labelpad=10)
 
                     for i in _ds_file.attrs:
@@ -314,6 +317,8 @@ class MapPlot(plottypes.GenericPlot):
     def _create_title(self, _step, _var):
         if 'obs' in _var or 'verdata' in _var:
             _title = f'{self.verif_name} \n'
+        elif 'persistence' in _var:
+            _title = 'persistence \n'
         elif self.verif_modelname is not None:
             _title = f'{self.verif_source} {self.verif_fcsystem} {self.verif_modelname} ' \
                      f'{self.verif_expname} {self.verif_mode} (enssize = {self.verif_enssize}) \n'

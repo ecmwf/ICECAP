@@ -16,7 +16,7 @@ class Metric(BaseMetric):
         super().__init__(name, conf)
         self.use_metric_name = True
         self.plottext = ''
-        self.legendtext = ''
+        self.legendtext = 'CRPSS'
         self.ylabel = 'CRPSS'
         self.levels = np.arange(-1.05, 1.1, .1)
         self.default_cmap = 'bwr'

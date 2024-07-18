@@ -17,6 +17,7 @@ import metrics.metric_utils as mutils
 import dataobjects
 import utils
 import forecast_info
+import namelist_entries
 
 class BaseMetric(dataobjects.DataObject):
     """Generic Metric Object inherited by each specific metric"""
@@ -93,44 +94,23 @@ class BaseMetric(dataobjects.DataObject):
 
         self.time_average = None
 
-        # copy attributes from entry
-        if conf.plotsets[name].copy_id is not None:
-            copy_metric = BaseMetric(conf.plotsets[name].copy_id, conf)
-
-
-            for key,value in self.__dict__.items():
-                if value is None or value == [None]:
-                    setattr(self, key, getattr(copy_metric, key))
-                elif value == 'None':
-                    setattr(self, key, None)
-
-
-
-        if len(self.verif_enssize) != 1:
-            raise ValueError('enssize can be either length 1 (all dates/systems with same ensemble size)')
-
         # initialize calibration forecasts
         self.calib = False
         self.calib_method = conf.plotsets[name].calib_method
         if self.calib_method is not None:
             self.calib = True
-            self.calib_modelname = self.verif_modelname
-            self.calib_expname = self.verif_expname
             self.calib_mode = utils.csv_to_list(conf.plotsets[name].calib_mode)
-            self.calib_source = self.verif_source
-            self.calib_fcsystem = self.verif_fcsystem
             self.calib_dates = utils.confdates_to_list(conf.plotsets[name].calib_dates)
             self.conf_calib_dates = conf.plotsets[name].calib_dates
             self.calib_fromyear = conf.plotsets[name].calib_fromyear
             self.calib_toyear = conf.plotsets[name].calib_toyear
             self.calib_refdate = utils.confdates_to_list(conf.plotsets[name].calib_refdate)
             self.calib_enssize = utils.csv_to_list(conf.plotsets[name].calib_enssize)
-            self.fccalibsets = self._init_fc(name='calib')
+
 
         if conf.plotsets[name].points is not None:
             tmp_points = utils.csv_to_list(conf.plotsets[name].points, ';')
-            self.points = [list(map(float,utils.csv_to_list(point,','))) for point in tmp_points]
-
+            self.points = [list(map(float, utils.csv_to_list(point, ','))) for point in tmp_points]
 
         if self.area_statistic_conf is not None:
             self.area_statistic_function = 'mean'
@@ -141,19 +121,20 @@ class BaseMetric(dataobjects.DataObject):
             if self.area_statistic_kind not in ['data', 'score']:
                 raise ValueError('area_statistic need to provide information if statistic '
                                  'is calculated over data or score')
-            if len(self.area_statistic)>1:
+            if len(self.area_statistic) > 1:
                 self.area_statistic_function = self.area_statistic[1]
                 if self.area_statistic_function not in ['mean', 'sum', 'median']:
                     raise ValueError('2nd argument of area_statistic need to be either'
                                      'mean, median or sum')
 
-            if len(self.area_statistic)>2:
+            if len(self.area_statistic) > 2:
                 self.area_statistic_unit = self.area_statistic[2]
-                if self.area_statistic_unit not in ['total','fraction','percent']:
+                if self.area_statistic_unit not in ['total', 'fraction', 'percent']:
                     raise ValueError('3rd argument of area_statistic (unit)'
                                      'needs to be either total, fraction, percent')
                 if self.area_statistic_unit == 'fraction' and self.area_statistic_function == 'sum':
-                    utils.print_info('Setting the unit of area_statistics to fraction has no effect when using sum as function')
+                    utils.print_info(
+                        'Setting the unit of area_statistics to fraction has no effect when using sum as function')
                     self.area_statistic_unit = 'total'
         else:
             self.area_statistic = None
@@ -161,10 +142,51 @@ class BaseMetric(dataobjects.DataObject):
             self.area_statistic_unit = None
             self.area_statistic_kind = None
 
+        # copy attributes from entry
+        if conf.plotsets[name].copy_id is not None:
+            copy_metric = BaseMetric(conf.plotsets[name].copy_id, conf)
+
+            # go through all attributes in copy_metric and opy those
+            # 1. which are missing in current object or
+            # 2. which are None or [None]
+            # Reset those to standard values which are set to 'None'/'none' in config
+
+            for key,value in copy_metric.__dict__.items():
+                if hasattr(self, key):
+                    value_self = getattr(self, key)
+                else:
+                    value_self = None
+
+                default_value = 'None'
+                if key in namelist_entries.config_optnames['plot']:
+                    if 'default_value' in namelist_entries.config_optnames['plot'][key]:
+                        default_value = namelist_entries.config_optnames['plot'][key]['default_value'][0]
+
+                if value_self is None or value_self == [None] or value_self == default_value:
+                    setattr(self, key, getattr(copy_metric, key))
+                elif value_self in ['None','none']:
+                    setattr(self, key, None)
+
+
+
+
+
         self.fcverifsets = self._init_fc(name='verif')
+        if self.calib:
+            self.calib_modelname = self.verif_modelname
+            self.calib_expname = self.verif_expname
+            self.calib_source = self.verif_source
+            self.calib_fcsystem = self.verif_fcsystem
+            self.fccalibsets = self._init_fc(name='calib')
 
 
 
+    def __str__(self):
+        lines = [f'Metric file for {self.metricname}']
+        for key, value in self.__dict__.items():
+            lines.append(' '.join([str(key),str(value)]))
+
+        return '\n  '.join(lines)
 
 
 
@@ -453,6 +475,12 @@ class BaseMetric(dataobjects.DataObject):
         """ Save metric to metricdir """
         _ofile = self.get_filename_metric()
         utils.make_dir(os.path.dirname(_ofile))
+
+        # save metric config
+        metric_config = f'{os.path.dirname(_ofile)}/metric.conf'
+        file = open(metric_config, "w")
+        file.write(str(self))
+        file.close()
 
         result = self.result
 
