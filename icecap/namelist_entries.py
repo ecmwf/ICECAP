@@ -274,15 +274,11 @@ config_optnames = {
         },
         'add_verdata' : {
             'printname' : 'add observations to plot',
-            'optional' : True,
-            'default_value' : ["no"],
-            'allowed_values' : ["yes", "no"]
+            'optional' : True
         },
         'add_verdata_nomask' : {
             'printname' : 'add non-masked observations to plot (only ice_extent)',
             'optional' : True,
-            'default_value' : ["no"],
-            'allowed_values' : ["yes", "no"]
         },
         'points' : {
             'printname' : 'points to be used for ice distance calculation',
@@ -302,9 +298,7 @@ config_optnames = {
         },
         'inset_position': {
             'printname':'inset position of map plot',
-            'optional' : True,
-            'default_value' : ["2"],
-            'allowed_values' : ["1", "2"]
+            'optional' : True
         },
         'additonal_mask': {
             'printname':'use additional land-sea-mask',

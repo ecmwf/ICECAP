@@ -25,8 +25,6 @@ class BaseMetric(dataobjects.DataObject):
     def __init__(self, name, conf):
         super().__init__(conf)
 
-
-
         self.metricname = name
         if conf.plotsets[name].verif_ref is not None:
             self.verif_name = conf.plotsets[name].verif_ref
@@ -36,7 +34,6 @@ class BaseMetric(dataobjects.DataObject):
         self.metricdir = conf.metricdir
 
         #initialise verification attributes
-
         self.verif_expname = utils.csv_to_list(conf.plotsets[name].verif_expname)
         self.verif_modelname = utils.csv_to_list(conf.plotsets[name].verif_modelname)
 
@@ -65,82 +62,44 @@ class BaseMetric(dataobjects.DataObject):
 
         self.use_dask = False
 
-        self.points = None
+
 
         self.add_verdata = conf.plotsets[name].add_verdata
         self.add_verdata_nomask = conf.plotsets[name].add_verdata_nomask
 
-        if self.add_verdata_nomask == 'yes' and self.plottype != 'ice_extent':
-            utils.print_info('Setting add_verdata_nomask is only possible for ice_extent')
-            self.add_verdata_nomask = 'no'
 
-        self.area_statistic_conf = conf.plotsets[name].area_statistic
-        self.area_statistic = None
-        self.area_statistic_function = None
-        self.area_statistic_unit = None
-        self.area_statistic_kind = None
+
+
+
+        self.area_statistic = conf.plotsets[name].area_statistic
 
         self.region_extent = conf.plotsets[name].region_extent
         self.nsidc_region = conf.plotsets[name].nsidc_region
         self.plot_shading = conf.plotsets[name].plot_shading
         self.inset_position = conf.plotsets[name].inset_position
+
+
         self.additonal_mask = conf.plotsets[name].additonal_mask
 
         self.etcdir = conf.etcdir
-
         self.ticks = None
         self.ticklabels = None
         self.norm = None
 
         self.time_average = None
 
-        # initialize calibration forecasts
-        self.calib = False
         self.calib_method = conf.plotsets[name].calib_method
-        if self.calib_method is not None:
-            self.calib = True
-            self.calib_mode = utils.csv_to_list(conf.plotsets[name].calib_mode)
-            self.calib_dates = utils.confdates_to_list(conf.plotsets[name].calib_dates)
-            self.conf_calib_dates = conf.plotsets[name].calib_dates
-            self.calib_fromyear = conf.plotsets[name].calib_fromyear
-            self.calib_toyear = conf.plotsets[name].calib_toyear
-            self.calib_refdate = utils.confdates_to_list(conf.plotsets[name].calib_refdate)
-            self.calib_enssize = utils.csv_to_list(conf.plotsets[name].calib_enssize)
+        self.calib_mode = utils.csv_to_list(conf.plotsets[name].calib_mode)
+        self.calib_dates = utils.confdates_to_list(conf.plotsets[name].calib_dates)
+        self.conf_calib_dates = conf.plotsets[name].calib_dates
+        self.calib_fromyear = conf.plotsets[name].calib_fromyear
+        self.calib_toyear = conf.plotsets[name].calib_toyear
+        self.calib_refdate = utils.confdates_to_list(conf.plotsets[name].calib_refdate)
+        self.calib_enssize = utils.csv_to_list(conf.plotsets[name].calib_enssize)
 
+        # initialize calibration forecasts
+        self.points = conf.plotsets[name].points
 
-        if conf.plotsets[name].points is not None:
-            tmp_points = utils.csv_to_list(conf.plotsets[name].points, ';')
-            self.points = [list(map(float, utils.csv_to_list(point, ','))) for point in tmp_points]
-
-        if self.area_statistic_conf is not None:
-            self.area_statistic_function = 'mean'
-            self.area_statistic_unit = 'fraction'
-
-            self.area_statistic = self.area_statistic_conf.split(':')
-            self.area_statistic_kind = self.area_statistic[0]
-            if self.area_statistic_kind not in ['data', 'score']:
-                raise ValueError('area_statistic need to provide information if statistic '
-                                 'is calculated over data or score')
-            if len(self.area_statistic) > 1:
-                self.area_statistic_function = self.area_statistic[1]
-                if self.area_statistic_function not in ['mean', 'sum', 'median']:
-                    raise ValueError('2nd argument of area_statistic need to be either'
-                                     'mean, median or sum')
-
-            if len(self.area_statistic) > 2:
-                self.area_statistic_unit = self.area_statistic[2]
-                if self.area_statistic_unit not in ['total', 'fraction', 'percent']:
-                    raise ValueError('3rd argument of area_statistic (unit)'
-                                     'needs to be either total, fraction, percent')
-                if self.area_statistic_unit == 'fraction' and self.area_statistic_function == 'sum':
-                    utils.print_info(
-                        'Setting the unit of area_statistics to fraction has no effect when using sum as function')
-                    self.area_statistic_unit = 'total'
-        else:
-            self.area_statistic = None
-            self.area_statistic_function = None
-            self.area_statistic_unit = None
-            self.area_statistic_kind = None
 
         # copy attributes from entry
         if conf.plotsets[name].copy_id is not None:
@@ -157,16 +116,61 @@ class BaseMetric(dataobjects.DataObject):
                 else:
                     value_self = None
 
-                default_value = 'None'
-                if key in namelist_entries.config_optnames['plot']:
-                    if 'default_value' in namelist_entries.config_optnames['plot'][key]:
-                        default_value = namelist_entries.config_optnames['plot'][key]['default_value'][0]
-
-                if value_self is None or value_self == [None] or value_self == default_value:
+                if value_self is None or value_self == [None]:
                     setattr(self, key, getattr(copy_metric, key))
                 elif value_self in ['None','none']:
                     setattr(self, key, None)
 
+        if self.inset_position is None:
+            self.inset_position = '2'
+
+        if self.add_verdata_nomask == 'yes' and self.plottype != 'ice_extent':
+            utils.print_info('Setting add_verdata_nomask is only possible for ice_extent')
+            self.add_verdata_nomask = 'no'
+
+        if self.add_verdata is None:
+            self.add_verdata = 'no'
+        if self.add_verdata_nomask is None:
+            self.add_verdata_nomask = 'no'
+
+
+        if self.points is not None:
+            tmp_points = utils.csv_to_list(self.points, ';')
+            self.points = [list(map(float, utils.csv_to_list(point, ','))) for point in tmp_points]
+
+        self.calib = False
+        if self.calib_method is not None:
+            self.calib = True
+
+        if self.area_statistic is not None:
+            self.area_statistic_function = 'mean'
+            self.area_statistic_unit = 'fraction'
+
+            self.area_statistic_split = self.area_statistic.split(':')
+            self.area_statistic_kind = self.area_statistic_split[0]
+            if self.area_statistic_kind not in ['data', 'score']:
+                raise ValueError('area_statistic need to provide information if statistic '
+                                 'is calculated over data or score')
+            if len(self.area_statistic_split) > 1:
+                self.area_statistic_function = self.area_statistic_split[1]
+                if self.area_statistic_function not in ['mean', 'sum', 'median']:
+                    raise ValueError('2nd argument of area_statistic need to be either'
+                                     'mean, median or sum')
+
+            if len(self.area_statistic_split) > 2:
+                self.area_statistic_unit = self.area_statistic_split[2]
+                if self.area_statistic_unit not in ['total', 'fraction', 'percent']:
+                    raise ValueError('3rd argument of area_statistic (unit)'
+                                     'needs to be either total, fraction, percent')
+                if self.area_statistic_unit == 'fraction' and self.area_statistic_function == 'sum':
+                    utils.print_info(
+                        'Setting the unit of area_statistics to fraction has no effect when using sum as function')
+                    self.area_statistic_unit = 'total'
+        else:
+            self.area_statistic = None
+            self.area_statistic_function = None
+            self.area_statistic_unit = None
+            self.area_statistic_kind = None
 
 
 

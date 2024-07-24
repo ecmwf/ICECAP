@@ -138,7 +138,7 @@ _proj,_proj_options = _init_proj(ds_regions_osi)
 proj = getattr(ccrs, _proj)(**_proj_options)
 ax = plt.axes(projection=proj)
 
-cmap = matplotlib.cm.get_cmap('nipy_spectral')
+cmap = matplotlib.colormaps.get_cmap('nipy_spectral')
 icolor = np.linspace(0,1,19)
 icolor = icolor[::2].tolist()+icolor[1::2].tolist()
 colors = cmap(icolor)
