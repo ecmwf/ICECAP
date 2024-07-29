@@ -474,7 +474,7 @@ class Configuration():
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(
-        description='Print the ICEPAC configuration')
+        description='Print the ICECAP configuration')
     helpstr = 'configuration file to use'
     parser.add_argument('-c', '--configfile', help=helpstr,
                         default=DEFAULT_CONF_NAME, nargs="+")
