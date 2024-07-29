@@ -25,10 +25,10 @@ Installation has been tested successfully on osx-arm64 (Macbook M2), linux-64, A
 Please follow the section 1.2 in the user guide how to set up your machine. 
 An example how to run ICECAP is provided Section 1.3.
 
-The user guide is located in the doc/ directory. Compile with
+The user guide is located in the doc/ directory. Compile it using the Makefile
 
     $ cd doc
-    $ pdflatex icecap.tex
+    $ make
 
 
 
