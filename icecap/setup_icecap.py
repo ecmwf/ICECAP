@@ -112,8 +112,13 @@ class ExecutionHost:
 
 
 
-        # copy config file
-        self._safe_copy(args, self.filename, './', self.pydir, 'icecap.conf')
+        # concatenate config and plotconfig to one config file in pydir
+        with open(f'{self.pydir}/icecap.conf', 'wb') as wfd:
+            for f in self.filename:
+                with open(f, 'rb') as fd:
+                    shutil.copyfileobj(fd, wfd)
+                wfd.write(b'\n')
+        # self._safe_copy(args, self.filename[0], './', self.pydir, 'icecap.conf')
 
     def _copy_etc_files(self, fromdir, args):
         files = ['load_modules', 'module_versions']

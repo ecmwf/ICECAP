@@ -20,6 +20,7 @@ clargs.add_config_option(parser)
 clargs.add_verbose_option(parser)
 clargs.add_force_option(parser)
 clargs.add_wipe_option(parser)
+clargs.add_plot_config_option(parser)
 
 def icecap_api(conf, args):
     """
@@ -47,5 +48,8 @@ def icecap_api(conf, args):
 
 if __name__ == '__main__':
     args = parser.parse_args()
+    if args.plotconfigfile:
+        args.configfile = [args.configfile]
+        args.configfile.append(args.plotconfigfile)
     conf = config.Configuration(file=args.configfile)
     icecap_api(conf, args)

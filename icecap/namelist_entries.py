@@ -44,7 +44,17 @@ config_optnames = {
         'python_exe':{
             'printname': 'python binary',
             'optional' : True
-        }
+        },
+        'job_memory':{
+'           printname': 'maximum memory per job',
+            'optional' : True,
+            'allowed_values' : ["", "128GB"],
+            'default_value' : [""],
+        },
+        'calibrationdir':{
+'           printname': 'directory of preexisting calibration files',
+            'optional' : True,
+        },
     }, # end environment
     'ecflow': {
         'ecfhomeroot': {
@@ -163,11 +173,11 @@ config_optnames = {
             'printname':'plot type',
             'optional' : False,
             'allowed_values' : ["interp_check","ensmean","forecast_error",
-                                "ice_distance", "plume", "freeze-up", 'brier',
+                                "ice_distance", "plume", "freeze_up", "break_up", 'brier',
                                 'crps', 'rmse', 'ser','iiee','sps',
                                 'brier_edge','linear_trend',
                                 'rmse_edge',
-                                'ice_extent', 'test2']
+                                'ice_extent', 'cycle', 'mae']
         },
         'verif_mode':{
             'printname': 'forcast or hindcast mode for plotting',
@@ -292,6 +302,10 @@ config_optnames = {
             'printname':'area statistics',
             'optional' : True,
         },
+        'temporal_average' : {
+            'printname':'temporal averaging',
+            'optional' : True,
+        },
         'plot_shading': {
             'printname':'plot ensemble shaded',
             'optional' : True
@@ -300,14 +314,20 @@ config_optnames = {
             'printname':'inset position of map plot',
             'optional' : True
         },
-        'additonal_mask': {
+        'additional_mask': {
             'printname':'use additional land-sea-mask',
             'optional' : True
         },
         'calib_method' : {
             'printname':'Method used for calibration',
             'optional' : True,
-            'allowed_values' : ["mean", "mean+trend", "anom"]
+            'allowed_values' : ["mean", "mean+trend", "anom","score"]
+        },
+        'calib_exists': {
+            'printname':'Specify whether calibration file has been precomputed',
+            'optional' : True,
+            'allowed_values' : ["yes", "no"],
+            'default_value' : ["no"],
         },
         'copy_id' : {
             'printname':'Copy config from different plotset',

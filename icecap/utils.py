@@ -32,6 +32,9 @@ def confdates_to_list(_dates):
     :param _dates: dates from config
     :return: dates as list
     """
+
+    lonly = False
+
     if not _dates:
         return None
 
@@ -43,6 +46,25 @@ def confdates_to_list(_dates):
         by_unit = by_tmp[-1]
         by_value = by_tmp[:-1]
         _dates = _dates.split('/by/')[0]
+
+    elif '/only/' in _dates:
+        weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+        lonly = True
+        by_unit = 'd'
+        by_value = 1
+        only_value = _dates.split('/only/')[1].split(',')
+
+        only_values_check = [True if _val in weekdays else False
+                             for _val in only_value]
+        if not all(only_values_check):
+            raise ValueError(f'Undefined only value. Must be on of {weekdays}')
+
+
+        _dates = _dates.split('/only/')[0]
+
+
+
+
     else:
         raise ValueError('by needs to be specified')
 
@@ -56,6 +78,8 @@ def confdates_to_list(_dates):
 
 
     if _dates_split_len[0] == 4:
+        if lonly:
+            raise ValueError('ONLY selection only possible if dates are given in YYYYMMDD format')
         _dates_split = ['2000' + _date for _date in _dates.split('/to/')]
         _dates_split = [dt.datetime.strptime(_datestring, '%Y%m%d') for _datestring in _dates_split]
 
@@ -84,6 +108,12 @@ def confdates_to_list(_dates):
     else:
         raise ValueError('Date config entry is not in right format '
                          '(either MM/DD or YYYY/MM/DD')
+
+    if lonly:
+        date_list_dow = [weekdays[string_to_datetime(date).weekday()]
+                         for date in date_list]
+        date_list = [date for date,date_dow in zip(date_list,date_list_dow)
+                     if date_dow in only_value]
 
     return date_list
 

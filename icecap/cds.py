@@ -40,7 +40,7 @@ class CdsRetrieval:
 
     def __init__(self, kwargs):
         self.kwargs = {}
-        self.kwargs['format'] = 'grib'
+        self.kwargs['data_format'] = 'grib'
         if kwargs['exptype'] == 'INIT':
             self.kwargs['variable'] = 'land_sea_mask'
         else:
@@ -78,7 +78,7 @@ class CdsRetrieval:
                     self.target
                 )
                 print('download', self.target)
-                cds_client.download(self.target)
+                # cds_client.download(self.target)
 
 
 

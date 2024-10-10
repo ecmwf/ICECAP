@@ -37,6 +37,7 @@ class Tree:
         self.suitename = conf.suitename
         self.ecflow = conf.ecflow
         self.python_binary = conf.python_exe
+        self.job_memory = conf.job_memory
         if self.ecflow == "yes":
             self.user = conf.user
             self.ecflow_host = conf.ecflow_host
@@ -160,6 +161,7 @@ class Tree:
         suite_f.add_variable('ECF_HOME', self.ecfhomedir)
         suite_f.add_variable('PYDIR', self.pydir)
         suite_f.add_variable('ETCDIR', self.rundir + '/etc')
+        suite_f.add_variable('ECF_MEMORY', self.job_memory)
 
         _todict = self._create_dict_from_tree()
 

@@ -112,6 +112,7 @@ class _OSIThreddsRetrieval(VerifyingData):
 
 
         for _date in self.loopdates:
+            lfound = True
             _ofile = f'{self.obscachedir}/{filename.format(_date, self.params)}'
 
 
@@ -130,32 +131,35 @@ class _OSIThreddsRetrieval(VerifyingData):
                             if verbose:
                                 print(f'Processing file {file}')
                         except:
-                            raise BaseException(f'Data {file} not found')
+                            print(f'Data {file} not found')
+                            lfound = False
                     else:
-                        raise BaseException(f'Data {file} not found')
+                        print(f'Data {file} not found')
+                        lfound = False
 
 
-                da_in = da_in.rename(self.params)
+                if lfound:
+                    da_in = da_in.rename(self.params)
 
-                da_in = da_in/100
-                da_in = da_in.rename({'lon': 'longitude', 'lat': 'latitude'})
-                da_in = da_in.transpose( 'time', 'yc', 'xc')
-                da_in['xc'] = da_in['xc'] * 1000
-                da_in['yc'] = da_in['yc'] * 1000
-
-
-                mapping_grid = getattr(da_in,'grid_mapping')
-                da_in_grid = xr.open_dataset(file)[mapping_grid]
-                if getattr(da_in_grid, 'grid_mapping_name') == 'lambert_azimuthal_equal_area':
-                    da_in.attrs['projection'] = 'LambertAzimuthalEqualArea'
-                    da_in.attrs['central_latitude'] = getattr(da_in_grid, 'latitude_of_projection_origin')
-                    da_in.attrs['central_longitude'] = getattr(da_in_grid, 'longitude_of_projection_origin')
-
-                if getattr(da_in_grid, 'grid_mapping_name') == 'polar_stereographic':
-                    da_in.attrs['projection'] = 'Stereographic'
-                    da_in.attrs['central_latitude'] = getattr(da_in_grid, 'latitude_of_projection_origin')
-                    da_in.attrs['central_longitude'] = getattr(da_in_grid, 'straight_vertical_longitude_from_pole')
-                    da_in.attrs['true_scale_latitude'] = getattr(da_in_grid, 'standard_parallel')
+                    da_in = da_in/100
+                    da_in = da_in.rename({'lon': 'longitude', 'lat': 'latitude'})
+                    da_in = da_in.transpose( 'time', 'yc', 'xc')
+                    da_in['xc'] = da_in['xc'] * 1000
+                    da_in['yc'] = da_in['yc'] * 1000
 
 
-                da_in.to_netcdf(_ofile)
+                    mapping_grid = getattr(da_in,'grid_mapping')
+                    da_in_grid = xr.open_dataset(file)[mapping_grid]
+                    if getattr(da_in_grid, 'grid_mapping_name') == 'lambert_azimuthal_equal_area':
+                        da_in.attrs['projection'] = 'LambertAzimuthalEqualArea'
+                        da_in.attrs['central_latitude'] = getattr(da_in_grid, 'latitude_of_projection_origin')
+                        da_in.attrs['central_longitude'] = getattr(da_in_grid, 'longitude_of_projection_origin')
+
+                    if getattr(da_in_grid, 'grid_mapping_name') == 'polar_stereographic':
+                        da_in.attrs['projection'] = 'Stereographic'
+                        da_in.attrs['central_latitude'] = getattr(da_in_grid, 'latitude_of_projection_origin')
+                        da_in.attrs['central_longitude'] = getattr(da_in_grid, 'straight_vertical_longitude_from_pole')
+                        da_in.attrs['true_scale_latitude'] = getattr(da_in_grid, 'standard_parallel')
+
+
+                    da_in.to_netcdf(_ofile)

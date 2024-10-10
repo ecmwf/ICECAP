@@ -8,16 +8,18 @@ addition of new metrics as easy as possible.
 """
 
 import os.path
+import calendar
 import datetime as dt
+import shutil
 import xarray as xr
 import numpy as np
 import pandas as pd
+
 
 import metrics.metric_utils as mutils
 import dataobjects
 import utils
 import forecast_info
-import namelist_entries
 
 class BaseMetric(dataobjects.DataObject):
     """Generic Metric Object inherited by each specific metric"""
@@ -44,8 +46,23 @@ class BaseMetric(dataobjects.DataObject):
 
         self.verif_dates = utils.confdates_to_list(conf.plotsets[name].verif_dates)
         self.conf_verif_dates = conf.plotsets[name].verif_dates
-        self.verif_fromyear = conf.plotsets[name].verif_fromyear
-        self.verif_toyear = conf.plotsets[name].verif_toyear
+        self.verif_fromyear = utils.csv_to_list(conf.plotsets[name].verif_fromyear)
+        self.verif_toyear = utils.csv_to_list(conf.plotsets[name].verif_toyear)
+
+        if not (self.verif_fromyear[0] is None or len(self.verif_fromyear)==1 or
+                len(self.verif_fromyear) == len(self.verif_dates)):
+            raise ValueError('Length of verif_fromyear must be 1 or equal to verif_dates')
+
+        if not (self.verif_toyear[0] is None or len(self.verif_toyear)==1 or
+                len(self.verif_toyear) == len(self.verif_dates)):
+            raise ValueError('Length of verif_toyear must be 1 or equal to verif_dates')
+
+        if self.verif_fromyear[0] is not None and len(self.verif_fromyear)==1:
+            self.verif_fromyear = [self.verif_fromyear[0] for year in range(len(self.verif_dates))]
+        if self.verif_toyear[0] is not None and len(self.verif_toyear)==1:
+            self.verif_toyear = [self.verif_toyear[0] for year in range(len(self.verif_dates))]
+
+
         self.verif_refdate = utils.confdates_to_list(conf.plotsets[name].verif_refdate)
 
         self.verif_enssize = utils.csv_to_list(conf.plotsets[name].verif_enssize)
@@ -72,6 +89,7 @@ class BaseMetric(dataobjects.DataObject):
 
 
         self.area_statistic = conf.plotsets[name].area_statistic
+        self.temporal_average = conf.plotsets[name].temporal_average
 
         self.region_extent = conf.plotsets[name].region_extent
         self.nsidc_region = conf.plotsets[name].nsidc_region
@@ -79,7 +97,7 @@ class BaseMetric(dataobjects.DataObject):
         self.inset_position = conf.plotsets[name].inset_position
 
 
-        self.additonal_mask = conf.plotsets[name].additonal_mask
+        self.additional_mask = conf.plotsets[name].additional_mask
 
         self.etcdir = conf.etcdir
         self.ticks = None
@@ -88,12 +106,31 @@ class BaseMetric(dataobjects.DataObject):
 
         self.time_average = None
 
+        self.calib_exists = conf.plotsets[name].calib_exists
+        self.calibrationdir = conf.calibrationdir
+        if self.calib_exists == 'yes' and self.calibrationdir is None:
+            raise ValueError("Calibrationdir needs to be specified if using precomputed calibration files")
         self.calib_method = conf.plotsets[name].calib_method
         self.calib_mode = utils.csv_to_list(conf.plotsets[name].calib_mode)
         self.calib_dates = utils.confdates_to_list(conf.plotsets[name].calib_dates)
         self.conf_calib_dates = conf.plotsets[name].calib_dates
-        self.calib_fromyear = conf.plotsets[name].calib_fromyear
-        self.calib_toyear = conf.plotsets[name].calib_toyear
+        self.calib_fromyear = utils.csv_to_list(conf.plotsets[name].calib_fromyear)
+        self.calib_toyear = utils.csv_to_list(conf.plotsets[name].calib_toyear)
+
+        if not (self.calib_fromyear[0] is None or len(self.calib_fromyear)==1 or
+                len(self.calib_fromyear) == len(self.calib_dates)):
+            raise ValueError('Length of calib_fromyear must be 1 or equal to verif_dates')
+
+        if not (self.calib_toyear[0] is None or len(self.calib_toyear)==1 or
+                len(self.calib_toyear) == len(self.calib_dates)):
+            raise ValueError('Length of calib_toyear must be 1 or equal to verif_dates')
+
+        if self.calib_fromyear[0] is not None and len(self.calib_fromyear)==1:
+            self.calib_fromyear = [self.calib_fromyear[0] for year in range(len(self.calib_dates))]
+        if self.calib_toyear[0] is not None and len(self.calib_toyear)==1:
+            self.calib_toyear = [self.calib_toyear[0] for year in range(len(self.calib_dates))]
+
+
         self.calib_refdate = utils.confdates_to_list(conf.plotsets[name].calib_refdate)
         self.calib_enssize = utils.csv_to_list(conf.plotsets[name].calib_enssize)
 
@@ -141,6 +178,46 @@ class BaseMetric(dataobjects.DataObject):
         self.calib = False
         if self.calib_method is not None:
             self.calib = True
+
+
+        if self.temporal_average is not None:
+            self.temporal_average_split = self.temporal_average.split(':')
+            self.temporal_average_type = self.temporal_average_split[0]
+            self.temporal_average_timescale = self.temporal_average_split[1]
+            self.temporal_average_value = self.temporal_average_split[2].split('-')
+            self.temporal_average_value = [int(val) for val in self.temporal_average_value]
+
+            if self.temporal_average_timescale not in ['days', 'months']:
+                raise ValueError('time averaging only for days/months implemented so far')
+
+            if self.temporal_average_timescale == 'days':
+                if len(self.temporal_average_value) > 1:
+                    raise ValueError('value must be one single value for days selection')
+                self.temporal_average_value = self.temporal_average_value[0]
+
+
+            if self.temporal_average_timescale == 'months':
+                if self.temporal_average_type == 'score':
+                    utils.print_info(f'Temporal averaging over scores can lead to small deviations compared when using'
+                                     f' e.g. monthly mean values. \n The reason is that 29th of February is always removed to ensure '
+                                     f'that the forecast data can be aligned along lead time (see documentation for details)')
+
+                # we need to subtract 1 so plotting and selection goes along with python synatx (0 is first item)
+                if len(self.temporal_average_value)>1:
+                   self.temporal_average_value = list(np.arange(self.temporal_average_value[0]-1,
+                                                                 self.temporal_average_value[1]))
+                else:
+                    self.temporal_average_value = [self.temporal_average_value[0]-1]
+
+            if 'r' not in self.target:
+                raise ValueError('time averaging only possible for range target')
+
+
+        else:
+            self.temporal_average_type = None
+            self.temporal_average_timescale = None
+            self.temporal_average_value = None
+
 
         if self.area_statistic is not None:
             self.area_statistic_function = 'mean'
@@ -205,7 +282,7 @@ class BaseMetric(dataobjects.DataObject):
         if len(getattr(self,f'{name}_dates')[0]) == 8:
 
             # set fromyear toyear to None if set in config
-            if getattr(self,f'{name}_fromyear') or getattr(self,f'{name}_toyear'):
+            if getattr(self,f'{name}_fromyear') != [None] or getattr(self,f'{name}_toyear') != [None]:
                 utils.print_info('Dates are given as YYYYMMDD so _fromyear and _toyear is ignored')
                 setattr(self,f'{name}_fromyear', None)
                 setattr(self, f'{name}_toyear', None)
@@ -249,10 +326,16 @@ class BaseMetric(dataobjects.DataObject):
         # second option: dates are given as MMDD and fromyear toyear is given so we construct all dates here
         # and have one forecast set for each initialization date MM/DD
         else:
-            for date in getattr(self,f'{name}_dates'):
+            for date, fromyear, toyear in \
+                zip(getattr(self,f'{name}_dates'),
+                    getattr(self,f'{name}_fromyear'),
+                    getattr(self,f'{name}_toyear')):
 
-                _dates_tmp = [f'{_year}{date}' for _year in range(int(getattr(self,f'{name}_fromyear')),
-                                                        int(getattr(self,f'{name}_toyear')) + 1)]
+                # _dates_tmp = [f'{_year}{date}' for _year in range(int(getattr(self,f'{name}_fromyear')),
+                #                                         int(getattr(self,f'{name}_toyear')) + 1)]
+
+                _dates_tmp = [f'{_year}{date}' for _year in range(int(fromyear),
+                                                                  int(toyear) + 1)]
 
                 # remove dates which are not defined, e.g. 29.2 for non-leap years
                 _dates = []
@@ -371,21 +454,39 @@ class BaseMetric(dataobjects.DataObject):
 
                     if datatype == 'verif':
                         _da_seldate_list = []
-                        for _seldate in _seldates:
+                        _missing_si = []
+                        _existing_si = []
+                        for _si, _seldate in enumerate(_seldates):
                             _filename = f"{self.obscachedir}/" \
                                         f"{filename.format(_seldate, self.params, self.grid)}"
+
                             if os.path.isfile(_filename):
                                 _da_file = self._load_file(_filename)
+                                _existing_si.append(_si)
+                                _da_seldate_list.append(_da_file)
                             else:
-                                if not _da_seldate_list:
-                                    utils.print_info('No verification data found')
-                                    return None
-                                else:
-                                    _da_file = xr.full_like(_da_seldate_list[0],
-                                                            np.nan)
-                                    _da_file['time'] = [pd.to_datetime(_seldate).to_numpy()]
+                                utils.print_info(f'No verification data found {_seldate} {_si}')
+                                _missing_si.append(_si)
+                                # if not _da_seldate_list:
+                                #     utils.print_info(f'No verification data found {_seldate} {_si}')
+                                #     _missing_si.append(_si)
+                                # else:
+                                #     _da_file = xr.full_like(_da_seldate_list[0],
+                                #                             np.nan)
+                                #     _da_file['time'] = [pd.to_datetime(_seldate).to_numpy()]
 
-                            _da_seldate_list.append(_da_file)
+
+
+                        if not _da_seldate_list:
+                            raise RuntimeError(f'No verification data found for {_date}')
+
+                        if _missing_si:
+                            utils.print_info(f'Some verification data missing for {_date}')
+                            for _si in _missing_si:
+                                _da_file_new = xr.full_like(_da_seldate_list[_existing_si[0]], np.nan)
+                                _da_file_new['time'] = [pd.to_datetime(_seldates[_si]).to_numpy()]
+                                _da_seldate_list.insert(_si, _da_file_new.copy())
+
                         _da_file = xr.concat(_da_seldate_list, dim='time')
 
 
@@ -394,25 +495,70 @@ class BaseMetric(dataobjects.DataObject):
                     elif datatype == 'fc':
                         _filename = f"{fcset[fcname]['cachedir']}/" \
                                     f"{filename.format(_date, _member, self.params, grid)}"
+                        # print(_filename)
                         _da_file = self._load_file(_filename, _seldates)
 
 
 
 
-                    # utils.print_info('CAUTION TEMPORARY IMPLEMENTATION')
-                    # self.time_average = 'QS-DEC'
-                    #
-                    # if self.time_average is not None:
-                    #     _da_file = _da_file.resample(time=self.time_average).mean(dim="time")
 
-                    _da_file = self.convert_time_to_lead(_da_file, target=target)
+
+
+                    # _da_file = self.convert_time_to_lead(_da_file, target=target)
+
+                    if target != 'i:0':
+
+                        if self.temporal_average_timescale == 'days' and self.temporal_average_type == 'data':
+                            _da_file = self.convert_time_to_lead(_da_file, target=target)
+                            _date_da = np.arange(_da_file.time.values[0],
+                                              _da_file.time.values[-1]+1)
+                            start = 0
+                            if _date_da[0] > 0:
+                                start = int(self.temporal_average_value)
+
+                            time_bounds = mutils.np_arange_include_upper(start, _date_da[-1] + 1, int(self.temporal_average_value))
+                            _da_file = _da_file.sel(time=slice(time_bounds[0],time_bounds[-1]))
+                            _da_file = _da_file.rolling(time=int(self.temporal_average_value)).mean().sel(time=slice(int(self.temporal_average_value) + _da_file.time.values[0] - 1,
+                                                                                                   None, int(self.temporal_average_value)))
+                        elif self.temporal_average_timescale == 'months':
+                            dates_all = _da_file.time.dt.strftime('%Y%m').values
+                            dates_unique = list(sorted(set(dates_all)))
+                            month_unique = [int(d[4:]) for d in dates_unique]
+                            dates_len = [sum(dates_all == d) for d in dates_unique]
+                            dates_monlen = [calendar.monthrange(int(d[:4]), int(d[4:]))[1] for d in dates_unique]
+                            dates_complete = [True if num == monlen else False for num, monlen in
+                                              zip(dates_len, dates_monlen)]
+
+                            if max(self.temporal_average_value) > len(dates_complete):
+                                raise RuntimeError('Selected month not in data')
+
+                            check_if_complete = [dates_complete[mon] for mon in self.temporal_average_value]
+
+                            if not all(check_if_complete):
+                                raise RuntimeError('Data for selected month not complete')
+                            months_select = [month_unique[mon] for mon in self.temporal_average_value]
+                            _da_file = _da_file.isel(time=_da_file.time.dt.month.isin(months_select))
+                            # remove 29th if in dataset
+                            _da_file = _da_file.sel(time=~((_da_file.time.dt.month == 2) & (_da_file.time.dt.day == 29)))
+
+                            if self.temporal_average_type == 'data':
+                                # averaging over months will be done here if performed over data
+                                _da_file = _da_file.resample(time='1ME').mean()
+                                _da_file['time'] = self.temporal_average_value
+
+                        else:
+                            _da_file = self.convert_time_to_lead(_da_file, target=target)
+
+                    else:
+                        _da_file = self.convert_time_to_lead(_da_file, target=target)
 
                     _da_ensmem_list.append(_da_file)
                     _ensdim = xr.DataArray(_members, dims='member', name='member')
                 _da_date = xr.concat(_da_ensmem_list, dim=_ensdim)
+
                 if 'member' in average_dim:
-                    _da_date = _da_date.mean(dim='member')
-                    _da_date = _da_date.load()
+                    _da_date = _da_date.mean(dim='member')#.compute()
+                    #_da_date = _da_date.load()
                 _da_date_list.append(_da_date)
 
 
@@ -510,16 +656,12 @@ class BaseMetric(dataobjects.DataObject):
         :param _da: xr DataArray
         :return: xr DataArray
         """
-        if self.time_average is None:
-            target_as_list = utils.create_list_target_verif(target, as_list=True)
-            _da = _da.assign_coords(time=target_as_list)
-        elif 'QS' in self.time_average:
-            _da = _da.assign_coords(time=_da.time.dt.month.values+1)
-        elif 'MS' in self.time_average:
-            _da = _da.assign_coords(time=_da.time.dt.month.values)
-        else:
-            _da = _da.assign_coords(time=range(len(_da.time.values)))
+
+        target_as_list = utils.create_list_target_verif(target, as_list=True)
+
+        _da = _da.assign_coords(time=target_as_list)
         return _da
+
 
     def _load_file(self, _file,_seldate=None):
         """
@@ -532,8 +674,12 @@ class BaseMetric(dataobjects.DataObject):
 
 
         if self.use_dask:
-            #_da_file = xr.open_dataarray(_file, chunks={'time':1, 'xc':50}) #chunks='auto')
-            _da_file = xr.open_dataarray(_file, chunks='auto')
+            # print(_file)
+            _da_file = xr.open_dataarray(_file) #, chunks={'time':20) #chunks='auto')
+            nsteps = len(_da_file['time'])
+            _da_file = _da_file.chunk(chunks={'time': nsteps})
+            #_da_file = xr.open_dataarray(_file, chunks='auto')
+            #_da_file = xr.open_dataarray(_file, chunks={'time':5})
         else:
             _da_file = xr.open_dataarray(_file)
 
@@ -619,12 +765,12 @@ class BaseMetric(dataobjects.DataObject):
         ds_mask = mutils.create_combined_mask(datalist[0],
                                              datalist[1])
 
-        if self.additonal_mask:
-            utils.print_info('APPLYING ADDITIONAL MASK')
-            ds_additonal_mask = xr.open_dataarray(self.additonal_mask)
 
-            #datalist = [d.where(~np.isnan(ds_additonal_mask)) for d in datalist]
-            ds_mask = ds_mask.where(~np.isnan(ds_additonal_mask))
+        if self.additional_mask:
+            utils.print_info('APPLYING ADDITIONAL MASK')
+            ds_additional_mask = xr.open_dataarray(self.additional_mask)
+
+            ds_mask = ds_mask.where(~np.isnan(ds_additional_mask))
 
         datalist_mask = [d.where(~np.isnan(ds_mask)) for d in datalist]
 
@@ -634,11 +780,13 @@ class BaseMetric(dataobjects.DataObject):
                 fcdata = fcdata.expand_dims(d)
         fcdata = fcdata.isel(member=0, date=0)
 
-        len1 = len(np.argwhere(~np.isnan(datalist_mask[1].isel(time=0).values)))
+        len1 = len(np.argwhere(~np.isnan(datalist_mask[0].isel(time=0).values)))
         len2 = len(np.argwhere(~np.isnan(datalist_mask[1].isel(time=0).values)))
         if len1 != len2:
             raise ValueError(f'Masking produces observations and forecasts with different number of'
                              f'NaN cells {len1} {len2}')
+        else:
+            print('OK')
 
         return datalist_mask, ds_mask.rename('lsm-full')
 
@@ -660,12 +808,11 @@ class BaseMetric(dataobjects.DataObject):
         ds_mask = mutils.create_combined_mask(ds_obs,
                                              ds_fc)
 
-        if self.additonal_mask:
+        if self.additional_mask:
             utils.print_info('APPLYING ADDITIONAL MASK')
-            ds_additonal_mask = xr.open_dataarray(self.additonal_mask)
+            ds_additional_mask = xr.open_dataarray(self.additional_mask)
 
-            #datalist = [d.where(~np.isnan(ds_additonal_mask)) for d in datalist]
-            ds_mask = ds_mask.where(~np.isnan(ds_additonal_mask))
+            ds_mask = ds_mask.where(~np.isnan(ds_additional_mask))
 
         return ds_mask.rename('lsm-full'), ds_obs
 
@@ -680,7 +827,6 @@ class BaseMetric(dataobjects.DataObject):
         """
 
         dict_out = {}
-
         # read verdata/fc data for verif
         da_fc_verif = self.load_fc_data('verif',
                                         average_dim=average_dims)
@@ -696,7 +842,7 @@ class BaseMetric(dataobjects.DataObject):
         data = [da_fc_verif, da_verdata_verif_raw.copy(deep=True)]
 
         # read verdata/fc data for calib
-        if self.calib:
+        if self.calib and self.calib_exists == 'no':
             da_fc_calib = self.load_fc_data('calib', average_dim=average_dims)
             da_verdata_calib = self.load_verif_data('calib', average_dim=['member'])
             data.append(da_fc_calib)
@@ -728,7 +874,7 @@ class BaseMetric(dataobjects.DataObject):
 
             datalist = [da_fc_verif, da_verdata_verif]
             # now calibrate if desired
-            if self.calib:
+            if self.calib and self.calib_exists == 'no':
                 da_fc_calib = data[2]
                 da_verdata_calib = data[3]
                 da_fc_verif_bc = self.calibrate(da_verdata_calib, da_fc_calib,
@@ -766,7 +912,7 @@ class BaseMetric(dataobjects.DataObject):
             dict_out['da_fc_verif'] = datalist[0]
             dict_out['da_verdata_verif'] = datalist[1]
 
-            if self.calib:
+            if self.calib and self.calib_exists == 'no':
                 dict_out['da_fc_calib'] = datalist[2]
                 dict_out['da_verdata_calib'] = datalist[3]
                 dict_out['da_fc_verif_bc'] = datalist[4]
@@ -812,7 +958,7 @@ class BaseMetric(dataobjects.DataObject):
             dict_out['da_fc_verif'] = da_fc_verif
 
             # now calibrate if desired
-            if self.calib:
+            if self.calib and self.calib_exists == 'no':
                 da_fc_calib = datalist[2]
                 da_verdata_calib = datalist[3]
                 da_fc_verif_bc = self.calibrate(da_verdata_calib, da_fc_calib,
@@ -844,11 +990,15 @@ class BaseMetric(dataobjects.DataObject):
         :return: calibrated forecast
         """
         utils.print_info(f'Calibrating using method: {method}')
-        allowed_methods = ['mean', 'mean+trend','anom']
+        allowed_methods = ['mean', 'mean+trend','anom','score']
         if method not in allowed_methods:
             raise ValueError(f'Method calibration needs to be one of {allowed_methods}')
 
-        if method == 'mean' or method == 'anom':
+        if method == 'score':
+            return da_fc_verif
+
+
+        if method in ('mean' , 'anom'):
             for dim in ['inidate', 'date','member']:
                 if dim in da_fc_calib.dims:
                     da_fc_calib = da_fc_calib.mean(dim=dim)
@@ -901,3 +1051,33 @@ class BaseMetric(dataobjects.DataObject):
             fc_verif_bc = fc_verif_bc.squeeze()
 
             return fc_verif_bc
+
+    def get_save_calibration_file(self, ds=None):
+        filename = f'{self.plottype}_{self.verif_source[0]}_'
+        if self.verif_modelname[0] is not None:
+            filename += f'{self.verif_modelname[0]}_'
+        filename += (f'{self.verif_expname[0]}_{self.verif_fcsystem[0]}_{self.calib_enssize[0]}_{self.calib_mode[0]}_'
+                     f'{self.calib_method}_{self.target}_')
+        calib_dates = '-'.join(self.calib_dates)
+        filename += f'{calib_dates}_'
+        if self.calib_fromyear[0] is not None:
+            filename += f'{self.calib_fromyear[0]}-{self.calib_toyear[0]}'
+        filename += '.nc'
+
+        if ds is None:
+            filename = self.calibrationdir + '/' + filename
+            if not os.path.isfile(filename):
+                raise RuntimeError(f'Calibration file {filename} not found')
+            ds_calib = xr.open_dataset(filename)
+            return ds_calib
+        else:
+            outfilename = self.metricdir +'/' + filename
+            ds.to_netcdf(outfilename)
+            utils.print_info(f'Saving calibration file to {outfilename}')
+
+            if self.calibrationdir is not None:
+                cfile = self.calibrationdir + '/' + filename
+                utils.print_info(f'Saving calibration file to {cfile}')
+                shutil.copy(outfilename, cfile)
+
+

@@ -142,6 +142,7 @@ class MapPlot(plottypes.GenericPlot):
                 for _step in _steps:
                     _data = _ds_file[_var].sel(time=_step)
 
+
                     if 'member' in _data.dims:
                         _data = _data.mean(dim='member')
 
@@ -270,6 +271,7 @@ class MapPlot(plottypes.GenericPlot):
                         cb.set_ticks(self.ticks)
                         cb.set_ticklabels(self.ticklabels)
 
+
                     cblabelstr = f'{self.shortname} {metric.legendtext} in {self.units}'
 
                     if self.plottype in ['brier', 'crps']:
@@ -292,7 +294,8 @@ class MapPlot(plottypes.GenericPlot):
                                 else:
                                     ax.text(**kw)
                             elif atype == 'cb.set_label':
-                                cb.set_label(**kw, labelpad=10)
+                                cb.set_label(**kw, labelpad=5)
+
 
 
                     ax.set_title(self._create_title(_step, _var))
@@ -302,6 +305,10 @@ class MapPlot(plottypes.GenericPlot):
                             ax.scatter(self.points[0][0], self.points[0][1], color='red', s=15,
                                         transform=ccrs.PlateCarree())
 
+                    ax.text(0.03, .97, self.plottype, style='italic',
+                            horizontalalignment='left',
+                            verticalalignment='top', transform=ax.transAxes,
+                            fontsize=14, bbox=dict(facecolor='blue', alpha=0.1))
 
                     if self.ofile is None:
                         ofile = self.get_filename_plot(varname=_var, time=_step,
@@ -328,9 +335,9 @@ class MapPlot(plottypes.GenericPlot):
 
         # calc target date
         # check if only one date
-        if self.verif_fromyear:
-            _verif_fromyear = int(self.verif_fromyear)
-            _verif_toyear = int(self.verif_toyear)
+        if self.verif_fromyear != [None]:
+            _verif_fromyear = int(self.verif_fromyear[0])
+            _verif_toyear = int(self.verif_toyear[0])
 
 
         if len(self.verif_dates) == 1:
@@ -346,9 +353,16 @@ class MapPlot(plottypes.GenericPlot):
                 _target_time = utils.datetime_to_string(_target_time, '%Y-%m-%d')
 
         elif 'to' in self.conf_verif_dates:
-            by_tmp = self.conf_verif_dates.split('/by/')[1]
-            _dates = self.conf_verif_dates.split('/by/')[0]
-            _dates = _dates.split('/to/')
+            if '/by/' in self.conf_verif_dates:
+                by_tmp = self.conf_verif_dates.split('/by/')[1]
+                _dates = self.conf_verif_dates.split('/by/')[0]
+                _dates = _dates.split('/to/')
+            if '/only/' in self.conf_verif_dates:
+                by_tmp = self.conf_verif_dates.split('/only/')[1]
+                _dates = self.conf_verif_dates.split('/only/')[0]
+                _dates = _dates.split('/to/')
+
+
             yymm_format = False
             if len(_dates[0]) == 4:
                 yymm_format = True
@@ -374,7 +388,10 @@ class MapPlot(plottypes.GenericPlot):
             _init_time = self.conf_verif_dates
             _title += f' init-time {_init_time}'
 
-        elif self.verif_fromyear is None:
+            if self.verif_fromyear[0] is not None:
+                _title += f' ({_verif_fromyear[0]} - {_verif_toyear[0]})'
+
+        elif self.verif_fromyear[0] is None:
             if len(self.verif_dates) == 1:
                 _title += f' valid-time {_target_time}'
             else:
@@ -393,7 +410,7 @@ class MapPlot(plottypes.GenericPlot):
         if self.calib:
             _title += f'\n calibrated using {self.conf_calib_dates}'
             if self.calib_fromyear:
-                _title += f' from {self.calib_fromyear} to {self.calib_toyear} ' \
+                _title += f' from {self.calib_fromyear[0]} to {self.calib_toyear[0]} ' \
                           f'(enssize = {self.calib_enssize})'
 
 

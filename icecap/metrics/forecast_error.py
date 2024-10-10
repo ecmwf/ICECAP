@@ -21,7 +21,7 @@ class Metric(BaseMetric):
         self.levels = [-.25, -.2, -.15, -.1, -.05, .05, .1, .15, .2, .25]
         self.default_cmap = 'RdBu_r'
         self.ylabel = 'sic'
-        self.use_dask = False
+        self.use_dask = True
 
     def compute(self):
         """ Compute metric """
@@ -29,6 +29,9 @@ class Metric(BaseMetric):
         # averaging over data or score the same for forecast_error. data is faster
         if self.area_statistic_kind is not None:
             self.area_statistic_kind = 'data'
+
+        if self.temporal_average_type is not None:
+            self.temporal_average_type = 'data'
 
         average_dims = ['member','inidate']
         persistence = True
@@ -46,13 +49,15 @@ class Metric(BaseMetric):
 
         da_verdata_verif = processed_data_dict['da_verdata_verif'].mean(dim='date')
         bias = (da_fc_verif_plot - da_verdata_verif).rename(f'{self.verif_expname[0]}')
-        data_plot.append(bias)
 
         if persistence:
             da_persistence = processed_data_dict['da_verdata_persistence'].mean(dim=('date','inidate'))
             bias_persistence = (da_persistence - da_verdata_verif).rename(f'{self.verif_expname[0]}')
-            data_plot.append(bias_persistence.rename('persistence'))
 
+        data_plot += [
+            bias.rename('fc_bias'),
+            bias_persistence.rename('persistence')
+        ]
 
         # set projection attributes
         data_plot = utils.set_xarray_attribute(data_plot, processed_data_dict['da_coords'],

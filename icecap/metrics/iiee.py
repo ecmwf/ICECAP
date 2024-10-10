@@ -18,12 +18,12 @@ class Metric(BaseMetric):
         self.legendtext = ''
         self.ylabel = 'IIEE'
         self.levels = None
-        self.use_dask = False
+        self.use_dask = True
 
     def compute(self):
         """ Compute metric """
 
-        # IEE is always spatially aggregated over score
+        # IIEE is always spatially aggregated over score
         self.area_statistic_kind = 'score'
         self.area_statistic_function = 'sum'
 

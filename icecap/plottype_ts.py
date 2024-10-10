@@ -1,12 +1,14 @@
 """ Create timeseries plots"""
 
 import random
+from collections import Counter
 import cartopy.crs as ccrs
 from matplotlib import pyplot as plt
 import numpy as np
 import matplotlib
 import xarray as xr
 from mpl_toolkits.axes_grid1.inset_locator import InsetPosition
+
 
 import plottypes
 import utils
@@ -135,6 +137,14 @@ class TsPlot(plottypes.GenericPlot):
 
                 label = _var
 
+                if 'time' in _ds_file_var.dims:
+                    x_axis_values = _ds_file_var.time.values+1
+                    xlim = x_axis_values.max() + 1.5
+                elif 'date' in _ds_file_var.dims:
+                    x_axis_values = _ds_file_var.date.values
+                    xlim = x_axis_values[-1]
+
+
                 if 'persistence' in _var:
                     color = 'grey'
                     linestyle = 'dotted'
@@ -144,7 +154,7 @@ class TsPlot(plottypes.GenericPlot):
                         continue
 
                 if not multi_member:
-                    ax.plot(_ds_file_var.time+1, _ds_file_var.values,
+                    ax.plot(x_axis_values, _ds_file_var.values,
                             color=color, alpha=1, linewidth=2,
                             label=label, linestyle=linestyle)
 
@@ -152,13 +162,13 @@ class TsPlot(plottypes.GenericPlot):
                         _ds_file_var_sig = _ds_file[_var.replace('value', 'pvalue')]
                         vals_p = _ds_file_var_sig.values
                         alpha = 0.05
-                        ax.scatter(_ds_file_var.time + 1, _ds_file_var.values, marker='o', facecolors='none',
+                        ax.scatter(x_axis_values, _ds_file_var.values, marker='o', facecolors='none',
                                    edgecolors=color)
-                        ax.scatter((_ds_file_var.time + 1)[vals_p < alpha], _ds_file_var.values[vals_p < alpha],
+                        ax.scatter((x_axis_values)[vals_p < alpha], _ds_file_var.values[vals_p < alpha],
                                    marker='o', color=color)
 
                 else:
-                    ax.plot(_ds_file_var.time+1, _ds_file_var.mean(dim='member').values,
+                    ax.plot(x_axis_values, _ds_file_var.mean(dim='member').values,
                             color=color, alpha=1, linewidth=2,
                             label=label, linestyle=linestyle)
 
@@ -167,13 +177,13 @@ class TsPlot(plottypes.GenericPlot):
                         perc = self.plot_shading  # ,1/3*100]
                         shading = (np.linspace(0.2,1,len(perc)+1)**3)[1:]
                         for pi, p in enumerate(perc):
-                            ax.fill_between(_ds_file_var.time+1, _ds_file_var.quantile(p/100, dim='member'),
+                            ax.fill_between(x_axis_values, _ds_file_var.quantile(p/100, dim='member'),
                                              _ds_file_var.quantile(1-p/100, dim='member'),
                                              color='teal', alpha=shading[pi],
                                             label=f'probability: {p}-{100 - p}%')
                     else:
                         for m in _ds_file_var['member'].values:
-                            ax.plot(_ds_file_var.time+1, _ds_file_var.sel(member=m).values,
+                            ax.plot(x_axis_values, _ds_file_var.sel(member=m).values,
                                     color=color, alpha=.1, linewidth=1,
                                     linestyle = linestyle)
                     # for m in _ds_file_var['member'].values:
@@ -314,16 +324,67 @@ class TsPlot(plottypes.GenericPlot):
             _title = self._create_title()
             ax.set_title(_title)
 
-            ax.set_xlim([0.5, _ds_file_var.time.max() + 1.5])
+
+
+
             ax.set_xlabel('forecast time [days]')
+
+            x_idx_max = np.min([10,len(x_axis_values)])
+            x_tick_idx = np.linspace(0,len(x_axis_values)-1,x_idx_max).astype(int)
+
+            ax.set_xticks(x_axis_values[x_tick_idx])
+            ax.set_xticklabels(x_axis_values[x_tick_idx])
+
+            ax.text(0.03, .97, self.plottype, style='italic',
+                    horizontalalignment='left',
+                    verticalalignment='top', transform=ax.transAxes,
+                    fontsize=14, bbox=dict(facecolor='blue', alpha=0.1))
+
+
             thisfig.savefig(ofile)
             ofiles_return.append(ofile)
             utils.print_info(f'output file: {ofile}')
 
         return ofiles_return
 
-
     def _create_title(self):
+        if self.verif_modelname is not None:
+            _title = f'{self.verif_modelname} {self.verif_expname}'
+        elif self.verif_source == 'ecmwf' and self.verif_expname == '0001':
+            _title = f'ecmwf oper'
+        else:
+            _title = f'{self.verif_expname}'
+
+        _title += f' {self.verif_fcsystem} {self.verif_mode} (enssize = {self.verif_enssize}) \n'
+
+        if len(self.verif_dates[0]) == 4:
+            _num = len(self.verif_dates)
+
+            if _num > 5:
+                _init_time = f'{self.verif_dates[0]} ... {self.verif_dates[-1]} [total={_num}]'
+            else:
+                _init_time = f', '.join(self.verif_dates)
+
+            _years = [f'{a_}-{b_}' for a_, b_ in zip(self.verif_fromyear, self.verif_toyear)]
+            if len(list(set(_years))) == 1:
+                _years = [_years[0]]
+                addline = False
+            else:
+                _years_count = dict(Counter(_years))
+                _years = [f'{key} [total={value}]' for key, value in _years_count.items()]
+                addline= True
+
+            _years = ', '.join(_years)
+
+            if addline:
+                _title += f' combined dates init-time {_init_time} \n' \
+                          f' ({_years})'
+            else:
+                _title += f' combined dates init-time {_init_time} ' \
+                          f' ({_years})'
+
+        return _title
+    def _create_title_OLD(self):
         _title = f'{self.verif_source} {self.verif_fcsystem} ' \
                  f'{self.verif_expname} {self.verif_mode} (enssize = {self.verif_enssize}) \n'
 

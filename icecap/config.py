@@ -10,6 +10,7 @@ import numpy as np
 
 import namelist_entries
 import dataobjects
+import utils
 
 DEFAULT_CONF_NAME = ['icecap.conf']
 
@@ -143,8 +144,10 @@ class Configuration():
         self.plot_shading = None
         self.inset_position = None
         self.area_statistic = None
-        self.additonal_mask = None
+        self.temporal_average = None
+        self.additional_mask = None
         self.calib_method =None
+        self.calib_exists = None
         self.nsidc_region = None
         self.copy_id = None
 
@@ -153,9 +156,11 @@ class Configuration():
 
         conf_parser = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
 
-        self.filename = file
-        if not os.path.isfile(self.filename):
-            raise RuntimeError(f'Configuration file {self.filename} not found.')
+        self.filename = utils.convert_to_list(file)
+        for conffile in self.filename:
+            if not os.path.isfile(conffile):
+                raise RuntimeError(f'Configuration file {conffile} not found.')
+
         conf_parser.read(self.filename)
 
         # attributes to beways initialized irrespective of environment or ecflow setting
@@ -164,6 +169,8 @@ class Configuration():
 
         # now initialize the environment as this determines batch/ecflow mode and machine
         self._init_config(conf_parser, 'environment')
+
+
 
         # some default values in icecap which can't be changed via config file
         # self.update_config()
@@ -284,10 +291,12 @@ class Configuration():
                 points=self.points,
                 verif_modelname=self.verif_modelname,
                 area_statistic = self.area_statistic,
+                temporal_average = self.temporal_average,
                 plot_shading = self.plot_shading,
                 inset_position = self.inset_position,
-                additonal_mask = self.additonal_mask,
+                additional_mask = self.additional_mask,
                 calib_method=self.calib_method,
+                calib_exists = self.calib_exists,
                 copy_id = self.copy_id
                 )
 

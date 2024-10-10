@@ -4,6 +4,53 @@ import numpy as np
 import xarray as xr
 from scipy import stats
 import utils
+
+def np_arange_include_upper(start, end, step):
+    """
+    Function calculating range of values including upper end
+    from https://stackoverflow.com/questions/50299172/range-or-numpy-arange-with-end-limit-include
+    :param start: start value
+    :param end: end value
+    :param step: step
+    :return: numpy array
+    """
+    end += (lambda x: step*max(0.1, x) if x < 0.5 else 0)((lambda n: n-int(n))((end - start)/step+1))
+    return np.arange(start, end, step).astype(int)
+def score_averaging(data, temporal_average_timescale, temporal_average_value):
+    """
+    Function to derive temporal average of score
+    :param data: list of xarray dataArrays
+    :param temporal_average_timescale: timescale over which to average, e.g. days
+    :param temporal_average_value: number of units used to derive average
+    :return: list of averaged xr DataArrays
+    """
+    utils.print_info('Temporal averaging of scores')
+    data_out = []
+    for _da_file in data:
+        if temporal_average_timescale == 'days':
+            _date_da = np.arange(_da_file.time.values[0],
+                                 _da_file.time.values[-1] + 1)
+
+
+            start = 0
+            if _date_da[0] > 0:
+                start = int(temporal_average_value)
+
+            time_bounds = np_arange_include_upper(start, _date_da[-1] + 1, int(temporal_average_value))
+            _da_file = _da_file.sel(time=slice(time_bounds[0], time_bounds[-1]))
+            _da_file = _da_file.rolling(time=int(temporal_average_value)).mean().sel(time=slice(int(temporal_average_value) + _da_file.time.values[0] - 1,
+                                                                                                None, int(temporal_average_value)))
+        else:
+            init_mon = _da_file.time.dt.month.values[0]
+            _da_file = _da_file.groupby('time.month').mean()
+            _da_file['month'] = (_da_file.month - init_mon) % 12 + 1
+            _da_file = _da_file.sortby('month')
+            _da_file =_da_file.rename({'month':'time'})
+            _da_file['time'] = temporal_average_value
+
+        data_out.append(_da_file)
+
+    return data_out
 def xr_regression_vector(y):
     """
     Derive linear regression slope and pvalue for a single vector and return as DataArray
@@ -207,7 +254,7 @@ def detect_extended_edge(ds_edge, max_extent=200):
     :return: xr DataArray with position of extended sea ice edge
     """
 
-    utils.print_info(f'Extended Edge detection algorithm')
+    utils.print_info('Extended Edge detection algorithm')
 
     # use grid spacing to derive number of cells using max_extent
     dx = np.diff(ds_edge.xc)[0]/1000

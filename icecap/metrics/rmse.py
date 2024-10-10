@@ -3,6 +3,7 @@ import os
 import numpy as np
 import xarray as xr
 import utils
+import metrics.metric_utils as mutils
 from .metric import BaseMetric
 
 
@@ -46,6 +47,7 @@ class Metric(BaseMetric):
 
 
         da_persistence = processed_data_dict['da_verdata_persistence']
+
         da_pers_rmse = np.sqrt(((da_persistence - da_verdata_verif) ** 2).mean(dim=('inidate', 'date')))
         data.append(da_pers_rmse)
 
@@ -57,6 +59,13 @@ class Metric(BaseMetric):
             da_pers_rmse = data[1]
             processed_data_dict['lsm'] = lsm
 
+
+        if self.temporal_average_type == 'score':
+            data = mutils.score_averaging([da_rmse, da_pers_rmse],
+                                          self.temporal_average_timescale,
+                                          self.temporal_average_value)
+            da_rmse = data[0]
+            da_pers_rmse = data[1]
 
         data_plot = []
         data_plot.append(processed_data_dict['lsm_full'])

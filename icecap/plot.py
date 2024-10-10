@@ -44,6 +44,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
     if args.plotconfigfile:
+        args.configfile = [args.configfile]
         args.configfile.append(args.plotconfigfile)
 
     conf = config.Configuration(file=args.configfile)
