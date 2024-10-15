@@ -114,7 +114,7 @@ class ExecutionHost:
 
         # concatenate config and plotconfig to one config file in pydir
         with open(f'{self.pydir}/icecap.conf', 'wb') as wfd:
-            for f in self.filename:
+            for f in utils.convert_to_list(self.filename):
                 with open(f, 'rb') as fd:
                     shutil.copyfileobj(fd, wfd)
                 wfd.write(b'\n')

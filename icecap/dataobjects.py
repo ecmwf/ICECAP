@@ -98,11 +98,7 @@ class DataObject:
         if self.periodic is None:
             raise ValueError("Class attribute periodic used in interpolate can't be set to None")
 
-        if 'grid' in self.verif_name:
-            ref_file = f'{self.obscachedir}/{self.verif_name}.nc'
-        else:
-            ref_file = f'{self.obscachedir}/' \
-                       f'{self._filenaming_convention("verif").format(self.salldates[0],self.params)}'
+        ref_file = f'{self.obscachedir}/{self.verif_name}.nc'
         ds_ref = xr.open_dataarray(ref_file)
 
         if self.regridder is None:

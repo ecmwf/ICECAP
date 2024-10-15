@@ -40,12 +40,15 @@ class MapPlot(plottypes.GenericPlot):
         self._init_proj()
 
 
-        if self.region_extent is None:
-            self.plot_global = True
-        else:
+        if self.region_extent is not None:
             self.region_extent = utils.csv_to_list(self.region_extent)
             self.region_extent = list(map(float, self.region_extent))
             self.plot_global = False
+        else:
+            self.plot_global = True
+
+
+
 
 
 
@@ -141,6 +144,7 @@ class MapPlot(plottypes.GenericPlot):
 
                 for _step in _steps:
                     _data = _ds_file[_var].sel(time=_step)
+
 
 
                     if 'member' in _data.dims:
@@ -400,7 +404,7 @@ class MapPlot(plottypes.GenericPlot):
             _title += f' combined dates valid-time {_target_time}' \
                       f' ({_verif_fromyear} - {_verif_toyear})'
 
-        if _var != 'obs' and self.plottype not in ['freeze-up']:
+        if _var != 'obs' and self.plottype not in ['freeze_up']:
             _title += f' (leadtime: {_step+1} days)'
 
 

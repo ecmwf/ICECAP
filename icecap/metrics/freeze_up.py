@@ -49,6 +49,11 @@ class Metric(BaseMetric):
             raise ValueError('only one verification date (verif_dates) can be specified'
                              'to plot break-up dates')
 
+        self.area_statistic = None
+        self.area_statistic_function = None
+        self.area_statistic_unit = None
+        self.area_statistic_kind = None
+
     def freeze_up(self, ds):
         """
         Calculate freeze-up dates (first date for which sea ice
@@ -179,17 +184,20 @@ class Metric(BaseMetric):
             mask_ice_all = xr.where(mask_ice == 1, 0, 1)
             mask_ice_all = xr.where(mask_ice_all.min(dim='member') == 1, True, False)
 
+
             combine = xr.where(late > early, late, early * -1)
             combine = xr.where(mask_water_all, -101, combine)
             combine = xr.where(mask_ice_all, 101, combine)
             combine = xr.where(np.isnan(lsm_full), np.nan, combine)
             combine = combine.assign_attrs(da_fc_verif.attrs)
 
+
+
             fc_name = self.verif_expname[0]
             if self.verif_modelname[0] is not None:
                 fc_name = f'{self.verif_modelname[0]} {fc_name}'
 
-            data_plot.append(combine.expand_dims(dim={"time": 1}).rename(f'{fc_name}'))
+            data_plot.append(combine.rename(f'{fc_name}'))
             data_plot.append(da_fc_calib_metric_upper.rename('upper_q_calib_noplot'))
             data_plot.append(da_fc_calib_metric_lower.rename('lower_q_calib_noplot'))
 

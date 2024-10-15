@@ -1,5 +1,7 @@
 """Module containing verification classes"""
 
+import os
+import shutil
 import datetime as dt
 import xarray as xr
 from dateutil.relativedelta import relativedelta
@@ -59,22 +61,23 @@ class VerifyingData(dataobjects.DataObject):
 class _OSIThreddsRetrieval(VerifyingData):
     def __init__(self, conf):
         super().__init__(conf)
+        self.dummydate = None
 
         self.root_server = "https://thredds.met.no/thredds/dodsC/osisaf/met.no/"
         if self.verif_name == 'osi-450-a':
             self.server = [self.root_server+"reprocessed/ice/conc_450a_files/"]
             self.filebase = ["ice_conc_nh_ease2-250_cdr-v3p0_"]
             self.fileext = ["1200.nc"]
-            if '20171130' not in self.loopdates:
-                self.loopdates.append('20171130')
+
+            self.dummydate = '20171130'
+
 
         if self.verif_name == 'osi-401-b':
             self.server = [self.root_server+"ice/conc/"]
             self.filebase = ["ice_conc_nh_polstere-100_multi_"]
             self.fileext = ["1200.nc"]
 
-            if '20171130' not in self.loopdates:
-                self.loopdates.append('20171130')
+            self.dummydate = '20171130'
 
         if self.verif_name == 'osi-cdr':
             self.server = self.root_server+"reprocessed/ice/conc_450a_files/"
@@ -85,13 +88,16 @@ class _OSIThreddsRetrieval(VerifyingData):
             self.filebase = [self.filebase, "ice_conc_nh_ease2-250_icdr-v3p0_"]
             self.fileext = [self.fileext, "1200.nc"]
 
-            if '20171130' not in self.loopdates:
-                self.loopdates.append('20171130')
+            self.dummydate = '20171130'
 
-        if not self.loopdates:
+        if self.dummydate is None:
             utils.print_info(f'No verification data to be downloaded for {self.verif_name}.\n'
                              f'This also means that no dummy data has been specified for this dataset \n'
                              f'(Please check the manual how to specify such a dummy observation file for a new dataset)')
+
+        if self.dummydate not in self.loopdates:
+            self.loopdates.append(self.dummydate)
+
 
 
     def make_filelist(self):
@@ -99,6 +105,7 @@ class _OSIThreddsRetrieval(VerifyingData):
         filename = self._filenaming_convention('verif')
         files = [self.obscachedir +'/' + filename.format(date, self.params)
                  for date in self.loopdates]
+        files.append(f'{self.obscachedir}/{self.verif_name}.nc')
         return files
 
     def process(self, verbose):
@@ -163,3 +170,8 @@ class _OSIThreddsRetrieval(VerifyingData):
 
 
                     da_in.to_netcdf(_ofile)
+
+        # copy dummy file to new id
+        if not os.path.isfile(f'{self.obscachedir}/{self.verif_name}.nc'):
+            shutil.copy(f'{self.obscachedir}/{self.dummydate}_sic.nc',
+                        f'{self.obscachedir}/{self.verif_name}.nc')

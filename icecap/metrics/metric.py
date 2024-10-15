@@ -253,7 +253,8 @@ class BaseMetric(dataobjects.DataObject):
 
 
         self.fcverifsets = self._init_fc(name='verif')
-        if self.calib:
+
+        if self.calib and self.calib_exists == 'no':
             self.calib_modelname = self.verif_modelname
             self.calib_expname = self.verif_expname
             self.calib_source = self.verif_source
@@ -478,16 +479,18 @@ class BaseMetric(dataobjects.DataObject):
 
 
                         if not _da_seldate_list:
-                            raise RuntimeError(f'No verification data found for {_date}')
+                            utils.print_info(f'No verification data found for {_date}')
+                            return None
+                        else:
+                            if _missing_si:
+                                utils.print_info(f'Some verification data missing for {_date}')
+                                for _si in _missing_si:
+                                    _da_file_new = xr.full_like(_da_seldate_list[_existing_si[0]], np.nan)
+                                    _da_file_new['time'] = [pd.to_datetime(_seldates[_si]).to_numpy()]
+                                    _da_seldate_list.insert(_si, _da_file_new.copy())
 
-                        if _missing_si:
-                            utils.print_info(f'Some verification data missing for {_date}')
-                            for _si in _missing_si:
-                                _da_file_new = xr.full_like(_da_seldate_list[_existing_si[0]], np.nan)
-                                _da_file_new['time'] = [pd.to_datetime(_seldates[_si]).to_numpy()]
-                                _da_seldate_list.insert(_si, _da_file_new.copy())
+                            _da_file = xr.concat(_da_seldate_list, dim='time')
 
-                        _da_file = xr.concat(_da_seldate_list, dim='time')
 
 
 
@@ -698,6 +701,7 @@ class BaseMetric(dataobjects.DataObject):
         :return: list of xarray objects (verif and fc) for which statistic has been applied to
         """
 
+        utils.print_info('Deriving statistic over area')
 
         # mask region of interest if selected
         if self.region_extent:
