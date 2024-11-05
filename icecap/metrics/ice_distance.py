@@ -46,7 +46,7 @@ class Metric(BaseMetric):
         self.use_metric_name = True
         self.levels = [0,None]
         self.clip = True
-        self.use_dask = True
+        self.use_dask = False
 
     @staticmethod
     def _remove_small_cluster(da, min_size=None):
@@ -83,6 +83,8 @@ class Metric(BaseMetric):
                              f'or for points being the same length as the target time'
                              f' {len(self.points)} != {len(da.time)}')
 
+        if 'member' not in da.dims:
+            da = da.expand_dims('member')
 
         out_dist = np.zeros([len(da.member), len(da.time)], dtype="float32")
 
@@ -164,83 +166,68 @@ class Metric(BaseMetric):
         min_size = 255
         #min_size = 15
         min_size = None
+
+        average_dims = []
+        persistence = False
+        sice_threshold = None
+
+        processed_data_dict = self.process_data_for_metric(average_dims, persistence,
+                                                           sice_threshold)
+
+        da_fc_verif = processed_data_dict['da_fc_verif']
+        da_verdata_verif = processed_data_dict['da_verdata_verif']
+
+        if self.calib:
+            da_fc_calib = processed_data_dict['da_fc_calib']
+            da_verdata_calib = processed_data_dict['da_verdata_calib']
+
         datalist = []
         data_names = []
-
-
-        da_fc_verif = self.load_fc_data('verif')
-        da_obs_verif = self.load_verif_data('verif')
-        data = [da_fc_verif, da_obs_verif]
-
-        if self.calib:
-            da_fc_calib = self.load_fc_data('calib')
-            da_verdata_calib = self.load_verif_data('calib')
-            data.extend([da_fc_calib,da_verdata_calib])
-
-
-        data, _ = self.mask_lsm(data)
-
-        if self.calib:
-            da_fc_verif, da_obs_verif, da_fc_calib, da_verdata_calib = data
-            da_fc_verif = da_fc_verif.load()
-            da_obs_verif = da_obs_verif.load()
-            da_fc_calib = da_fc_calib.load()
-            da_verdata_calib = da_verdata_calib.load()
-
-        else:
-            da_fc_verif, da_obs_verif = data
-            da_fc_verif = da_fc_verif.load()
-            da_obs_verif = da_obs_verif.load()
-        print('done')
-
-
-        list_fc_verif = []
-        for idate in da_fc_verif['date'].values:
-            da_fc_verif_tmp = da_fc_verif.isel(inidate=0).sel(date=idate)
-            da_fc_verif_dist_tmp = self._compute_distance(da_fc_verif_tmp, min_size=min_size)
-            list_fc_verif.append(da_fc_verif_dist_tmp)
-        da_fc_verif_dist = xr.concat(list_fc_verif, dim='newdim')
-        da_fc_verif_dist = da_fc_verif_dist.mean(dim='newdim')
-
+        #compute dist for verif fc
+        da_fc_verif_dist = self._compute_distance(da_fc_verif.isel(date=0, inidate=0),
+                                                      min_size=min_size)
 
 
         if self.add_verdata == "yes":
-            list_obs = []
-            for idate in da_obs_verif['date'].values:
-                da_obs_verif_tmp = da_obs_verif.sel(date=idate).isel(inidate=0)
-                da_obs_verif_dist_tmp = self._compute_distance(da_obs_verif_tmp, min_size=min_size)
-                list_obs.append(da_obs_verif_dist_tmp)
-            da_obs_verif_dist = xr.concat(list_obs, dim='newdim')
-            da_obs_verif_dist = da_obs_verif_dist.mean(dim='newdim')
-
+            da_obs_verif_dist = self._compute_distance(da_verdata_verif.isel(date=0, inidate=0),
+                                                           min_size=min_size)
             datalist.append(da_obs_verif_dist.isel(member=0))
             data_names.append('obs')
 
         if self.calib:
             print('calibrating')
             bias_list = []
-            verdata_list = []
-            for idate in da_fc_calib['date'].values:
-                print(idate)
-                tmp_fc = da_fc_calib.sel(date=idate).isel(inidate=0)
-                tmp_verdata = da_verdata_calib.sel(date=idate).isel(inidate=0)
-                tmp_fc_dist = self._compute_distance(tmp_fc, min_size=min_size)
-                tmp_verdata_dist = self._compute_distance(tmp_verdata, min_size=min_size)
-                bias_list.append(tmp_fc_dist.mean(dim='member')-tmp_verdata_dist.mean(dim='member'))
-                verdata_list.append(tmp_verdata_dist)
+            verdata_calib_list = []
+            for init in da_fc_calib['inidate'].values:
+                bias_list_date = []
+                verdata_calib_list_date = []
+                for idate in da_fc_calib['date'].values:
+                    print(idate)
+                    tmp_fc_dist = self._compute_distance(da_fc_calib.sel(date=idate, inidate=init),
+                                                         min_size=min_size)
+                    tmp_verdata_dist = self._compute_distance(da_verdata_calib.sel(date=idate, inidate=init),
+                                                              min_size=min_size)
+                    bias_list_date.append(tmp_fc_dist.mean(dim='member') - tmp_verdata_dist.mean(dim='member'))
+                    verdata_calib_list_date.append(tmp_verdata_dist)
+                bias_dist_calib_date = xr.concat(bias_list_date, dim='newdim')
+                bias_dist_calib_date = bias_dist_calib_date.mean(dim='newdim')
+                verdata_dist_calib_date = xr.concat(verdata_calib_list_date, dim='date').mean(dim='date')
+                bias_list.append(bias_dist_calib_date)
+                verdata_calib_list.append(verdata_dist_calib_date)
 
-
-            # end new
-            bias_dist_calib = xr.concat(bias_list, dim='newdim')
+            bias_dist_calib= xr.concat(bias_list, dim='newdim')
             bias_dist_calib = bias_dist_calib.mean(dim='newdim')
-            verdata_dist_calib = xr.concat(verdata_list, dim='date')
-
-            datalist.append(verdata_dist_calib.mean(dim='date').dropna(dim='member').isel(member=0))
-            data_names.append('obs-hc')
+            verdata_dist_calib = xr.concat(verdata_calib_list, dim='inidate').mean(dim='inidate')
             da_fc_verif_dist = da_fc_verif_dist - bias_dist_calib
+
+            datalist.append(verdata_dist_calib.dropna(dim='member').isel(member=0))
+            data_names.append('obs-hc')
 
         datalist.append(da_fc_verif_dist)
         data_names.append('model')
+
+
+
 
         data_xr = xr.merge([data.rename(data_names[di]) for di, data in enumerate(datalist)])
 

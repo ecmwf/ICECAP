@@ -174,7 +174,7 @@ config_optnames = {
             'optional' : False,
             'allowed_values' : ["interp_check","ensmean","forecast_error",
                                 "ice_distance", "plume", "freeze_up", "break_up", 'brier',
-                                'crps', 'rmse', 'ser','iiee','sps',
+                                'crps', 'rmse', 'ser','iiee','sps','iiee2',
                                 'brier_edge','linear_trend',
                                 'rmse_edge',
                                 'ice_extent', 'cycle', 'mae']
@@ -321,7 +321,8 @@ config_optnames = {
         'calib_method' : {
             'printname':'Method used for calibration',
             'optional' : True,
-            'allowed_values' : ["mean", "mean+trend", "anom","score"]
+            'allowed_values' : ["mean", "mean+trend", "anom","score",
+                                'persistence']
         },
         'calib_exists': {
             'printname':'Specify whether calibration file has been precomputed',

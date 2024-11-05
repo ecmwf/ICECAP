@@ -82,6 +82,7 @@ class GenericPlot:
         """
 
         fname = metric.get_filename_metric()
+        print(fname)
         if os.path.isfile(fname):
             output = xr.open_dataset(fname)
         else:

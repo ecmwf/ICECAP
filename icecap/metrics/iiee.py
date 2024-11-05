@@ -37,20 +37,48 @@ class Metric(BaseMetric):
         data_plot = []
         data_plot.append(processed_data_dict['lsm_full'])
         if self.calib:
-            da_fc_verif= processed_data_dict['da_fc_verif_bc']
+            da_fc_verif= processed_data_dict['da_fc_verif_bc'].clip(0,1)
         else:
             da_fc_verif = processed_data_dict['da_fc_verif']
 
+
         da_verdata_verif = processed_data_dict['da_verdata_verif']
-        da_mae = (np.abs(da_verdata_verif - da_fc_verif)).mean(dim=('inidate', 'date'))
-
         da_persistence = processed_data_dict['da_verdata_persistence']
-        da_pers_mae = (np.abs(da_persistence - da_fc_verif)).mean(dim=('inidate', 'date'))
 
-        data, lsm = self.calc_area_statistics([da_mae, da_pers_mae], processed_data_dict['lsm_full'],
+        ensmean_over_fc = xr.ones_like(da_verdata_verif).where(da_fc_verif - da_verdata_verif == 1, 0)
+        ensmean_under_fc = xr.ones_like(da_verdata_verif).where(da_fc_verif - da_verdata_verif == -1, 0)
+
+        ensmean_over_pers = xr.ones_like(da_verdata_verif).where(da_persistence - da_verdata_verif == 1, 0)
+        ensmean_under_pers = xr.ones_like(da_verdata_verif).where(da_persistence - da_verdata_verif == -1, 0)
+
+
+
+        data, lsm = self.calc_area_statistics([ensmean_over_fc, ensmean_under_fc,
+                                               ensmean_over_pers, ensmean_under_pers],
+                                              processed_data_dict['lsm_full'],
                                               statistic=self.area_statistic_function)
-        data_plot.append(data[0].rename('fc_iiee'))
-        #data_plot.append(data[1].rename('persistence'))
+        ensmean_over_fc = data[0]
+        ensmean_under_fc = data[1]
+        ensmean_over_pers = data[2]
+        ensmean_under_pers = data[3]
+
+
+        iiee_fc = ensmean_over_fc + ensmean_under_fc
+        aee_fc = np.fabs(ensmean_over_fc - ensmean_under_fc)
+        me_fc = 2 * np.minimum(ensmean_over_fc, ensmean_under_fc)
+
+
+
+        iiee_pers = ensmean_over_pers + ensmean_under_pers
+        aee_pers = np.fabs(ensmean_over_pers - ensmean_under_pers)
+        me_pers = 2 * np.minimum(ensmean_over_pers, ensmean_under_pers)
+
+        data_plot.append(iiee_fc.rename('fc_iiee').mean(dim=('inidate', 'date')))
+        data_plot.append(aee_fc.rename('noplot_fc_aee').mean(dim=('inidate', 'date')))
+        data_plot.append(me_fc.rename('noplot_fc_me').mean(dim=('inidate', 'date')))
+        data_plot.append(iiee_pers.rename('persistence_iiee').mean(dim=('inidate', 'date')))
+        data_plot.append(aee_pers.rename('noplot_persistence_aee').mean(dim=('inidate', 'date')))
+        data_plot.append(me_pers.rename('noplot_persistence_me').mean(dim=('inidate', 'date')))
         data_plot.append(lsm)
 
 

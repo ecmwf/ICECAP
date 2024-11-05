@@ -59,7 +59,11 @@ def xr_regression_vector(y):
     """
 
     x = np.arange(len(y))
-    slope, intercept, r_value, p_value, std_err = stats.linregress(x, y)
+    mask = ~np.isnan(y)
+    if mask.sum() >0:
+        slope, intercept, r_value, p_value, std_err = stats.linregress(x[mask], y[mask])
+    else:
+        slope = intercept = r_value = p_value = np.nan
 
     data_xr = xr.DataArray([slope, intercept, p_value], dims=['slope/intercept/pvalue'])
     return data_xr

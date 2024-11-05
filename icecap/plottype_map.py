@@ -309,7 +309,7 @@ class MapPlot(plottypes.GenericPlot):
                             ax.scatter(self.points[0][0], self.points[0][1], color='red', s=15,
                                         transform=ccrs.PlateCarree())
 
-                    ax.text(0.03, .97, self.plottype, style='italic',
+                    ax.text(0.01, .97, self.plottype, style='italic',
                             horizontalalignment='left',
                             verticalalignment='top', transform=ax.transAxes,
                             fontsize=14, bbox=dict(facecolor='blue', alpha=0.1))

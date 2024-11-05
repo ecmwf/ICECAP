@@ -51,7 +51,7 @@ class Metric(BaseMetric):
         bias = (da_fc_verif_plot - da_verdata_verif).rename(f'{self.verif_expname[0]}')
 
         if persistence:
-            da_persistence = processed_data_dict['da_verdata_persistence'].mean(dim=('date','inidate'))
+            da_persistence = processed_data_dict['da_verdata_persistence'].mean(dim=('date'))
             bias_persistence = (da_persistence - da_verdata_verif).rename(f'{self.verif_expname[0]}')
 
         data_plot += [

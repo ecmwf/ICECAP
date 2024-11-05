@@ -254,7 +254,7 @@ class BaseMetric(dataobjects.DataObject):
 
         self.fcverifsets = self._init_fc(name='verif')
 
-        if self.calib and self.calib_exists == 'no':
+        if self.calib and self.calib_exists == 'no' and self.calib_method != 'persistence':
             self.calib_modelname = self.verif_modelname
             self.calib_expname = self.verif_expname
             self.calib_source = self.verif_source
@@ -431,6 +431,7 @@ class BaseMetric(dataobjects.DataObject):
 
         filename = self._filenaming_convention(datatype)
 
+
         _all_list = []
         _inits = []
         for fcname in fcset:
@@ -468,14 +469,6 @@ class BaseMetric(dataobjects.DataObject):
                             else:
                                 utils.print_info(f'No verification data found {_seldate} {_si}')
                                 _missing_si.append(_si)
-                                # if not _da_seldate_list:
-                                #     utils.print_info(f'No verification data found {_seldate} {_si}')
-                                #     _missing_si.append(_si)
-                                # else:
-                                #     _da_file = xr.full_like(_da_seldate_list[0],
-                                #                             np.nan)
-                                #     _da_file['time'] = [pd.to_datetime(_seldate).to_numpy()]
-
 
 
                         if not _da_seldate_list:
@@ -491,21 +484,11 @@ class BaseMetric(dataobjects.DataObject):
 
                             _da_file = xr.concat(_da_seldate_list, dim='time')
 
-
-
-
-
                     elif datatype == 'fc':
                         _filename = f"{fcset[fcname]['cachedir']}/" \
                                     f"{filename.format(_date, _member, self.params, grid)}"
                         # print(_filename)
                         _da_file = self._load_file(_filename, _seldates)
-
-
-
-
-
-
 
                     # _da_file = self.convert_time_to_lead(_da_file, target=target)
 
@@ -760,6 +743,81 @@ class BaseMetric(dataobjects.DataObject):
 
         return datalist_out, ds_mask_reg.rename('lsm')
 
+    def calc_area_statistics_dict(self, dict_data, ds_mask, statistic='mean'):
+        """
+        Calculate area statistics (mean/sum) for verif and fc using a combined land-sea-mask from both datasets
+        :param dict_data: dict of xarray objects for verif and fc
+        :param ds_mask: combined land-sea-mask from fc and verif (using mask_lsm function)
+        :param statistic: derive mean or sum
+        :return: list of xarray objects (verif and fc) for which statistic has been applied to
+        """
+
+        utils.print_info('Deriving statistic over area')
+
+        # mask region of interest if selected
+        if self.region_extent:
+            _region_bounds = utils.csv_to_list(self.region_extent)
+            _region_bounds = [float(r) for r in _region_bounds]
+            lon1 = _region_bounds[0]
+            lon2 = _region_bounds[1]
+            lat1 = _region_bounds[2]
+            lat2 = _region_bounds[3]
+
+            dict_data = {k: (mutils.area_cut(v, lon1,lon2,lat1,lat2) if v is not None else v) for k, v in dict_data.items()}
+            ds_mask_reg = mutils.area_cut(ds_mask, lon1,lon2,lat1,lat2)
+
+        elif self.nsidc_region:
+
+            utils.print_info('Selecting NSIDC region')
+            ifile = f"{self.etcdir}/nsidc_{self.verif_name.replace('-grid','')}.nc"
+            try:
+                ds_nsidc = xr.open_dataarray(ifile)
+            except:
+                raise FileNotFoundError(f'NSIDC region file {ifile} not found ')
+
+            region_number = mutils.get_nsidc_region(ds_nsidc, self.nsidc_region)
+            ds_mask_reg = xr.where(ds_nsidc == region_number,ds_mask,float('nan'))
+            ds_mask_reg = ds_mask_reg.drop([i for i in ds_mask_reg.coords if i not in ds_mask_reg.dims])
+            dict_data = {k: (v.where(~np.isnan(ds_mask_reg)) if v is not None else v) for k, v in
+                         dict_data.items()}
+
+        else:
+            ds_mask_reg = ds_mask
+            dict_data = {k: (v.where(~np.isnan(ds_mask_reg)) if v is not None else v) for k, v in
+                         dict_data.items()}
+
+
+
+        # CELL AREA
+        xdiff = np.unique(np.diff(dict_data['da_fc_verif']['xc'].values))
+        ydiff = np.unique(np.diff(dict_data['da_fc_verif']['yc'].values))
+        if len(xdiff) > 1 or len(ydiff) > 1:
+            raise ValueError('XC or YC coordinates are not evenly spaced')
+
+        xdiff = np.abs(xdiff[0] / 1000)
+        ydiff = np.abs(ydiff[0] / 1000)
+        cell_area = xdiff * ydiff
+
+        if statistic == 'mean':
+            dict_data_out = {k: (v.mean(dim=('xc', 'yc'), skipna=True) if v is not None else v) for k, v in
+                         dict_data.items()}
+            if self.area_statistic_unit == 'total':
+                dict_data_out = {k: (v*cell_area if v is not None else v) for k, v in
+                         dict_data.items()}
+        elif statistic == 'sum':
+            dict_data_out = {k: (v.sum(dim=('xc', 'yc'), skipna=True, min_count=1)*cell_area if v is not None else v) for k, v in
+                             dict_data.items()}
+        elif statistic == 'median':
+            dict_data_out = {k: (v.median(dim=('xc', 'yc'), skipna=True) if v is not None else v)
+                             for k, v in
+                             dict_data.items()}
+        else:
+            raise ValueError(f'statistic can be either mean or sum not {statistic}')
+
+
+
+        return dict_data_out, ds_mask_reg.rename('lsm')
+
 
     def mask_lsm(self, datalist):
         """ Create land-sea mask from two datasets (usually observations and fc)
@@ -776,7 +834,7 @@ class BaseMetric(dataobjects.DataObject):
 
             ds_mask = ds_mask.where(~np.isnan(ds_additional_mask))
 
-        datalist_mask = [d.where(~np.isnan(ds_mask)) for d in datalist]
+        datalist_mask = [d.where(~np.isnan(ds_mask.squeeze())) for d in datalist]
 
         fcdata = datalist_mask[0]
         for d in ['member','date']:
@@ -786,11 +844,11 @@ class BaseMetric(dataobjects.DataObject):
 
         len1 = len(np.argwhere(~np.isnan(datalist_mask[0].isel(time=0).values)))
         len2 = len(np.argwhere(~np.isnan(datalist_mask[1].isel(time=0).values)))
-        if len1 != len2:
-            raise ValueError(f'Masking produces observations and forecasts with different number of'
-                             f'NaN cells {len1} {len2}')
-        else:
-            print('OK')
+        # if len1 != len2:
+        #     raise ValueError(f'Masking produces observations and forecasts with different number of'
+        #                      f'NaN cells {len1} {len2}')
+        # else:
+        #     print('OK')
 
         return datalist_mask, ds_mask.rename('lsm-full')
 
@@ -812,11 +870,12 @@ class BaseMetric(dataobjects.DataObject):
         ds_mask = mutils.create_combined_mask(ds_obs,
                                              ds_fc)
 
+
         if self.additional_mask:
             utils.print_info('APPLYING ADDITIONAL MASK')
             ds_additional_mask = xr.open_dataarray(self.additional_mask)
 
-            ds_mask = ds_mask.where(~np.isnan(ds_additional_mask))
+            ds_mask = ds_mask.where(~np.isnan(ds_additional_mask.squeeze()))
 
         return ds_mask.rename('lsm-full'), ds_obs
 
@@ -826,11 +885,20 @@ class BaseMetric(dataobjects.DataObject):
                                 sice_threshold=None):
         """
         Process forecast/observation data for metric (load data, calibrate forecast etc)
-        :param average_dims: dimesnions over which to average when loading data
+        :param average_dims: dimensions over which to average when loading data
         :return: dictionary of forecast/observation data
         """
 
+        if self.calib_method == 'persistence':
+            if persistence is False:
+                raise ValueError('Calibration using persistence only works when persistence is turned on in metric')
+            target_list = utils.create_list_target_verif(self.target, as_list=True)
+            if target_list[0] != 0:
+                raise ValueError('Calibration using persistence only works when first timestep for forecast is in target')
+
+
         dict_out = {}
+        dict_data = {}
         # read verdata/fc data for verif
         da_fc_verif = self.load_fc_data('verif',
                                         average_dim=average_dims)
@@ -843,148 +911,109 @@ class BaseMetric(dataobjects.DataObject):
                 utils.print_info('No verification data found --> add_verdata set to no')
                 self.add_verdata = 'no'
 
-        data = [da_fc_verif, da_verdata_verif_raw.copy(deep=True)]
+        dict_data['da_fc_verif'] = da_fc_verif
+        dict_data['da_verdata_verif'] = da_verdata_verif_raw.copy(deep=True)
+
 
         # read verdata/fc data for calib
-        if self.calib and self.calib_exists == 'no':
+        if self.calib and self.calib_exists == 'no' and self.calib_method != 'persistence':
             da_fc_calib = self.load_fc_data('calib', average_dim=average_dims)
             da_verdata_calib = self.load_verif_data('calib', average_dim=['member'])
-            data.append(da_fc_calib)
-            data.append(da_verdata_calib)
+            dict_data['da_fc_calib'] = da_fc_calib
+            dict_data['da_verdata_calib'] = da_verdata_calib
+        else:
+            dict_data['da_fc_calib'] = None
+            dict_data['da_verdata_calib'] = None
+
+
 
         if persistence:
-            da_persistence = self.load_verif_data('verif', target='i:0').isel(member=0, time=0)
-            data.append(da_persistence)
+            avg_dims = average_dims.copy() if average_dims is not None else []
+            avg_dim = list(set(avg_dims+['member']))
+            da_persistence = self.load_verif_data('verif', target='i:0',
+                                                  average_dim=avg_dim).isel(time=0)
+            dict_data['da_verdata_persistence'] = da_persistence
+        else:
+            dict_data['da_verdata_persistence'] = None
 
         lsm_full, da_coords = self.mask_lsm_new(da_verdata_verif_raw, da_fc_verif)
-        data = [d.where(~np.isnan(lsm_full)) for d in data]
+        dict_data = {k: (v.where(~np.isnan(lsm_full)) if v is not None else v) for k, v in dict_data.items()}
+
         dict_out['lsm_full'] = lsm_full
-
-        # assign back to xarray objects
-        da_fc_verif = data[0]
-        da_verdata_verif = data[1]
-
-
-
-        if persistence:
-            da_persistence = data[2]
 
 
         if sice_threshold is not None:
-            # 1. calibrate first for each grid cell and add to datalist
-            # 2. add persistence to datalist
-            # 3. set values to 1
-            # 3. average all data in list
+            # 1. calibrate first for each grid cell and add to dict_data
+            # 2. set values to 1
+            # 3. average all data in dict_data
 
-            datalist = [da_fc_verif, da_verdata_verif]
+
             # now calibrate if desired
             if self.calib and self.calib_exists == 'no':
-                da_fc_calib = data[2]
-                da_verdata_calib = data[3]
-                da_fc_verif_bc = self.calibrate(da_verdata_calib, da_fc_calib,
-                                                da_fc_verif,
+                da_fc_verif_bc = self.calibrate(dict_data['da_verdata_calib'], dict_data['da_fc_calib'],
+                                                dict_data['da_fc_verif'], dict_data['da_verdata_persistence'],
                                                 method=self.calib_method)
 
-                datalist += [da_fc_calib, da_verdata_calib, da_fc_verif_bc]
+                dict_data['da_fc_verif_bc'] = da_fc_verif_bc
 
-
-            if persistence:
-                datalist.append(da_persistence)
 
             # 2nd step
             utils.print_info(f'Setting all grid cells with sea ice > {sice_threshold} to 1')
-            datalist_thresh = [xr.where(d > sice_threshold, 1, 0) for d in datalist]
-            datalist = [datalist_thresh[d].where(~np.isnan(datalist[d])) for d in range(len(datalist))]
-
+            dict_data_thresh = {k: (xr.where(v > sice_threshold, 1, 0) if v is not None else v) for k, v in dict_data.items()}
+            dict_data = {k: (dict_data_thresh[k].where(~np.isnan(v)) if v is not None else v) for k, v in dict_data.items()}
 
 
 
             if 'edge' in self.plottype:
-                utils.print_info('Edge detection algorithm')
-                da_verdata_verif_ice_edge = mutils.detect_edge(da_verdata_verif, None)
-                da_verdata_verif_ice_ext_edge = mutils.detect_extended_edge(da_verdata_verif_ice_edge)
-                datalist = [d.where(da_verdata_verif_ice_ext_edge == 1) for d in datalist]
+                raise ValueError('EDGE NOT IMPLEMENTED YET')
+                # utils.print_info('Edge detection algorithm')
+                # da_verdata_verif_ice_edge = mutils.detect_edge(da_verdata_verif, None)
+                # da_verdata_verif_ice_ext_edge = mutils.detect_extended_edge(da_verdata_verif_ice_edge)
+                # datalist = [d.where(da_verdata_verif_ice_ext_edge == 1) for d in datalist]
 
 
             # 3rd
             if self.area_statistic_kind == 'data':
-                datalist, lsm = self.calc_area_statistics(datalist, lsm_full,
+                dict_data, lsm = self.calc_area_statistics_dict(dict_data, lsm_full,
                                                       statistic=self.area_statistic_function)
                 dict_out['lsm'] = lsm
 
 
-            dict_out['da_fc_verif'] = datalist[0]
-            dict_out['da_verdata_verif'] = datalist[1]
-
-            if self.calib and self.calib_exists == 'no':
-                dict_out['da_fc_calib'] = datalist[2]
-                dict_out['da_verdata_calib'] = datalist[3]
-                dict_out['da_fc_verif_bc'] = datalist[4]
-
-
-            if persistence:
-                dict_out['da_verdata_persistence'] = datalist[-1]
-                if self.plottype == 'ice_extent':
-                    dict_out['da_verdata_verif_raw'] = datalist[-2]
-
-            if self.plottype == 'ice_extent':
-                da_verdata_verif_raw_thresh = xr.where(da_verdata_verif_raw > sice_threshold, 1, 0)
-                da_verdata_verif_raw_thresh = da_verdata_verif_raw_thresh.where(~np.isnan(da_verdata_verif_raw))
-                lsm_obs, _ = self.mask_lsm_new(da_verdata_verif_raw, da_verdata_verif_raw)
-                data_raw, _ = self.calc_area_statistics([da_verdata_verif_raw_thresh], lsm_obs,
-                                                          statistic=self.area_statistic_function)
-                dict_out['da_verdata_verif_raw'] = data_raw[0]
-
         else:
-            # 1. use datalist directly
-            # 2. average all data in list
+            # 1. average all data in dict
             # 2. calibrate
 
-            datalist = data
-
             if 'edge' in self.plottype:
-                utils.print_info('Edge detection algorithm')
-                da_verdata_verif_ice_edge = mutils.detect_edge(da_verdata_verif)
-                da_verdata_verif_ice_ext_edge = mutils.detect_extended_edge(da_verdata_verif_ice_edge)
-                datalist = [d.where(da_verdata_verif_ice_ext_edge == 1) for d in datalist]
+                raise ValueError('EDGE NOT IMPLEMENTED YET')
+                # utils.print_info('Edge detection algorithm')
+                # da_verdata_verif_ice_edge = mutils.detect_edge(da_verdata_verif)
+                # da_verdata_verif_ice_ext_edge = mutils.detect_extended_edge(da_verdata_verif_ice_edge)
+                # datalist = [d.where(da_verdata_verif_ice_ext_edge == 1) for d in datalist]
 
 
             # derive area statistics if desired for data itself
             if self.area_statistic_kind == 'data':
-                datalist, lsm = self.calc_area_statistics(datalist, lsm_full,
-                                                      statistic=self.area_statistic_function)
+                dict_data, lsm = self.calc_area_statistics_dict(dict_data, lsm_full,
+                                                                statistic=self.area_statistic_function)
                 dict_out['lsm'] = lsm
 
-            # reassign data list items to individual xarray objects
-            da_fc_verif = datalist[0]
-            da_verdata_verif = datalist[1]
-            dict_out['da_verdata_verif'] = da_verdata_verif
-            dict_out['da_fc_verif'] = da_fc_verif
 
             # now calibrate if desired
             if self.calib and self.calib_exists == 'no':
-                da_fc_calib = datalist[2]
-                da_verdata_calib = datalist[3]
-                da_fc_verif_bc = self.calibrate(da_verdata_calib, da_fc_calib,
-                                                da_fc_verif,
+                da_fc_verif_bc = self.calibrate(dict_data['da_verdata_calib'], dict_data['da_fc_calib'],
+                                                dict_data['da_fc_verif'], dict_data['da_verdata_persistence'],
                                                 method=self.calib_method)
 
-                dict_out['da_fc_verif_bc'] = da_fc_verif_bc
-                dict_out['da_verdata_calib'] = da_verdata_calib
-                dict_out['da_fc_calib'] = da_fc_calib
+                dict_data['da_fc_verif_bc'] = da_fc_verif_bc
 
-
-
-            if persistence:
-                dict_out['da_verdata_persistence'] = datalist[-1]
-
+        dict_out = {**dict_out, **dict_data}
         # return this array as it definitely still has all attributes needed for plotting
         dict_out['da_coords'] = da_coords
 
         return dict_out
 
 
-    def calibrate(self, da_verdata_calib, da_fc_calib, da_fc_verif, method=None):
+    def calibrate(self, da_verdata_calib, da_fc_calib, da_fc_verif, da_pers, method=None):
         """
         Apply calibration to forecast to be verified
         :param da_verdata_calib: calibration observation data
@@ -994,13 +1023,19 @@ class BaseMetric(dataobjects.DataObject):
         :return: calibrated forecast
         """
         utils.print_info(f'Calibrating using method: {method}')
-        allowed_methods = ['mean', 'mean+trend','anom','score']
+        allowed_methods = ['mean', 'mean+trend','anom','score','persistence']
+
+
         if method not in allowed_methods:
             raise ValueError(f'Method calibration needs to be one of {allowed_methods}')
 
         if method == 'score':
             return da_fc_verif
 
+        if method == 'persistence':
+            correction = da_fc_verif.isel(time=0) - da_pers
+            fc_verif_bc = da_fc_verif - correction
+            return fc_verif_bc.clip(0,1)
 
         if method in ('mean' , 'anom'):
             for dim in ['inidate', 'date','member']:
@@ -1017,7 +1052,7 @@ class BaseMetric(dataobjects.DataObject):
                 utils.print_info('Calibration anomalies')
                 fc_verif_bc = da_fc_verif - da_fc_calib
 
-            return fc_verif_bc
+            return fc_verif_bc.clip(0,1)
 
 
         if method == 'mean+trend':
@@ -1036,11 +1071,12 @@ class BaseMetric(dataobjects.DataObject):
 
             da_slope, da_intercept, da_pvalue = mutils.compute_linreg(bias_calib)
 
-            years_calib = np.arange(int(self.calib_fromyear), int(self.calib_toyear) + 100)
+
+            years_calib = np.arange(int(self.calib_fromyear[0]), int(self.calib_toyear[0]) + 100)
 
 
-            if self.verif_fromyear is not None:
-                years_verif = np.arange(int(self.verif_fromyear), int(self.verif_toyear)+1)
+            if self.verif_fromyear[0] is not None:
+                years_verif = np.arange(int(self.verif_fromyear[0]), int(self.verif_toyear[0])+1)
             else:
                 verif_year = self.verif_dates[0][:4]
                 years_verif = np.arange(int(verif_year), int(verif_year) + 1)
@@ -1049,14 +1085,23 @@ class BaseMetric(dataobjects.DataObject):
             orgdates = da_fc_verif['date'].values[:]
             da_fc_verif['date'] = years_verif_int
 
+
             correction = da_slope*da_fc_verif['date'] + da_intercept
             fc_verif_bc = da_fc_verif - correction
             fc_verif_bc['date'] = orgdates
             fc_verif_bc = fc_verif_bc.squeeze()
 
-            return fc_verif_bc
+            return fc_verif_bc.clip(0,1)
 
     def get_save_calibration_file(self, ds=None):
+        """
+        Retrieve or save calibration file of metric
+        :param ds: if None then load existing calibration file else
+        save file
+        :return: xarray with calibration if ds is None
+        """
+
+
         filename = f'{self.plottype}_{self.verif_source[0]}_'
         if self.verif_modelname[0] is not None:
             filename += f'{self.verif_modelname[0]}_'

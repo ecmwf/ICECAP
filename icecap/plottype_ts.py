@@ -109,6 +109,7 @@ class TsPlot(plottypes.GenericPlot):
             for _vi, _var in enumerate(var_list):
                 _ds_file_var = _ds_file[_var]
 
+
                 if 'obs' in _var:
                     color='k'
                 else:
@@ -382,6 +383,13 @@ class TsPlot(plottypes.GenericPlot):
             else:
                 _title += f' combined dates init-time {_init_time} ' \
                           f' ({_years})'
+        else:
+            _init_time = self.verif_dates[0]
+            _title += f' init-time {_init_time}'
+            # if self.calib:
+            #     _title += f'\n calibrated using {self.conf_calib_dates}'
+            # if self.calib_fromyear:
+            #     _title += f' averaged from {self.calib_fromyear} to {self.calib_toyear}'
 
         return _title
     def _create_title_OLD(self):
