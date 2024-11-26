@@ -59,11 +59,11 @@ config_optnames = {
     'ecflow': {
         'ecfhomeroot': {
             'printname': 'Root directory for ecFlow-generated files (ECF_HOME)',
-            'optional' : False,
+            'optional' : ['ecflow:yes'],
         },
         'ecflow_host': {
             'printname': 'ecflow hostname',
-            'optional' : False
+            'optional' : ['ecflow:yes']
         },
         'ecflow_port': {
             'printname': 'ecflow host port',

@@ -623,11 +623,26 @@ class BaseMetric(dataobjects.DataObject):
 
         if isinstance(result, list):
             for fi, file in enumerate(result):
+
                 utils.print_info(f'Saving metric file {_ofile.replace(".nc",f"_{fi}.nc")}')
-                file.load().to_netcdf(_ofile.replace('.nc',f'_{fi}.nc'))
+                file_save = file.load()
+                file_save = file_save.drop([i for i in file_save.coords
+                                         if i not in list(file_save.dims) + ['longitude', 'latitude']])
+                enc = {}
+                for var in list(file_save.coords) + list(file_save.data_vars):
+                    enc[var] = {'_FillValue': None}
+                file_save.to_netcdf(_ofile.replace('.nc',f'_{fi}.nc'),
+                                    encoding=enc)
         else:
             utils.print_info(f'Saving metric file {_ofile}')
-            result.load().to_netcdf(_ofile)
+            file_save = result.load()
+            file_save = file_save.drop([i for i in file_save.coords
+                                    if i not in list(file_save.dims) + ['longitude', 'latitude']])
+            enc = {}
+            for var in list(file_save.coords)+list(file_save.data_vars):
+                enc[var] = {'_FillValue': None}
+
+            file_save.to_netcdf(_ofile, encoding=enc)
     def gettype(self):
         """ Determine typ of plot (timeseries or mapplot) """
         if self.area_statistic or self.plottype in ['ice_distance']:

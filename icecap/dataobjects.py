@@ -320,99 +320,100 @@ class ForecastConfigObject:
         self.fromyear = kwargs['fromyear']
         self.toyear = kwargs['toyear']
 
-        _dates_list = utils.confdates_to_list(self.dates)
+        if 'minimal' not in kwargs:
+            _dates_list = utils.confdates_to_list(self.dates)
 
-        # dates are given as YYYYMMDD
-        if len(_dates_list[0]) == 8:
-            self.sdates = _dates_list
-            self.dtdates = [utils.string_to_datetime(d) for d in self.sdates ]
+            # dates are given as YYYYMMDD
+            if len(_dates_list[0]) == 8:
+                self.sdates = _dates_list
+                self.dtdates = [utils.string_to_datetime(d) for d in self.sdates ]
 
-            # add previous day for persistence calculation
-            prev_day = self.dtdates[0] - relativedelta(days=1)
-            self.dtdates_all = [prev_day] + self.dtdates
-
-
-        # for hindcast mode dates need to be given in MMDD format
-        # for hc we need hc reference dates as well as
-        # a loop variable, as the reference date might be equivalent for different forecasts dates, e.g. for S2S
-        if self.mode == 'hc':
-            if len(_dates_list[0]) != 4:
-                raise ValueError('Dates need to be specified in MMDD format together '
-                                 'with fromyear and toyear if mode = hc')
-
-            _dates_list_ref = utils.confdates_to_list(self.hcrefdate)
-
-            if len(_dates_list_ref[0]) != 8:
-                raise ValueError('hcrefdate needs to be in the format YYYYMMDD')
-            if len(_dates_list_ref) == 1:
-                _dates_list_ref = [_dates_list_ref[0] for _d in range(len(_dates_list))]
-            elif len(_dates_list_ref) != len(_dates_list):
-                raise ValueError('hcrefdate must have length 1 or the same length '
-                                 'as dates')
+                # add previous day for persistence calculation
+                prev_day = self.dtdates[0] - relativedelta(days=1)
+                self.dtdates_all = [prev_day] + self.dtdates
 
 
-            self.dthcrefdate = [dt.datetime.strptime(d, '%Y%m%d') for d in _dates_list_ref]
-            self.shcrefdate = [d.strftime('%Y%m%d') for d in self.dthcrefdate]
-            self.shcrefdate_loop = [f'{self.shcrefdate[i]}-{i + 1}'
-                                    for i in range(len(self.shcrefdate))]
-
-
-        # dates given in MMDD format + fromyear/toyear
-        if len(_dates_list[0]) == 4:
-            if not self.fromyear or not self.toyear:
-                raise ValueError('fromyear and toyear need to be specified if date is given as MMDD')
-
-            # for hindcast mode we need to store hindcast dates as dt and string dictionaries
-            # this is as the keys of these dictionary are defined bu the loopvariable created earlier
+            # for hindcast mode dates need to be given in MMDD format
+            # for hc we need hc reference dates as well as
+            # a loop variable, as the reference date might be equivalent for different forecasts dates, e.g. for S2S
             if self.mode == 'hc':
-                hc_date_dict = {}
-                shc_date_dict = {}
+                if len(_dates_list[0]) != 4:
+                    raise ValueError('Dates need to be specified in MMDD format together '
+                                     'with fromyear and toyear if mode = hc')
 
-            _dates_list_yyyymmdd = []
-            _dates_list_yyyymmdd_all = []
-            for di, date in enumerate(_dates_list):
-                _dates_tmp = [f'{_year}{date}' for _year in range(int(getattr(self, 'fromyear')),
-                                                                  int(getattr(self, 'toyear')) + 1)]
+                _dates_list_ref = utils.confdates_to_list(self.hcrefdate)
 
-
-
-                # remove dates which are not defined, e.g. 29.2 for non-leap years
-                _dates = []
-                _dates_all = []
-                for d in _dates_tmp:
-                    try:
-                        _dates.append(dt.datetime.strptime(d, '%Y%m%d'))
-                    except:
-                        pass
-                if _dates:
-                    # dates including previous day for persistence scores
-                    dtdates_prev = [ fcday - relativedelta(days=1) for fcday in _dates] + _dates
-
-                    _dates_list_yyyymmdd += _dates
-                    _dates_list_yyyymmdd_all += dtdates_prev  # _dates
-                    if self.mode == 'hc':
-                        hc_date_dict[self.shcrefdate_loop[di]] = _dates
-                        shc_date_dict[self.shcrefdate_loop[di]] = [d.strftime('%Y%m%d') for d in _dates]
-
-                else:
-                    utils.print_info(f'No forecasts for Date {date}')
-
-            self.dtdates = _dates_list_yyyymmdd
-            self.sdates = [d.strftime('%Y%m%d') for d in self.dtdates]
-            self.dtdates_all = _dates_list_yyyymmdd_all
+                if len(_dates_list_ref[0]) != 8:
+                    raise ValueError('hcrefdate needs to be in the format YYYYMMDD')
+                if len(_dates_list_ref) == 1:
+                    _dates_list_ref = [_dates_list_ref[0] for _d in range(len(_dates_list))]
+                elif len(_dates_list_ref) != len(_dates_list):
+                    raise ValueError('hcrefdate must have length 1 or the same length '
+                                     'as dates')
 
 
-            if self.mode == 'hc':
-                self.hcdates = hc_date_dict
-                self.shcdates = shc_date_dict
+                self.dthcrefdate = [dt.datetime.strptime(d, '%Y%m%d') for d in _dates_list_ref]
+                self.shcrefdate = [d.strftime('%Y%m%d') for d in self.dthcrefdate]
+                self.shcrefdate_loop = [f'{self.shcrefdate[i]}-{i + 1}'
+                                        for i in range(len(self.shcrefdate))]
 
 
-        # all forecast days calculated from init-day + ndays parameter
-        #self.dtalldates = utils.make_days_datelist(self.dtdates, self.ndays)
-        #self.dtalldates = utils.make_days_datelist(self.dtdates, self.ndays)
-        self.dtalldates = utils.make_days_datelist(self.dtdates_all, self.ndays)
-        self.salldates = sorted(list(dict.fromkeys([d.strftime('%Y%m%d')
-                                                    for d in self.dtalldates])))
+            # dates given in MMDD format + fromyear/toyear
+            if len(_dates_list[0]) == 4:
+                if not self.fromyear or not self.toyear:
+                    raise ValueError('fromyear and toyear need to be specified if date is given as MMDD')
+
+                # for hindcast mode we need to store hindcast dates as dt and string dictionaries
+                # this is as the keys of these dictionary are defined bu the loopvariable created earlier
+                if self.mode == 'hc':
+                    hc_date_dict = {}
+                    shc_date_dict = {}
+
+                _dates_list_yyyymmdd = []
+                _dates_list_yyyymmdd_all = []
+                for di, date in enumerate(_dates_list):
+                    _dates_tmp = [f'{_year}{date}' for _year in range(int(getattr(self, 'fromyear')),
+                                                                      int(getattr(self, 'toyear')) + 1)]
+
+
+
+                    # remove dates which are not defined, e.g. 29.2 for non-leap years
+                    _dates = []
+                    _dates_all = []
+                    for d in _dates_tmp:
+                        try:
+                            _dates.append(dt.datetime.strptime(d, '%Y%m%d'))
+                        except:
+                            pass
+                    if _dates:
+                        # dates including previous day for persistence scores
+                        dtdates_prev = [ fcday - relativedelta(days=1) for fcday in _dates] + _dates
+
+                        _dates_list_yyyymmdd += _dates
+                        _dates_list_yyyymmdd_all += dtdates_prev  # _dates
+                        if self.mode == 'hc':
+                            hc_date_dict[self.shcrefdate_loop[di]] = _dates
+                            shc_date_dict[self.shcrefdate_loop[di]] = [d.strftime('%Y%m%d') for d in _dates]
+
+                    else:
+                        utils.print_info(f'No forecasts for Date {date}')
+
+                self.dtdates = _dates_list_yyyymmdd
+                self.sdates = [d.strftime('%Y%m%d') for d in self.dtdates]
+                self.dtdates_all = _dates_list_yyyymmdd_all
+
+
+                if self.mode == 'hc':
+                    self.hcdates = hc_date_dict
+                    self.shcdates = shc_date_dict
+
+
+            # all forecast days calculated from init-day + ndays parameter
+            #self.dtalldates = utils.make_days_datelist(self.dtdates, self.ndays)
+            #self.dtalldates = utils.make_days_datelist(self.dtdates, self.ndays)
+            self.dtalldates = utils.make_days_datelist(self.dtdates_all, self.ndays)
+            self.salldates = sorted(list(dict.fromkeys([d.strftime('%Y%m%d')
+                                                        for d in self.dtalldates])))
 
 
 
@@ -458,3 +459,8 @@ class PlotConfigObject:
         self.calib_method = kwargs['calib_method']
         self.calib_exists = kwargs['calib_exists']
         self.copy_id = kwargs['copy_id']
+
+    @property
+    def source(self):
+        """ Define verif_source and set to source --> needed for jupyter notebook"""
+        return self.verif_source

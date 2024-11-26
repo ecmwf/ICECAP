@@ -23,6 +23,7 @@ def plot_api(conf, args):
     m.compute()
     m.save()
 
+
     if m.gettype() == 'map':
         p = plottype_map.MapPlot(conf, args.plotid, m)
     elif m.gettype() == 'ts':

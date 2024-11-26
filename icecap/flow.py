@@ -1,5 +1,5 @@
-""" generate software flow by generating a flow-like strusture
-which is later translated into an ecflow suiate or batch mode """
+""" generate software flow by generating a flow-like structure
+which is later translated into an ecflow suite """
 
 from collections import OrderedDict
 import json

@@ -37,14 +37,20 @@ def icecap_api(conf, args):
         if conf.ecflow == 'yes':
             flow.wipe_ecflow_host(args.wipe)
 
-    else:
+
+    elif conf.ecflow == 'yes':
         execution_host.setup(args)
-        if conf.ecflow == 'yes':
-            if args.verbose:
-                flow.to_json()
-            flow.build_ecflow()
-            flow.save_defs(force=args.force)
-            flow.load_ecflow(force=args.force)
+        if args.verbose:
+            flow.to_json()
+        flow.build_ecflow()
+        flow.save_defs(force=args.force)
+        flow.load_ecflow(force=args.force)
+
+    elif conf.ecflow == 'no':
+        execution_host.setup(args)
+        ofiles = flow.execute(args)
+        return ofiles
+
 
 if __name__ == '__main__':
     args = parser.parse_args()

@@ -7,6 +7,7 @@ import shutil
 import ecmwf
 import utils
 import flow
+import flow_sequential
 
 def create_flow(conf):
     """
@@ -14,12 +15,13 @@ def create_flow(conf):
     :param conf: configuration object
     :return: flow object
     """
-    if conf.machine is None:
-        return flow.ProcessTree(conf)
-    elif conf.machine == 'ecmwf':
-        return ecmwf.EcmwfTree(conf)
-    elif conf.machine == 'jupyter':
-        return
+    if conf.ecflow == 'yes':
+        if conf.machine is None:
+            return flow.ProcessTree(conf)
+        elif conf.machine == 'ecmwf':
+            return ecmwf.EcmwfTree(conf)
+    else:
+        return flow_sequential.ProcesstreeSequential(conf)
 
     raise ValueError(f'Machine name {conf.machine} is not allowed. ')
 

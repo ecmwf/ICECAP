@@ -147,8 +147,8 @@ class MapPlot(plottypes.GenericPlot):
 
 
 
-                    if 'member' in _data.dims:
-                        _data = _data.mean(dim='member')
+                    # if 'member' in _data.dims:
+                    #     _data = _data.mean(dim='member')
 
 
 
@@ -321,7 +321,7 @@ class MapPlot(plottypes.GenericPlot):
                         ofile = utils.csv_to_list(self.ofile)[_vi]
                     ofiles_return.append(ofile)
                     print(ofile)
-                    thisfig.savefig(ofile)
+                    thisfig.savefig(ofile, bbox_inches='tight')
                     plt.close(thisfig)
         return ofiles_return
 
@@ -379,8 +379,8 @@ class MapPlot(plottypes.GenericPlot):
 
             if yymm_format:
                 _next_year = [1 if d.year > 2000 else 0 for d in _dates_dt_target]
-                _verif_fromyear += _next_year[0]
-                _verif_toyear += _next_year[1]
+                _verif_fromyear = _next_year[0]
+                _verif_toyear = _next_year[1]
                 _target_time = [utils.datetime_to_string(d, '%m-%d') for d in _dates_dt_target]
             else:
                 _target_time = [utils.datetime_to_string(d, '%Y-%m-%d') for d in _dates_dt_target]

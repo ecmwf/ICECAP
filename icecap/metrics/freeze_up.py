@@ -212,6 +212,7 @@ class Metric(BaseMetric):
 
             data_plot.append(da_fc_calib_early_bss.rename('bss_fc_early_noplot'))
             data_plot.append(da_fc_calib_late_bss.rename('bss_fc_late_noplot'))
+            data_plot.append(da_fc_verif_metric.rename('da_verif_dates_noplot'))
 
 
         data_plot = utils.set_xarray_attribute(data_plot, processed_data_dict['da_coords'],
