@@ -138,7 +138,6 @@ class Configuration():
         self.calib_toyear = None
         self.points = None
         self.add_verdata = None
-        self.add_verdata_nomask = None
         self.ofile = None
         self.verif_modelname = None
         self.plot_shading = None
@@ -287,7 +286,6 @@ class Configuration():
                 calib_toyear=self.calib_toyear,
                 ofile=self.ofile,
                 add_verdata=self.add_verdata,
-                add_verdata_nomask = self.add_verdata_nomask,
                 points=self.points,
                 verif_modelname=self.verif_modelname,
                 area_statistic = self.area_statistic,

@@ -449,7 +449,6 @@ class PlotConfigObject:
         self.ofile = kwargs['ofile']
         self.points = kwargs['points']
         self.add_verdata = kwargs['add_verdata']
-        self.add_verdata_nomask = kwargs['add_verdata_nomask']
         self.verif_modelname = kwargs['verif_modelname']
         self.area_statistic = kwargs['area_statistic']
         self.temporal_average = kwargs['temporal_average']

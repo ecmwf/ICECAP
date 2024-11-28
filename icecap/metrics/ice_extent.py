@@ -61,10 +61,6 @@ class Metric(BaseMetric):
             da_verdata_verif = processed_data_dict['da_verdata_verif'].squeeze()
             data_plot.append(da_verdata_verif.rename(self.verif_name))
 
-        if self.add_verdata_nomask == 'yes':
-            da_verdata_verif = processed_data_dict['da_verdata_verif_raw'].squeeze()
-            data_plot.append(da_verdata_verif.rename(f'{self.verif_name} (no masking)'))
-
 
 
         # set projection attributes

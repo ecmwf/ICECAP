@@ -47,7 +47,7 @@ The user can select:
 <li>the region for which to compute the sea ice extent. This can be either done using </li>
     <ol>
         <li> <i>region extent</i> (format: longitude west, longitude east, latitude south, latitude north) </li>
-        <li> <i>nsidc region</i> (selecting one of the predefied regions from the menu) </li>
+        <li> <i>nsidc region</i> (selecting one of the predefied regions from the menu). This menu shows only if nsidc region files are available </li>
     </ol>
 </ol>
 

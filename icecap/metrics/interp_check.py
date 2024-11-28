@@ -27,4 +27,4 @@ class Metric(BaseMetric):
         if 'xc' in fc_native_select.dims:
             fc_native_select = fc_native_select.rename({'xc': 'xc_native', 'yc': 'yc_native'})
 
-        self.result = [fc_regrid_select, fc_native_select]
+        self.result = [fc_regrid_select.to_dataset(), fc_native_select.to_dataset()]

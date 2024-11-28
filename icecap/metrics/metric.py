@@ -82,10 +82,6 @@ class BaseMetric(dataobjects.DataObject):
 
 
         self.add_verdata = conf.plotsets[name].add_verdata
-        self.add_verdata_nomask = conf.plotsets[name].add_verdata_nomask
-
-
-
 
 
         self.area_statistic = conf.plotsets[name].area_statistic
@@ -161,14 +157,10 @@ class BaseMetric(dataobjects.DataObject):
         if self.inset_position is None:
             self.inset_position = '2'
 
-        if self.add_verdata_nomask == 'yes' and self.plottype != 'ice_extent':
-            utils.print_info('Setting add_verdata_nomask is only possible for ice_extent')
-            self.add_verdata_nomask = 'no'
 
         if self.add_verdata is None:
             self.add_verdata = 'no'
-        if self.add_verdata_nomask is None:
-            self.add_verdata_nomask = 'no'
+
 
 
         if self.points is not None:

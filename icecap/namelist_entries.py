@@ -286,10 +286,6 @@ config_optnames = {
             'printname' : 'add observations to plot',
             'optional' : True
         },
-        'add_verdata_nomask' : {
-            'printname' : 'add non-masked observations to plot (only ice_extent)',
-            'optional' : True,
-        },
         'points' : {
             'printname' : 'points to be used for ice distance calculation',
             'optional' : ['plottype:ice_distance']

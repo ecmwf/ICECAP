@@ -137,7 +137,13 @@ class Icecap:
             elif 'ice_extent' == self.conf.plotsets['001'].plottype:
                 needed_opts = ['verif_expname_fct', 'verif_dates_fct','region_extent_fct','nsidc_region_fct']
             else:
-                utils.print_info(f'ERROR: Plottype must be one of {allowed_plottypes}')
+                raise NotImplementedError(f'ERROR: Plottype must be one of {allowed_plottypes}')
+
+            # check if nsidc nc files are in sourcedir/etc...otherwise don't show nsidc box
+            if 'nsidc_region_fct' in needed_opts:
+                if not os.path.exists(f'{self.conf.sourcedir}/etc/nsidc_{self.conf.verdata}.nc'):
+                    utils.print_info('No NSIDC region files found')
+                    needed_opts = [n for n in needed_opts if n != 'nsidc_region_fct']
 
 
             for w in needed_opts:
@@ -380,7 +386,6 @@ class ConfigurationJupyter(config.Configuration):
             calib_toyear=self.calib_toyear,
             ofile=self.ofile,
             add_verdata=self.add_verdata,
-            add_verdata_nomask=self.add_verdata_nomask,
             points=self.points,
             verif_modelname=self.verif_modelname,
             area_statistic=self.area_statistic,

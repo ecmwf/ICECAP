@@ -145,8 +145,6 @@ class MapPlot(plottypes.GenericPlot):
                 for _step in _steps:
                     _data = _ds_file[_var].sel(time=_step)
 
-
-
                     # if 'member' in _data.dims:
                     #     _data = _data.mean(dim='member')
 

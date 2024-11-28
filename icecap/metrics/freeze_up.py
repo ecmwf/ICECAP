@@ -73,13 +73,19 @@ class Metric(BaseMetric):
         # mask_always_ice = xr.where(ds.min(dim=('time', 'member')) >= threshold, np.nan, 1)
         mask_ice_member = xr.where(ds.isel(time=0) == 1, np.nan, 1)
 
-        # mask ds_water usign all masks above
+        # mask ds_water using all masks above
         ds_mask_all = mask_water_member * mask_ice_member
         ds_water_masked = xr.where(ds_mask_all == 1, ds_water, 0)
+
+        # observations can have nan values. We put them back in here and assume that they are ice
+        ds_water_masked = xr.where(~np.isnan(ds), ds_water_masked, np.nan)
+        ds_water_masked = xr.where(xr.where(np.isnan(ds), 1, 0).mean(dim='time') == 1, 0, ds_water_masked)
+
 
         # this finds the first instance where the field is 0 (meaning > threshold)
         # we have to subtract 1 to get the date of ice free conditions
         ds_fc_day = ds_water_masked.argmin(dim='time')
+
 
         # set ice mask entries to -300 and water entries to -200
         ds_fc_day = xr.where((mask_ice_member) == 1, ds_fc_day, np.nan)
@@ -107,8 +113,11 @@ class Metric(BaseMetric):
         lsm_full = processed_data_dict['lsm_full']
 
         da_fc_verif = processed_data_dict['da_fc_verif'].mean(dim='date')
+        da_verdata_verif = processed_data_dict['da_verdata_verif'].mean(dim='date')
+
 
         da_fc_verif_metric, mask_water, mask_ice = self.freeze_up(da_fc_verif)
+        da_verdata_verif_metric, mask_water, mask_ice = self.freeze_up(da_verdata_verif)
 
         if self.calib:
             if self.calib_exists == 'yes':
@@ -116,6 +125,8 @@ class Metric(BaseMetric):
 
                 da_fc_calib_metric_upper = ds_calib['da_fc_calib_metric_upper']
                 da_fc_calib_metric_lower = ds_calib['da_fc_calib_metric_lower']
+                da_verdata_calib_metric_upper = ds_calib['da_verdata_calib_metric_upper']
+                da_verdata_calib_metric_lower = ds_calib['da_verdata_calib_metric_lower']
                 da_fc_calib_early_bss = ds_calib['da_fc_calib_early_bss']
                 da_fc_calib_late_bss = ds_calib['da_fc_calib_late_bss']
 
@@ -191,6 +202,18 @@ class Metric(BaseMetric):
             combine = xr.where(np.isnan(lsm_full), np.nan, combine)
             combine = combine.assign_attrs(da_fc_verif.attrs)
 
+            # derive probabilities using calib files for verdata
+            if self.add_verdata == 'yes':
+                early_verdata = xr.where(da_verdata_verif_metric < da_verdata_calib_metric_lower, 1, 0).mean(dim='member') * 100
+                late_verdata = xr.where(da_verdata_verif_metric > da_verdata_calib_metric_upper, 1, 0).mean(dim='member') * 100
+
+                combine_verdata = xr.where(late_verdata > early_verdata, late_verdata, early_verdata * -1)
+                combine_verdata = xr.where(mask_water_all, -101, combine_verdata)
+                combine_verdata = xr.where(mask_ice_all, 101, combine_verdata)
+                combine_verdata = xr.where(np.isnan(lsm_full), np.nan, combine_verdata)
+                combine_verdata = combine_verdata.assign_attrs(da_fc_verif.attrs).squeeze()
+                data_plot.append(combine_verdata.rename(f'{self.verif_name}'))
+                data_plot.append(da_verdata_verif_metric.rename('da_vedata_verif_dates_noplot'))
 
 
             fc_name = self.verif_expname[0]
@@ -201,7 +224,7 @@ class Metric(BaseMetric):
             data_plot.append(da_fc_calib_metric_upper.rename('upper_q_calib_noplot'))
             data_plot.append(da_fc_calib_metric_lower.rename('lower_q_calib_noplot'))
 
-            # these are masked BSS fileds (using fc_verif mask for plotting)
+            # these are masked BSS fields (using fc_verif mask for plotting)
             da_fc_calib_early_bss = xr.where(mask_water_all, -101, da_fc_calib_early_bss)
             da_fc_calib_early_bss = xr.where(mask_ice_all, 101, da_fc_calib_early_bss)
             da_fc_calib_early_bss = xr.where(np.isnan(lsm_full), np.nan, da_fc_calib_early_bss)
