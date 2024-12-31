@@ -18,6 +18,7 @@ class Metric(BaseMetric):
         self.legendtext = 'BSS'
         self.ylabel = 'BSS'
         self.levels = np.arange(-1, 1.1, .1)
+        self.levels = np.delete(self.levels, [10])
         self.default_cmap = 'bwr'
         self.use_dask = True
 
@@ -75,7 +76,7 @@ class Metric(BaseMetric):
         data_plot += [
             da_fc_verif_bs.rename('noplot_fc_bs'),
             da_persistence_bs.rename('noplot_pers_bs'),
-            da_fc_verif_bss.rename('fc_bss')
+            da_fc_verif_bss.rename(f'{self.title_fcname}')
         ]
 
         # set projection attributes
@@ -84,7 +85,7 @@ class Metric(BaseMetric):
                                                          'true_scale_latitude'])
 
         data_xr = xr.merge(data_plot)
-        data_xr = data_xr.assign_attrs({'fc_bss-map_plot': 'pcolormesh'})
+
 
 
         self.result = data_xr

@@ -16,12 +16,12 @@ class Metric(BaseMetric):
         self.use_metric_name = True
         self.plottext = f'bias to {self.verif_name}'
         self.legendtext = 'bias'
-        self.default_cmap = 'bwr'
-        self.levels = np.arange(-1.05, 1.15, .1)
-        self.levels = [-.25, -.2, -.15, -.1, -.05, .05, .1, .15, .2, .25]
-        self.default_cmap = 'RdBu_r'
+        self.levels = np.arange(-1,1.1,.1)
+        self.levels = np.delete(self.levels,10)
+        self.default_cmap = 'RdBu'
         self.ylabel = 'sic'
         self.use_dask = True
+        self.clip = False
 
     def compute(self):
         """ Compute metric """
@@ -33,7 +33,7 @@ class Metric(BaseMetric):
         if self.temporal_average_type is not None:
             self.temporal_average_type = 'data'
 
-        average_dims = ['member','inidate']
+        average_dims = None
         persistence = True
 
         processed_data_dict = self.process_data_for_metric(average_dims, persistence)
@@ -43,19 +43,19 @@ class Metric(BaseMetric):
         if 'lsm' in processed_data_dict:
             data_plot.append(processed_data_dict['lsm'])
         if self.calib:
-            da_fc_verif_plot = processed_data_dict['da_fc_verif_bc'].mean(dim='date')
+            da_fc_verif_plot = processed_data_dict['da_fc_verif_bc'].mean(dim=('date','member','inidate'))
         else:
-            da_fc_verif_plot = processed_data_dict['da_fc_verif'].mean(dim='date')
+            da_fc_verif_plot = processed_data_dict['da_fc_verif'].mean(dim=('date','member','inidate'))
 
-        da_verdata_verif = processed_data_dict['da_verdata_verif'].mean(dim='date')
+        da_verdata_verif = processed_data_dict['da_verdata_verif'].mean(dim=('date','member','inidate'))
         bias = (da_fc_verif_plot - da_verdata_verif).rename(f'{self.verif_expname[0]}')
 
         if persistence:
-            da_persistence = processed_data_dict['da_verdata_persistence'].mean(dim=('date'))
+            da_persistence = processed_data_dict['da_verdata_persistence'].mean(dim=('date','inidate'))
             bias_persistence = (da_persistence - da_verdata_verif).rename(f'{self.verif_expname[0]}')
 
         data_plot += [
-            bias.rename('fc_bias'),
+            bias.rename(f'{self.title_fcname}'),
             bias_persistence.rename('persistence')
         ]
 

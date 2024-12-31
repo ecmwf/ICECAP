@@ -58,7 +58,7 @@ topaz = Icecap('ice_area_maps_topaz5.conf')
 
 ```python
 """Execute this cell to plot result"""
-topaz.plot(maxcols=3, figsize=(16, 8))
+topaz.plot()
 ```
 
 <div class="alert alert-block alert-success"> <b>2nd Example: Seasonal forecasts retrieved from the Climate Data Store (CDS) </b><br>
@@ -77,6 +77,15 @@ cds = Icecap('ice_area_maps_cds.conf')
 
 ```python
 cds.plot()
+```
+
+```python
+import cdsapi
+```
+
+```python
+cdsapi.__v
+
 ```
 
 ```python

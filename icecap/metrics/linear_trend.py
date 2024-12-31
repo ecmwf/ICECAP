@@ -26,7 +26,7 @@ class Metric(BaseMetric):
         """ Compute metric """
 
 
-        average_dims = ['member','inidate']
+        average_dims = None
         persistence = False
 
         processed_data_dict = self.process_data_for_metric(average_dims, persistence)
@@ -41,9 +41,9 @@ class Metric(BaseMetric):
         else:
             da_fc_verif = processed_data_dict['da_fc_verif']
 
-        da_verdata_verif = processed_data_dict['da_verdata_verif']
+        da_verdata_verif = processed_data_dict['da_verdata_verif'].mean(dim=('member','inidate'))
 
-        data = [da_verdata_verif, da_fc_verif]
+        data = [da_verdata_verif.mean(dim=('member','inidate')), da_fc_verif]
         for di in range(len(data)):
             if 'xc' not in data[di].dims:
                 data[di] = data[di].expand_dims(['xc', 'yc'])

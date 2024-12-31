@@ -46,14 +46,11 @@ class Metric(BaseMetric):
         else:
             da_fc_verif = processed_data_dict['da_fc_verif'].squeeze()
 
-        fc_name = self.verif_expname[0]
-        if self.verif_modelname[0] is not None:
-            fc_name = f'{self.verif_modelname[0]} {fc_name}'
-        data_plot.append(da_fc_verif.rename(f'{fc_name}'))
+        data_plot.append(da_fc_verif.rename(f'{self.title_fcname}'))
 
         if self.add_verdata == "yes":
             da_verdata_verif = processed_data_dict['da_verdata_verif'].squeeze()
-            data_plot.append(da_verdata_verif.rename('obs'))
+            data_plot.append(da_verdata_verif.rename(self.verif_name))
 
 
         # set projection attributes
@@ -65,8 +62,8 @@ class Metric(BaseMetric):
 
         data_xr = xr.merge(data_plot)
 
-        data_xr = data_xr.assign_attrs({'obs-linecolor': 'k'})
-        data_xr = data_xr.assign_attrs({f'{self.verif_expname[0]}-linecolor': 'blue'})
+        data_xr = data_xr.assign_attrs({f'{self.verif_name}-linecolor': 'k'})
+        data_xr = data_xr.assign_attrs({f'{self.title_fcname}-linecolor': 'blue'})
 
 
         self.result = data_xr

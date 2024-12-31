@@ -1,4 +1,4 @@
-name: icecap
+name: %%ENVNAME%%
 channels:
   - conda-forge
   - defaults
@@ -38,13 +38,13 @@ dependencies:
   - brotli-python=1.1.0
   - bzip2=1.0.8
   - c-ares=1.23.0
-  - ca-certificates=2024.8.30
+  - ca-certificates=2024.12.14
   - cached-property=1.5.2
   - cached_property=1.5.2
   - cairo=1.18.0
   - cartopy=0.22.0
-  - cdsapi=0.6.1
-  - certifi=2024.8.30
+  - cdsapi=0.7.5
+  - certifi=2024.12.14
   - cf_xarray=0.8.6
   - cffi=1.16.0
   - cfgrib=0.9.10.4
@@ -61,6 +61,7 @@ dependencies:
   - cytoolz=0.12.2
   - dask=2023.12.0
   - dask-core=2023.12.0
+  - datapi=0.1.1
   - dbus=1.13.6
   - debugpy=1.8.9
   - decorator=5.1.1
@@ -247,6 +248,7 @@ dependencies:
   - mpi=1.0
   - mpich=4.1.2
   - msgpack-python=1.0.7
+  - multiurl=0.3.3
   - munkres=1.1.4
   - mysql-common=8.0.33
   - mysql-libs=8.0.33

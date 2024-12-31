@@ -53,8 +53,8 @@ class Metric(BaseMetric):
         data_plot = []
         data_plot.append(processed_data_dict['lsm_full'])
         data_plot.append(lsm)
-        data_plot.append(data[0].rename('fc_sps'))
-        data_plot.append(data[1].rename('persistence_sps'))
+        data_plot.append(data[0].rename(f'{self.title_fcname}'))
+        data_plot.append(data[1].rename('persistence'))
 
         # set projection attributes
         data_plot = utils.set_xarray_attribute(data_plot, processed_data_dict['da_coords'],

@@ -74,6 +74,10 @@ class Metric(BaseMetric):
         ds_mask_all = mask_water_member * mask_ice_member * mask_end_member
         ds_water_masked = xr.where(ds_mask_all==1, ds_water, 0)
 
+        # observations can have nan values. We put them back in here and assume that they are ice
+        ds_water_masked = xr.where(~np.isnan(ds), ds_water_masked, np.nan)
+        ds_water_masked = xr.where(xr.where(np.isnan(ds), 1, 0).mean(dim='time') == 1, 0, ds_water_masked)
+
         # change coordinate to increasing array and reverse xarray along time dim
         # this option preferred to reindex (https://github.com/pydata/xarray/discussions/6695)
         ds_water_masked_reverse = ds_water_masked.isel(time=slice(None, None, -1))
@@ -85,8 +89,8 @@ class Metric(BaseMetric):
         ds_fc_day = len(ds_water_masked_reverse.time.values) - ds_fc_day - 1
 
         # set ice mask entries to -300 and water entries to -200
-        ds_fc_day = xr.where((mask_ice_member * mask_end_member)==1,ds_fc_day,np.nan)
-        ds_fc_day = xr.where(mask_water_member == 1, ds_fc_day, np.nan)
+        ds_fc_day = xr.where((mask_ice_member * mask_end_member)==1,ds_fc_day,180)
+        ds_fc_day = xr.where(mask_water_member == 1, ds_fc_day, 0)
 
         # needed as xr.where does not preserve attributes
         ds_fc_day = ds_fc_day.assign_attrs(ds.attrs)
@@ -168,8 +172,8 @@ class Metric(BaseMetric):
                     da_verdata_calib_metric_upper.rename('da_verdata_calib_metric_upper'))
                 data_calib.append(
                     da_verdata_calib_metric_lower.rename('da_verdata_calib_metric_lower'))
-                data_calib.append(da_fc_calib_early_bss.rename('da_fc_calib_early_bss'))
-                data_calib.append(da_fc_calib_late_bss.rename('da_fc_calib_late_bss'))
+                data_calib.append(bs_fc_early.rename('da_fc_calib_early_bs'))
+                data_calib.append(bs_fc_late.rename('da_fc_calib_late_bs'))
                 data_calib = utils.set_xarray_attribute(data_calib, processed_data_dict['da_coords'],
                                                         params=['projection', 'central_longitude', 'central_latitude',
                                                                 'true_scale_latitude'])
@@ -223,11 +227,11 @@ class Metric(BaseMetric):
         cmd_all = []
 
         cmd_all.append(dict(attr_type='ax.text',
-                            x=1.3, y=.75, s='Prob (later than upper tercile)',
+                            x=1.3, y=.75, s='Prob (within upper tercile)',
                   transform='True', fontsize=12,
                   verticalalignment='center', rotation=90))
         cmd_all.append(dict(attr_type='ax.text',
-                            x=1.3, y=.25, s='Prob (earlier than upper tercile)',
+                            x=1.3, y=.25, s='Prob (within lower tercile)',
                             transform='True', fontsize=12,
                             verticalalignment='center', rotation=90))
         cmd_all.append(dict(attr_type='cb.set_label', label=self.legendtext))
@@ -237,6 +241,5 @@ class Metric(BaseMetric):
                           cmd.items()]
 
             data_xr = data_xr.assign_attrs({f'{fc_name}-{i}': cmd_list})
-        data_xr = data_xr.assign_attrs({f'{fc_name}-map_plot': 'pcolormesh'})
 
         self.result = data_xr

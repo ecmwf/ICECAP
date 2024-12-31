@@ -18,7 +18,8 @@ class Metric(BaseMetric):
         self.plottext = ''
         self.legendtext = 'CRPSS'
         self.ylabel = 'CRPSS'
-        self.levels = np.arange(-1.05, 1.1, .1)
+        self.levels = np.arange(-1, 1.1, .1)
+        self.levels = np.delete(self.levels, [10])
         self.default_cmap = 'bwr'
         self.use_dask = True
 
@@ -70,11 +71,10 @@ class Metric(BaseMetric):
         if 'lsm' in processed_data_dict:
             data_plot.append(processed_data_dict['lsm'])
 
-
         data_plot += [
             da_fc_verif_crps.rename('noplot_fc_crps'),
             da_persistence_crps.rename('noplot_pers_crps'),
-            da_fc_crpss.rename('fc_crpss'),
+            da_fc_crpss.rename(f'{self.title_fcname}'),
         ]
 
         # set projection attributes

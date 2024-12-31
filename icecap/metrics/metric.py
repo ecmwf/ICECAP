@@ -10,16 +10,14 @@ addition of new metrics as easy as possible.
 import os.path
 import calendar
 import datetime as dt
-import shutil
 import xarray as xr
 import numpy as np
 import pandas as pd
 
-
-import metrics.metric_utils as mutils
 import dataobjects
 import utils
 import forecast_info
+import metrics.metric_utils as mutils
 
 class BaseMetric(dataobjects.DataObject):
     """Generic Metric Object inherited by each specific metric"""
@@ -75,6 +73,7 @@ class BaseMetric(dataobjects.DataObject):
 
         # initialize metric arguments important for plotting
         self.clip = False
+        self.extend = 'neither'
         self.ofile = conf.plotsets[name].ofile
 
         self.use_dask = False
@@ -157,11 +156,11 @@ class BaseMetric(dataobjects.DataObject):
         if self.inset_position is None:
             self.inset_position = '2'
 
+        if self.calib_exists is None:
+            self.calib_exists = 'no'
 
         if self.add_verdata is None:
             self.add_verdata = 'no'
-
-
 
         if self.points is not None:
             tmp_points = utils.csv_to_list(self.points, ';')
@@ -253,12 +252,15 @@ class BaseMetric(dataobjects.DataObject):
             self.calib_fcsystem = self.verif_fcsystem
             self.fccalibsets = self._init_fc(name='calib')
 
-
+        self.title_fcname = self.verif_expname[0]
+        if self.verif_modelname[0] is not None:
+            self.title_fcname = f'{self.verif_modelname[0]}-sys{self.title_fcname}'
 
     def __str__(self):
         lines = [f'Metric file for {self.metricname}']
         for key, value in self.__dict__.items():
-            lines.append(' '.join([str(key),str(value)]))
+            if key not in ['result']:
+                lines.append(' '.join([str(key),str(value)]))
 
         return '\n  '.join(lines)
 
@@ -613,7 +615,7 @@ class BaseMetric(dataobjects.DataObject):
         result = self.result
 
 
-        if isinstance(result, list):
+        if isinstance(result, list) or isinstance(result, tuple):
             for fi, file in enumerate(result):
 
                 utils.print_info(f'Saving metric file {_ofile.replace(".nc",f"_{fi}.nc")}')
@@ -626,17 +628,20 @@ class BaseMetric(dataobjects.DataObject):
                 file_save.to_netcdf(_ofile.replace('.nc',f'_{fi}.nc'),
                                     encoding=enc)
         else:
-            utils.print_info(f'Saving metric file {_ofile}')
-            file_save = result.load()
-            file_save = file_save.drop([i for i in file_save.coords
-                                    if i not in list(file_save.dims) + ['longitude', 'latitude']])
-            enc = {}
-            for var in list(file_save.coords)+list(file_save.data_vars):
-                enc[var] = {'_FillValue': None}
+            if result is not None:
+                utils.print_info(f'Saving metric file {_ofile}')
+                file_save = result.load()
+                file_save = file_save.drop([i for i in file_save.coords
+                                        if i not in list(file_save.dims) + ['longitude', 'latitude']])
+                enc = {}
+                for var in list(file_save.coords)+list(file_save.data_vars):
+                    enc[var] = {'_FillValue': None}
 
-            file_save.to_netcdf(_ofile, encoding=enc)
+                file_save.to_netcdf(_ofile, encoding=enc)
     def gettype(self):
         """ Determine typ of plot (timeseries or mapplot) """
+        if self.plottype in ['calc_calib']:
+            return None
         if self.area_statistic or self.plottype in ['ice_distance']:
             return 'ts'
         else:
@@ -825,41 +830,7 @@ class BaseMetric(dataobjects.DataObject):
 
         return dict_data_out, ds_mask_reg.rename('lsm')
 
-
-    def mask_lsm(self, datalist):
-        """ Create land-sea mask from two datasets (usually observations and fc)
-        :param datalist: list of dataArrays (first two will be used to generate combined lsm)
-        :return: list masked dataArrays from datalist
-        """
-        ds_mask = mutils.create_combined_mask(datalist[0],
-                                             datalist[1])
-
-
-        if self.additional_mask:
-            utils.print_info('APPLYING ADDITIONAL MASK')
-            ds_additional_mask = xr.open_dataarray(self.additional_mask)
-
-            ds_mask = ds_mask.where(~np.isnan(ds_additional_mask))
-
-        datalist_mask = [d.where(~np.isnan(ds_mask.squeeze())) for d in datalist]
-
-        fcdata = datalist_mask[0]
-        for d in ['member','date']:
-            if d not in fcdata.dims:
-                fcdata = fcdata.expand_dims(d)
-        fcdata = fcdata.isel(member=0, date=0)
-
-        len1 = len(np.argwhere(~np.isnan(datalist_mask[0].isel(time=0).values)))
-        len2 = len(np.argwhere(~np.isnan(datalist_mask[1].isel(time=0).values)))
-        # if len1 != len2:
-        #     raise ValueError(f'Masking produces observations and forecasts with different number of'
-        #                      f'NaN cells {len1} {len2}')
-        # else:
-        #     print('OK')
-
-        return datalist_mask, ds_mask.rename('lsm-full')
-
-    def mask_lsm_new(self, ds_obs, ds_fc):
+    def mask_lsm(self, ds_obs, ds_fc):
         """ Create land-sea mask from two datasets (usually observations and fc)
         :param datalist: list of dataArrays (first two will be used to generate combined lsm)
         :return: list masked dataArrays from datalist
@@ -943,75 +914,43 @@ class BaseMetric(dataobjects.DataObject):
         else:
             dict_data['da_verdata_persistence'] = None
 
-        lsm_full, da_coords = self.mask_lsm_new(da_verdata_verif_raw, da_fc_verif)
+
+
+        # 1. calibrate if desired
+        if self.calib and self.calib_method != 'score':
+            da_fc_verif_bc = self.calibrate(dict_data['da_verdata_calib'], dict_data['da_fc_calib'],
+                                            dict_data['da_fc_verif'], dict_data['da_verdata_persistence'],
+                                            method=self.calib_method)
+            dict_data['da_fc_verif_bc'] = da_fc_verif_bc
+
+        lsm_full, da_coords = self.mask_lsm(da_verdata_verif_raw, da_fc_verif)
         dict_data = {k: (v.where(~np.isnan(lsm_full)) if v is not None else v) for k, v in dict_data.items()}
 
         dict_out['lsm_full'] = lsm_full
 
 
+        # set values > thresh to 1 if desired
         if sice_threshold is not None:
-            # 1. calibrate first for each grid cell and add to dict_data
-            # 2. set values to 1
-            # 3. average all data in dict_data
-
-
-            # now calibrate if desired
-            if self.calib and self.calib_exists == 'no':
-                da_fc_verif_bc = self.calibrate(dict_data['da_verdata_calib'], dict_data['da_fc_calib'],
-                                                dict_data['da_fc_verif'], dict_data['da_verdata_persistence'],
-                                                method=self.calib_method)
-
-                dict_data['da_fc_verif_bc'] = da_fc_verif_bc
-
-
-            # 2nd step
             utils.print_info(f'Setting all grid cells with sea ice > {sice_threshold} to 1')
-            dict_data_thresh = {k: (xr.where(v > sice_threshold, 1, 0) if v is not None else v) for k, v in dict_data.items()}
-            dict_data = {k: (dict_data_thresh[k].where(~np.isnan(v)) if v is not None else v) for k, v in dict_data.items()}
+            dict_data_thresh = {k: (xr.where(v > sice_threshold, 1, 0) if v is not None else v) for k, v in
+                                dict_data.items()}
+            dict_data = {k: (dict_data_thresh[k].where(~np.isnan(v)) if v is not None else v) for k, v in
+                         dict_data.items()}
+
+        if 'edge' in self.plottype:
+            raise ValueError('EDGE NOT IMPLEMENTED YET')
+            # utils.print_info('Edge detection algorithm')
+            # da_verdata_verif_ice_edge = mutils.detect_edge(da_verdata_verif)
+            # da_verdata_verif_ice_ext_edge = mutils.detect_extended_edge(da_verdata_verif_ice_edge)
+            # datalist = [d.where(da_verdata_verif_ice_ext_edge == 1) for d in datalist]
+
+        # area average if  desired
+        if self.area_statistic_kind == 'data':
+            dict_data, lsm = self.calc_area_statistics_dict(dict_data, lsm_full,
+                                                            statistic=self.area_statistic_function)
+            dict_out['lsm'] = lsm
 
 
-
-            if 'edge' in self.plottype:
-                raise ValueError('EDGE NOT IMPLEMENTED YET')
-                # utils.print_info('Edge detection algorithm')
-                # da_verdata_verif_ice_edge = mutils.detect_edge(da_verdata_verif, None)
-                # da_verdata_verif_ice_ext_edge = mutils.detect_extended_edge(da_verdata_verif_ice_edge)
-                # datalist = [d.where(da_verdata_verif_ice_ext_edge == 1) for d in datalist]
-
-
-            # 3rd
-            if self.area_statistic_kind == 'data':
-                dict_data, lsm = self.calc_area_statistics_dict(dict_data, lsm_full,
-                                                      statistic=self.area_statistic_function)
-                dict_out['lsm'] = lsm
-
-
-        else:
-            # 1. average all data in dict
-            # 2. calibrate
-
-            if 'edge' in self.plottype:
-                raise ValueError('EDGE NOT IMPLEMENTED YET')
-                # utils.print_info('Edge detection algorithm')
-                # da_verdata_verif_ice_edge = mutils.detect_edge(da_verdata_verif)
-                # da_verdata_verif_ice_ext_edge = mutils.detect_extended_edge(da_verdata_verif_ice_edge)
-                # datalist = [d.where(da_verdata_verif_ice_ext_edge == 1) for d in datalist]
-
-
-            # derive area statistics if desired for data itself
-            if self.area_statistic_kind == 'data':
-                dict_data, lsm = self.calc_area_statistics_dict(dict_data, lsm_full,
-                                                                statistic=self.area_statistic_function)
-                dict_out['lsm'] = lsm
-
-
-            # now calibrate if desired
-            if self.calib and self.calib_exists == 'no':
-                da_fc_verif_bc = self.calibrate(dict_data['da_verdata_calib'], dict_data['da_fc_calib'],
-                                                dict_data['da_fc_verif'], dict_data['da_verdata_persistence'],
-                                                method=self.calib_method)
-
-                dict_data['da_fc_verif_bc'] = da_fc_verif_bc
 
         dict_out = {**dict_out, **dict_data}
         # return this array as it definitely still has all attributes needed for plotting
@@ -1030,14 +969,28 @@ class BaseMetric(dataobjects.DataObject):
         :return: calibrated forecast
         """
         utils.print_info(f'Calibrating using method: {method}')
-        allowed_methods = ['mean', 'mean+trend','anom','score','persistence']
+        allowed_methods = ['mean', 'mean+trend','anom','persistence']
 
 
         if method not in allowed_methods:
             raise ValueError(f'Method calibration needs to be one of {allowed_methods}')
 
-        if method == 'score':
-            return da_fc_verif
+
+        if self.calib_exists == 'yes':
+            correction = self.get_save_calibration_file().to_dataarray().squeeze()
+
+            target_list = utils.create_list_target_verif(self.target, _dates=None, as_list=True)
+
+            if np.max(target_list) > correction.time.values.max():
+                raise RuntimeError("Calibration file does not include all necessary timesteps")
+
+            correction = correction.isel(time=correction.time.isin(target_list))
+            if len(correction.time.values) != len(da_fc_verif.time.values):
+                raise RuntimeError("Calibration file and forecast file do not have the same number of timesteps")
+
+            fc_verif_bc = da_fc_verif - correction
+
+            return fc_verif_bc.clip(0, 1)
 
         if method == 'persistence':
             correction = da_fc_verif.isel(time=0) - da_pers
@@ -1045,6 +998,9 @@ class BaseMetric(dataobjects.DataObject):
             return fc_verif_bc.clip(0,1)
 
         if method in ('mean' , 'anom'):
+            # mask all occasions where no verdata data exists
+            da_fc_calib = da_fc_calib.where(~np.isnan(da_verdata_calib))
+
             for dim in ['inidate', 'date','member']:
                 if dim in da_fc_calib.dims:
                     da_fc_calib = da_fc_calib.mean(dim=dim)
@@ -1053,17 +1009,23 @@ class BaseMetric(dataobjects.DataObject):
 
             if method == 'mean':
                 utils.print_info('Calibration mean')
-                bias_calib = da_fc_calib - da_verdata_calib
-                fc_verif_bc = da_fc_verif - bias_calib
+                correction = da_fc_calib - da_verdata_calib
+                fc_verif_bc = da_fc_verif - correction
             elif method == 'anom':
                 utils.print_info('Calibration anomalies')
-                fc_verif_bc = da_fc_verif - da_fc_calib
+                correction = da_fc_calib
+                fc_verif_bc = da_fc_verif - correction
+
+            self.get_save_calibration_file(correction)
 
             return fc_verif_bc.clip(0,1)
 
 
         if method == 'mean+trend':
             utils.print_info('Calibration mean+trend')
+            # mask all occasions where no verdata data exists
+            da_fc_calib = da_fc_calib.where(~np.isnan(da_verdata_calib))
+
             for dim in ['inidate', 'member']:
                 if dim in da_fc_calib.dims:
                     da_fc_calib = da_fc_calib.mean(dim=dim)
@@ -1108,32 +1070,32 @@ class BaseMetric(dataobjects.DataObject):
         :return: xarray with calibration if ds is None
         """
 
+        if self.calib_method == 'score':
+            filename = f'{self.plottype}_{self.verif_source[0]}_'
+        else:
+            filename = f'{self.verif_source[0]}_'
 
-        filename = f'{self.plottype}_{self.verif_source[0]}_'
         if self.verif_modelname[0] is not None:
             filename += f'{self.verif_modelname[0]}_'
+
         filename += (f'{self.verif_expname[0]}_{self.verif_fcsystem[0]}_{self.calib_enssize[0]}_{self.calib_mode[0]}_'
-                     f'{self.calib_method}_{self.target}_')
+                     f'{self.calib_method}_')
         calib_dates = '-'.join(self.calib_dates)
         filename += f'{calib_dates}_'
         if self.calib_fromyear[0] is not None:
             filename += f'{self.calib_fromyear[0]}-{self.calib_toyear[0]}'
-        filename += '.nc'
+
+        filename += f'_{self.verif_name}.nc'
 
         if ds is None:
+            utils.print_info('Reading pre-calculated calibration file')
             filename = self.calibrationdir + '/' + filename
             if not os.path.isfile(filename):
                 raise RuntimeError(f'Calibration file {filename} not found')
             ds_calib = xr.open_dataset(filename)
             return ds_calib
         else:
-            outfilename = self.metricdir +'/' + filename
-            ds.to_netcdf(outfilename)
-            utils.print_info(f'Saving calibration file to {outfilename}')
-
             if self.calibrationdir is not None:
-                cfile = self.calibrationdir + '/' + filename
-                utils.print_info(f'Saving calibration file to {cfile}')
-                shutil.copy(outfilename, cfile)
-
-
+                outfilename = self.calibrationdir + '/' + filename
+                ds.to_netcdf(outfilename)
+                utils.print_info(f'Saving calibration file to {outfilename}')

@@ -1,6 +1,6 @@
 """ Create 2-D filled contour plots"""
 
-
+from collections import Counter
 import numpy as np
 import cartopy
 import cartopy.crs as ccrs
@@ -29,6 +29,7 @@ class MapPlot(plottypes.GenericPlot):
         self.units = ''
         self.shortname = ''
         self.points = metric.points
+        self.extend = metric.extend
 
 
         if self.cmap is None:
@@ -46,12 +47,6 @@ class MapPlot(plottypes.GenericPlot):
             self.plot_global = False
         else:
             self.plot_global = True
-
-
-
-
-
-
 
         for i, k in utils.plot_params[self.param].items():
             setattr(self, i, k)
@@ -84,12 +79,18 @@ class MapPlot(plottypes.GenericPlot):
 
 
 
-
-
-
     def plot(self, metric, verbose=False):
         """ plot all steps in file """
         xr_file_list = self.xr_file
+
+        levels = np.asarray(self.levels)
+
+        if isinstance(self.cmap, str):
+            cmap = plt.get_cmap(self.cmap)
+        else:
+            cmap = self.cmap
+
+
         ofiles_return = []
         if not isinstance(self.xr_file, list):
             xr_file_list = [self.xr_file]
@@ -103,33 +104,8 @@ class MapPlot(plottypes.GenericPlot):
             # remove lsm and noplot variables from metric
             var_list = [d for d in var_list if ('lsm' not in d and 'noplot' not in d)]
 
-            #check if pvalue variable exists (this is significance and will be hatched)
-            _var_list_new = []
-            sig_list = []
-            for _var in var_list:
-                _var_strip = _var.replace('-value', '').replace('-pvalue', '')
-                if _var_strip + '-value' not in _var_list_new:
-                    if _var_strip + '-value' in var_list and _var_strip + '-pvalue' in var_list:
-                        _var_list_new.append(_var_strip + '-value')
-                        sig_list.append(1)
-                    else:
-                        _var_list_new.append(_var_strip)
-                        sig_list.append(0)
-
-            var_list = _var_list_new
-
             for _vi, _var in enumerate(var_list):
                 _steps = utils.convert_to_list(_ds_file[_var]['time'].values)
-
-
-                levels = self.levels
-                norm = self.norm
-                if isinstance(self.cmap, str):
-                    cmap = plt.get_cmap(self.cmap)
-                else:
-                    cmap = self.cmap
-
-
 
                 # check if attributes specifying label etc are passed with xarray DataArray
                 if f'{_var}-cmap' in _ds_file.attrs:
@@ -141,13 +117,10 @@ class MapPlot(plottypes.GenericPlot):
                     tmp_level = _ds_file.attrs[f'{_var}-levels'].replace('[','').replace(']','').split(' ')
                     levels = [float(lev) for lev in tmp_level if lev != '']
 
+                norm = matplotlib.colors.BoundaryNorm(levels, cmap.N, extend=self.extend)
 
                 for _step in _steps:
                     _data = _ds_file[_var].sel(time=_step)
-
-                    # if 'member' in _data.dims:
-                    #     _data = _data.mean(dim='member')
-
 
 
                     thisfig = plt.figure(figsize=(11.69, 8.27))  # A4 figure size
@@ -214,34 +187,11 @@ class MapPlot(plottypes.GenericPlot):
                         ax.set_extent(self.region_extent,
                                       crs=ccrs.PlateCarree())
 
-
-
-
-
                     if self.clip:
                         _data = _data.clip(levels[0], levels[-1])
-                        extend = 'neither'
-                    else:
-                        extend = 'both'
-                        # if levels[0] is zero and trans_grid != proj
-                        # missing values are drawn as lowest color
-                        # this workaround ensures that this is not the case
-                        levels[0] -= 1e-05
 
-
-
-                    if f'{_var}-map_plot' in _ds_file.attrs:
-                        if _ds_file.attrs[f'{_var}-map_plot'] == 'pcolormesh':
-                            plot = ax.pcolormesh(x_dim, y_dim, _data, transform=trans_grid,
-                                                 cmap=cmap, norm=norm)
-                    else:
-                        plot = ax.contourf(x_dim, y_dim, _data, levels, transform=trans_grid,
-                                                                cmap=cmap, extend=extend, norm=norm)
-
-                    if sig_list[_vi] == 1:
-                        _data_sig = _ds_file[_var.replace('value','pvalue')].sel(time=_step)
-                        ax.contourf(x_dim, y_dim, _data_sig< 0.05, levels=[0.5, 1.5],
-                                    hatches=['.....'], alpha=0.25,transform=trans_grid)
+                    plot = ax.pcolormesh(x_dim, y_dim, _data, transform=trans_grid,
+                                         cmap=cmap, norm=norm)
 
 
                     ax.add_feature(cartopy.feature.LAND,
@@ -249,13 +199,10 @@ class MapPlot(plottypes.GenericPlot):
                                    facecolor='darkgray')
                     plt.gca().set_facecolor("darkgray")
 
-
-
                     gl = ax.gridlines(draw_labels=True,
                                       ylocs=range(-80,91,10),
                                       x_inline=False, y_inline=False,)
-                    #gl.top_labels = False
-                    #gl.right_labels = False
+
                     gl.xformatter = LONGITUDE_FORMATTER
                     gl.yformatter = LATITUDE_FORMATTER
 
@@ -263,9 +210,6 @@ class MapPlot(plottypes.GenericPlot):
                     ax.coastlines(color='grey')
                     cb = plt.colorbar(plot)#, location='left')
 
-                    # revert level changes to ensure NaN are plotted with background color
-                    if extend == 'both':
-                        levels[0] += 1e-05
 
                     if self.ticks is None:
                         cb.set_ticks(levels)
@@ -273,12 +217,10 @@ class MapPlot(plottypes.GenericPlot):
                         cb.set_ticks(self.ticks)
                         cb.set_ticklabels(self.ticklabels)
 
-
                     cblabelstr = f'{self.shortname} {metric.legendtext} in {self.units}'
 
                     if self.plottype in ['brier', 'crps']:
                         cblabelstr = f'{metric.legendtext} (reference: persistence)'
-
 
                     cb.set_label(cblabelstr, labelpad=10)
 
@@ -298,14 +240,12 @@ class MapPlot(plottypes.GenericPlot):
                             elif atype == 'cb.set_label':
                                 cb.set_label(**kw, labelpad=5)
 
-
-
                     ax.set_title(self._create_title(_step, _var))
 
                     if self.points is not None:
                         if len(self.points) == 1:
                             ax.scatter(self.points[0][0], self.points[0][1], color='red', s=15,
-                                        transform=ccrs.PlateCarree())
+                                       transform=ccrs.PlateCarree())
 
                     ax.text(0.01, .97, self.plottype, style='italic',
                             horizontalalignment='left',
@@ -314,17 +254,25 @@ class MapPlot(plottypes.GenericPlot):
 
                     if self.ofile is None:
                         ofile = self.get_filename_plot(varname=_var, time=_step,
-                                               plotformat=self.format)
+                                                       plotformat=self.format)
                     else:
                         ofile = utils.csv_to_list(self.ofile)[_vi]
                     ofiles_return.append(ofile)
                     print(ofile)
                     thisfig.savefig(ofile, bbox_inches='tight')
                     plt.close(thisfig)
+
         return ofiles_return
 
     def _create_title(self, _step, _var):
-        if 'obs' in _var or 'verdata' in _var:
+        """
+        Create title string for plot
+        :param _step: forecast timestep to be plotted
+        :param _var: variable name
+        :return: title string
+        """
+
+        if _var in ['obs', 'verdata', f'{self.verif_name}']:
             _title = f'{self.verif_name} \n'
         elif 'persistence' in _var:
             _title = 'persistence \n'
@@ -335,88 +283,61 @@ class MapPlot(plottypes.GenericPlot):
             _title = f'{self.verif_source} {self.verif_fcsystem} ' \
                      f'{self.verif_expname} {self.verif_mode} (enssize = {self.verif_enssize}) \n'
 
-        # calc target date
-        # check if only one date
-        if self.verif_fromyear != [None]:
-            _verif_fromyear = int(self.verif_fromyear[0])
-            _verif_toyear = int(self.verif_toyear[0])
-
-
-        if len(self.verif_dates) == 1:
-            _tmp_date = self.verif_dates[0]
-            if len(self.verif_dates[0]) == 4:
-                _tmp_date = f'2000{self.verif_dates[0]}'
-            _target_time = utils.string_to_datetime(_tmp_date)
-
-            _target_time += relativedelta(days=int(_step))
-            if len(self.verif_dates[0]) == 4:
-                _target_time = utils.datetime_to_string(_target_time, '%m-%d')
-            else:
-                _target_time = utils.datetime_to_string(_target_time, '%Y-%m-%d')
-
-        elif 'to' in self.conf_verif_dates:
-            if '/by/' in self.conf_verif_dates:
-                by_tmp = self.conf_verif_dates.split('/by/')[1]
-                _dates = self.conf_verif_dates.split('/by/')[0]
-                _dates = _dates.split('/to/')
-            if '/only/' in self.conf_verif_dates:
-                by_tmp = self.conf_verif_dates.split('/only/')[1]
-                _dates = self.conf_verif_dates.split('/only/')[0]
-                _dates = _dates.split('/to/')
-
-
-            yymm_format = False
-            if len(_dates[0]) == 4:
-                yymm_format = True
-
-
-            if yymm_format:
-                _dates = [f'2000{d}' for d in _dates]
-            _dates_dt = [utils.string_to_datetime(d) for d in _dates]
-            _dates_dt_target = [d+relativedelta(days=int(_step)) for d in _dates_dt]
-
-            if yymm_format:
-                _next_year = [1 if d.year > 2000 else 0 for d in _dates_dt_target]
-                _verif_fromyear = _next_year[0]
-                _verif_toyear = _next_year[1]
-                _target_time = [utils.datetime_to_string(d, '%m-%d') for d in _dates_dt_target]
-            else:
-                _target_time = [utils.datetime_to_string(d, '%Y-%m-%d') for d in _dates_dt_target]
-            _target_time = '/to/'.join(_target_time)
-            _target_time += f'/by/{by_tmp}'
-
-
-        if self.plottype in ['freeze-up']:
+        if self.plottype in ['freeze_up', 'break_up']:
             _init_time = self.conf_verif_dates
             _title += f' init-time {_init_time}'
 
             if self.verif_fromyear[0] is not None:
-                _title += f' ({_verif_fromyear[0]} - {_verif_toyear[0]})'
+                _title += f' ({int(self.verif_fromyear[0])} - {int(self.verif_toyear[0])})'
 
-        elif self.verif_fromyear[0] is None:
-            if len(self.verif_dates) == 1:
-                _title += f' valid-time {_target_time}'
+            _title += f'\n calibrated using {self.conf_calib_dates}'
+            if self.calib_fromyear[0] is not None:
+                _title += f' averaged from {self.calib_fromyear[0]} to {self.calib_toyear[0]}'
+            _title += f' (enssize = {self.calib_enssize})'
+            return _title
+
+        # create verif dates string
+        if len(self.verif_dates[0]) == 4:
+            _num = len(self.verif_dates)
+
+            if _num > 5:
+                _init_time = f'{self.verif_dates[0]} ... {self.verif_dates[-1]} [total={_num}]'
             else:
-                _title += f' combined dates valid-time {_target_time}'
-        else:
-            _title += f' combined dates valid-time {_target_time}' \
-                      f' ({_verif_fromyear} - {_verif_toyear})'
+                _init_time = ', '.join(self.verif_dates)
 
-        if _var != 'obs' and self.plottype not in ['freeze_up']:
+            _years = [f'{a_}-{b_}' for a_, b_ in zip(self.verif_fromyear, self.verif_toyear)]
+            if len(list(set(_years))) == 1:
+                _years = [_years[0]]
+                addline = False
+            else:
+                _years_count = dict(Counter(_years))
+                _years = [f'{key} [total={value}]' for key, value in _years_count.items()]
+                addline = True
+
+            _years = ', '.join(_years)
+
+            if addline:
+                _title += f' combined dates init-time {_init_time} \n' \
+                          f' ({_years})'
+            else:
+                _title += f' combined dates init-time {_init_time} ' \
+                          f' ({_years})'
+        else:
+            if len(self.verif_dates) == 1:
+                _init_time = self.verif_dates[0]
+                _title += f' init-time {_init_time}'
+            elif 'to' in self.conf_verif_dates:
+                _init_time = self.conf_verif_dates
+                _title += f' combined dates init-time {_init_time}'
+
+        if self.plottype not in ['freeze_up', 'break_up']:
             _title += f' (leadtime: {_step+1} days)'
 
-
-
-
-
-        if self.calib:
+        # add calibration string
+        if self.calib and _var not in ['obs', 'verdata', f'{self.verif_name}', 'persistence']:
             _title += f'\n calibrated using {self.conf_calib_dates}'
-            if self.calib_fromyear:
-                _title += f' from {self.calib_fromyear[0]} to {self.calib_toyear[0]} ' \
-                          f'(enssize = {self.calib_enssize})'
-
-
-
-        _title += f' {self.metric_plottext}'
+            if self.calib_fromyear[0] is not None:
+                _title += f' averaged from {self.calib_fromyear[0]} to {self.calib_toyear[0]}'
+            _title += f' (enssize = {self.calib_enssize})'
 
         return _title

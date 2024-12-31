@@ -88,6 +88,7 @@ class GenericPlot:
             fdir = os.path.dirname(fname)+'/'
             files = [f for f in os.listdir(fdir) if os.path.isfile(fdir+f)]
             files = [f for f in files if '.nc' in f]
+            files = sorted(files)
             output = []
             for f in files:
                 output.append(xr.open_dataset(fdir+f))

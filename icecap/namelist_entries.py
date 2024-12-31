@@ -46,13 +46,13 @@ config_optnames = {
             'optional' : True
         },
         'job_memory':{
-'           printname': 'maximum memory per job',
+            'printname': 'maximum memory per job',
             'optional' : True,
             'allowed_values' : ["", "128GB"],
             'default_value' : [""],
         },
         'calibrationdir':{
-'           printname': 'directory of preexisting calibration files',
+            'printname': 'directory of preexisting calibration files',
             'optional' : True,
         },
     }, # end environment
@@ -161,7 +161,7 @@ config_optnames = {
     }, # end fc
     'plot' : {
         'verif_ref' : {
-            'printname':'experiment name for plotting',
+            'printname':'observation name for plotting',
             'optional' : True,
             'allowed_values': ["osi-cdr", 'osi-401-b']
         },
@@ -177,7 +177,7 @@ config_optnames = {
                                 'crps', 'rmse', 'ser','iiee','sps','iiee2',
                                 'brier_edge','linear_trend',
                                 'rmse_edge',
-                                'ice_extent', 'cycle', 'mae']
+                                'ice_extent', 'cycle', 'mae','calc_calib']
         },
         'verif_mode':{
             'printname': 'forcast or hindcast mode for plotting',
@@ -318,13 +318,12 @@ config_optnames = {
             'printname':'Method used for calibration',
             'optional' : True,
             'allowed_values' : ["mean", "mean+trend", "anom","score",
-                                'persistence']
+                                'persistence', 'None']
         },
         'calib_exists': {
             'printname':'Specify whether calibration file has been precomputed',
             'optional' : True,
             'allowed_values' : ["yes", "no"],
-            'default_value' : ["no"],
         },
         'copy_id' : {
             'printname':'Copy config from different plotset',

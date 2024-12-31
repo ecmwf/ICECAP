@@ -192,7 +192,7 @@ class Metric(BaseMetric):
             da_obs_verif_dist = self._compute_distance(da_verdata_verif.isel(date=0, inidate=0),
                                                            min_size=min_size)
             datalist.append(da_obs_verif_dist.isel(member=0))
-            data_names.append('obs')
+            data_names.append(f'{self.verif_name}')
 
         if self.calib:
             print('calibrating')
@@ -221,18 +221,18 @@ class Metric(BaseMetric):
             da_fc_verif_dist = da_fc_verif_dist - bias_dist_calib
 
             datalist.append(verdata_dist_calib.dropna(dim='member').isel(member=0))
-            data_names.append('obs-hc')
+            data_names.append(f'{self.verif_name}-hc')
 
         datalist.append(da_fc_verif_dist)
-        data_names.append('model')
+        data_names.append(f'{self.title_fcname}')
 
 
 
 
         data_xr = xr.merge([data.rename(data_names[di]) for di, data in enumerate(datalist)])
 
-        data_xr = data_xr.assign_attrs({'obs-linecolor': 'k',
-                                        'obs-hc-linecolor': 'red',
-                                        'model-linecolor': 'blue'})
+        data_xr = data_xr.assign_attrs({f'{self.verif_name}-linecolor': 'k',
+                                        f'{self.verif_name}-hc-linecolor': 'red',
+                                        f'{self.title_fcname}-linecolor': 'blue'})
 
         self.result = data_xr

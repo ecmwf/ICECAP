@@ -48,9 +48,16 @@ class Metric(BaseMetric):
         da_rmse = np.sqrt(((da_fc_verif.mean(dim='member') - da_verdata_verif) ** 2).mean(dim=('inidate', 'date')))
         da_spread = np.sqrt(da_fc_verif.var(dim='member').mean(dim=('inidate', 'date')))
 
+        # scaling of spread and error w.r.t. ensemble size
+        da_spread = da_spread * np.sqrt(int(self.verif_enssize[0]) / (int(self.verif_enssize[0]) - 1))
+        da_rmse = da_rmse * np.sqrt(int(self.verif_enssize[0]) / (int(self.verif_enssize[0]) + 1))
+
         # set zero values to 1e-11 to avoid division by 0
         da_rmse = xr.where(da_rmse == 0, 1e-11, da_rmse)
         da_spread = xr.where(da_spread == 0, 1e-11, da_spread)
+
+
+
         da_ser = da_spread / da_rmse
 
         # restore zero values before saving
@@ -65,6 +72,7 @@ class Metric(BaseMetric):
             da_spread = data[1]
             da_ser = data[2]
             processed_data_dict['lsm'] = lsm
+
 
 
         data_plot = []
@@ -89,7 +97,7 @@ class Metric(BaseMetric):
         # set xarray DataArray attributes to set variable specific labels, colors,...
         for var in ['fc_rmse', 'fc_spread']:
             data_xr = data_xr.assign_attrs({f'{var}-cmap': 'hot_r',
-                                            f'{var}-levels': f'{np.arange(0.05, 1.05, .1)}',
+                                            f'{var}-levels': f'{np.arange(0., 1.1, .1)}',
                                             f'{var}-norm': 'None'})
 
         for var in ['fc_ser', 'fc_rmse', 'fc_spread']:
@@ -107,4 +115,4 @@ class Metric(BaseMetric):
         var_list_ser = [var for var in var_list if var not in ['fc_rmse', 'fc_spread']]
         var_list_rest = [var for var in var_list if var not in ['fc_ser']]
 
-        self.result = [data_xr[var_list_rest], data_xr[var_list_ser]]
+        self.result = (data_xr[var_list_rest], data_xr[var_list_ser])

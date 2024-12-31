@@ -24,6 +24,8 @@ def set_xarray_attribute(data, da_ref,
             data_out = []
             for _data in data:
                 _data.attrs[proj_param] = getattr(da_ref, proj_param)
+                _data = _data.drop([i for i in _data.coords
+                                            if i not in list(_data.dims) + ['longitude', 'latitude']])
                 data_out.append(_data)
     return data_out
 

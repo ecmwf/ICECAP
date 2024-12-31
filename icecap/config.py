@@ -254,7 +254,7 @@ class Configuration():
 
             reg_list = [self.region_extent,self.nsidc_region]
             reg_list_len = len([i for i in reg_list if (i is not None and i != 'None')])
-            #if self.region_extent is not None and self.nsidc_region is not None:
+
             if reg_list_len > 1:
                 raise ValueError('Selecting a region via nsidc_region and region_extent is not allowed')
 

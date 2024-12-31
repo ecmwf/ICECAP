@@ -27,9 +27,9 @@ class Metric(BaseMetric):
         self.area_statistic_kind = 'score'
         self.area_statistic_function = 'sum'
 
-        average_dims = ['member']
+        average_dims = None
         persistence = True
-        sice_threshold = 0.15
+        sice_threshold = None # IIEE uses 15% threshold but averaging over members first
 
         processed_data_dict = self.process_data_for_metric(average_dims, persistence,
                                                            sice_threshold)
@@ -37,13 +37,18 @@ class Metric(BaseMetric):
         data_plot = []
         data_plot.append(processed_data_dict['lsm_full'])
         if self.calib:
-            da_fc_verif= processed_data_dict['da_fc_verif_bc'].clip(0,1)
+            da_fc_verif= processed_data_dict['da_fc_verif_bc'].mean(dim='member')
         else:
-            da_fc_verif = processed_data_dict['da_fc_verif']
+            da_fc_verif = processed_data_dict['da_fc_verif'].mean(dim='member')
 
 
-        da_verdata_verif = processed_data_dict['da_verdata_verif']
+        da_verdata_verif = processed_data_dict['da_verdata_verif'].mean(dim='member')
         da_persistence = processed_data_dict['da_verdata_persistence']
+
+        # set sic>0.15 to 1 else 0
+        da_fc_verif = xr.where(da_fc_verif>0.15,1,0)
+        da_verdata_verif = xr.where(da_verdata_verif>0.15,1,0)
+        da_persistence = xr.where(da_persistence>0.15,1,0)
 
         ensmean_over_fc = xr.ones_like(da_verdata_verif).where(da_fc_verif - da_verdata_verif == 1, 0)
         ensmean_under_fc = xr.ones_like(da_verdata_verif).where(da_fc_verif - da_verdata_verif == -1, 0)
@@ -73,10 +78,10 @@ class Metric(BaseMetric):
         aee_pers = np.fabs(ensmean_over_pers - ensmean_under_pers)
         me_pers = 2 * np.minimum(ensmean_over_pers, ensmean_under_pers)
 
-        data_plot.append(iiee_fc.rename('fc_iiee').mean(dim=('inidate', 'date')))
+        data_plot.append(iiee_fc.rename(f'{self.title_fcname}').mean(dim=('inidate', 'date')))
         data_plot.append(aee_fc.rename('noplot_fc_aee').mean(dim=('inidate', 'date')))
         data_plot.append(me_fc.rename('noplot_fc_me').mean(dim=('inidate', 'date')))
-        data_plot.append(iiee_pers.rename('persistence_iiee').mean(dim=('inidate', 'date')))
+        data_plot.append(iiee_pers.rename('persistence').mean(dim=('inidate', 'date')))
         data_plot.append(aee_pers.rename('noplot_persistence_aee').mean(dim=('inidate', 'date')))
         data_plot.append(me_pers.rename('noplot_persistence_me').mean(dim=('inidate', 'date')))
         data_plot.append(lsm)

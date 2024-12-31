@@ -44,11 +44,11 @@ class ExecutionHost:
 
         self.directories_create = [conf.pydir, conf.pydir + '/metrics', conf.pydir + '/contrib',
                               conf.pydir + '/aux', conf.metricdir, conf.plotdir,
-                              conf.cachedir, conf.tmpdir,
+                              conf.cachedir, conf.tmpdir, conf.calibrationdir,
                                    self.etcdir]
         self.directories_create_ecflow = [conf.ecffilesdir, conf.ecfincdir, conf.ecfhomeroot]
 
-        self.directories_wipe = [conf.rundir, conf.datadir, conf.tmpdir,
+        self.directories_wipe = [conf.rundir, conf.datadir, conf.tmpdir,conf.calibrationdir,
                                  f'{conf.ecfhomeroot}/icecap/{self.suitename}']
         self.directories_wipe_full = [conf.cachedir]
 
@@ -72,7 +72,7 @@ class ExecutionHost:
 
 
         for directory in _directories_wipe:
-            if os.path.exists(directory):
+            if directory is not None and os.path.exists(directory):
                 if args.verbose:
                     print(f'  Deleted {directory} ')
                 shutil.rmtree(directory)
@@ -88,7 +88,8 @@ class ExecutionHost:
 
 
         for directory in _directories_create:
-            utils.make_dir(directory, verbose=args.verbose)
+            if directory is not None:
+                utils.make_dir(directory, verbose=args.verbose)
 
         fromdir = self.sourcedir + '/icecap'
         self._copy_python_scripts(fromdir, args)

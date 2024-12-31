@@ -10,21 +10,21 @@ Interfaces and functionality are likely to change, and the project itself may be
 ### Installation
 Clone source code repository
 
-    $ git clone https://git.ecmwf.int/scm/~nedb/icecap.git
+    $ git clone https://github.com/ecmwf/ICECAP 
 
 Create conda environment and install necessary packages
 
-    $ cd icecap
+    $ cd ICECAP
     $ conda remove --name icecap --all  # delete icecap env if it exists
     $ conda config --set channel_priority flexible
     $ conda env create -f environment.yml 
 
 Installation has been tested successfully linux x86-64 (ATOS HPC). 
-Installation might also works on on osx-arm64 (Macbook M2) using the environment.yaml file in /etc.
+Installation might also work on osx-arm64 (Macbook M2) using the environment.yaml file in /etc.
 
 ### Usage
 Please follow the section 1.2 in the user guide how to set up your machine. 
-An example how to run ICECAP is provided Section 1.3.
+An example how to run ICECAP is provided Section 3.1.
 
 The user guide is located in the doc/ directory. Compile it using the Makefile
 

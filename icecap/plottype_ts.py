@@ -140,10 +140,8 @@ class TsPlot(plottypes.GenericPlot):
 
                 if 'time' in _ds_file_var.dims:
                     x_axis_values = _ds_file_var.time.values+1
-                    xlim = x_axis_values.max() + 1.5
                 elif 'date' in _ds_file_var.dims:
                     x_axis_values = _ds_file_var.date.values
-                    xlim = x_axis_values[-1]
 
 
                 if 'persistence' in _var:
@@ -349,10 +347,15 @@ class TsPlot(plottypes.GenericPlot):
         return ofiles_return
 
     def _create_title(self):
+        """
+        Create title string for plot
+        :return: title string
+        """
+
         if self.verif_modelname is not None:
             _title = f'{self.verif_modelname} {self.verif_expname}'
         elif self.verif_source == 'ecmwf' and self.verif_expname == '0001':
-            _title = f'ecmwf oper'
+            _title = 'ecmwf oper'
         else:
             _title = f'{self.verif_expname}'
 
@@ -364,7 +367,7 @@ class TsPlot(plottypes.GenericPlot):
             if _num > 5:
                 _init_time = f'{self.verif_dates[0]} ... {self.verif_dates[-1]} [total={_num}]'
             else:
-                _init_time = f', '.join(self.verif_dates)
+                _init_time = ', '.join(self.verif_dates)
 
             _years = [f'{a_}-{b_}' for a_, b_ in zip(self.verif_fromyear, self.verif_toyear)]
             if len(list(set(_years))) == 1:
@@ -384,44 +387,16 @@ class TsPlot(plottypes.GenericPlot):
                 _title += f' combined dates init-time {_init_time} ' \
                           f' ({_years})'
         else:
-            _init_time = self.verif_dates[0]
-            _title += f' init-time {_init_time}'
-            # if self.calib:
-            #     _title += f'\n calibrated using {self.conf_calib_dates}'
-            # if self.calib_fromyear:
-            #     _title += f' averaged from {self.calib_fromyear} to {self.calib_toyear}'
-
-        return _title
-    def _create_title_OLD(self):
-        _title = f'{self.verif_source} {self.verif_fcsystem} ' \
-                 f'{self.verif_expname} {self.verif_mode} (enssize = {self.verif_enssize}) \n'
-
-        # calc target date
-        # check if only one date
-        if self.verif_fromyear:
-            _verif_fromyear = int(self.verif_fromyear)
-            _verif_toyear = int(self.verif_toyear)
-
-        if len(self.verif_dates) == 1:
-            _init_time = self.verif_dates[0]
-
-        elif 'to' in self.conf_verif_dates:
-            _init_time = self.conf_verif_dates
-
-        if self.verif_fromyear is None:
             if len(self.verif_dates) == 1:
+                _init_time = self.verif_dates[0]
                 _title += f' init-time {_init_time}'
-            else:
+            elif 'to' in self.conf_verif_dates:
+                _init_time = self.conf_verif_dates
                 _title += f' combined dates init-time {_init_time}'
-        else:
-            _title += f' combined dates init-time {_init_time}' \
-                      f' ({_verif_fromyear} - {_verif_toyear})'
 
-
-
-        if self.calib:
-            _title += f'\n calibrated using {self.conf_calib_dates}'
-            if self.calib_fromyear:
-                _title += f' averaged from {self.calib_fromyear} to {self.calib_toyear}'
+            if self.calib:
+                _title += f'\n calibrated using {self.conf_calib_dates}'
+                if self.calib_fromyear[0] is not None:
+                    _title += f' averaged from {self.calib_fromyear[0]} to {self.calib_toyear[0]}'
 
         return _title

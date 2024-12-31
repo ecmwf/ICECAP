@@ -32,9 +32,6 @@ if __name__ == '__main__':
     data = ecmwf.EcmwfData(conf, args)
 
 
-    # print(not data.check_cache(verbose=False))
-    # exit()
-
     if args.exptype == 'INIT':
         data.create_folders()
         data.process_lsm()

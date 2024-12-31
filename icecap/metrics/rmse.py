@@ -19,7 +19,7 @@ class Metric(BaseMetric):
         self.plottext = ''
         self.legendtext = ''
         self.ylabel = 'RMSE'
-        self.levels = np.arange(0.05, 1.05, .1)
+        self.levels = np.arange(0., 1.1, .1)
         self.default_cmap = 'hot_r'
         self.use_dask = True
 
@@ -27,7 +27,7 @@ class Metric(BaseMetric):
     def compute(self):
         """ Compute metric """
 
-        average_dims = ['member']
+        average_dims = None
         persistence = True
         sice_threshold = None
 
@@ -35,11 +35,11 @@ class Metric(BaseMetric):
 
 
         if self.calib:
-            da_fc_verif = processed_data_dict['da_fc_verif_bc']
+            da_fc_verif = processed_data_dict['da_fc_verif_bc'].mean(dim='member')
         else:
-            da_fc_verif = processed_data_dict['da_fc_verif']
+            da_fc_verif = processed_data_dict['da_fc_verif'].mean(dim='member')
 
-        da_verdata_verif = processed_data_dict['da_verdata_verif']
+        da_verdata_verif = processed_data_dict['da_verdata_verif'].mean(dim='member')
 
         da_rmse = np.sqrt(((da_fc_verif - da_verdata_verif) ** 2).mean(dim=('inidate', 'date')))
 
@@ -73,7 +73,7 @@ class Metric(BaseMetric):
             data_plot.append(processed_data_dict['lsm'])
 
         data_plot += [
-            da_rmse.rename('fc_rmse'),
+            da_rmse.rename(f'{self.title_fcname}'),
             da_pers_rmse.rename('persistence')
         ]
 
@@ -87,7 +87,7 @@ class Metric(BaseMetric):
         data_xr = xr.merge(data_plot)
 
         data_xr = data_xr.assign_attrs({'obs-linecolor': 'k'})
-        data_xr = data_xr.assign_attrs({f'{self.verif_expname[0]}-linecolor': 'blue'})
+        data_xr = data_xr.assign_attrs({f'{self.title_fcname}-linecolor': 'blue'})
 
 
         self.result = data_xr

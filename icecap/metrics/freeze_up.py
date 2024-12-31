@@ -88,8 +88,11 @@ class Metric(BaseMetric):
 
 
         # set ice mask entries to -300 and water entries to -200
-        ds_fc_day = xr.where((mask_ice_member) == 1, ds_fc_day, np.nan)
-        ds_fc_day = xr.where(mask_water_member == 1, ds_fc_day,np.nan)
+        #ds_fc_day = xr.where((mask_ice_member) == 1, ds_fc_day, np.nan)
+        #ds_fc_day = xr.where(mask_water_member == 1, ds_fc_day,np.nan)
+
+        ds_fc_day = xr.where((mask_ice_member) == 1, ds_fc_day, 0)
+        ds_fc_day = xr.where(mask_water_member == 1, ds_fc_day, 180)
 
         # needed as xr.where does not preserve attributes
         ds_fc_day = ds_fc_day.assign_attrs(ds.attrs)
@@ -117,7 +120,7 @@ class Metric(BaseMetric):
 
 
         da_fc_verif_metric, mask_water, mask_ice = self.freeze_up(da_fc_verif)
-        da_verdata_verif_metric, mask_water, mask_ice = self.freeze_up(da_verdata_verif)
+        da_verdata_verif_metric, mask_water_vardata, mask_ice_vardata = self.freeze_up(da_verdata_verif)
 
         if self.calib:
             if self.calib_exists == 'yes':
@@ -125,6 +128,7 @@ class Metric(BaseMetric):
 
                 da_fc_calib_metric_upper = ds_calib['da_fc_calib_metric_upper']
                 da_fc_calib_metric_lower = ds_calib['da_fc_calib_metric_lower']
+                da_fc_calib_metric_median = ds_calib['da_fc_calib_metric_lower']
                 da_verdata_calib_metric_upper = ds_calib['da_verdata_calib_metric_upper']
                 da_verdata_calib_metric_lower = ds_calib['da_verdata_calib_metric_lower']
                 da_fc_calib_early_bss = ds_calib['da_fc_calib_early_bss']
@@ -140,9 +144,11 @@ class Metric(BaseMetric):
                                                                 method='closest_observation')
                 da_fc_calib_metric_lower = da_fc_calib_metric.quantile(1 / 3, dim=('member', 'date'),
                                                                 method='closest_observation')
-
+                da_fc_calib_metric_median = da_fc_calib_metric.quantile(1 / 2, dim=('member', 'date'),
+                                                                       method='closest_observation')
                 da_fc_calib_metric_upper = da_fc_calib_metric_upper.drop_vars('quantile')
-                da_fc_calib_metric_lower = da_fc_calib_metric_lower.drop_vars('quantile')
+                da_fc_calib_metric_median = da_fc_calib_metric_median.drop_vars('quantile')
+
 
                 # verdata calib
                 da_verdata_calib_metric, _, _ = self.freeze_up(da_verdata_calib)
@@ -195,7 +201,6 @@ class Metric(BaseMetric):
             mask_ice_all = xr.where(mask_ice == 1, 0, 1)
             mask_ice_all = xr.where(mask_ice_all.min(dim='member') == 1, True, False)
 
-
             combine = xr.where(late > early, late, early * -1)
             combine = xr.where(mask_water_all, -101, combine)
             combine = xr.where(mask_ice_all, 101, combine)
@@ -207,22 +212,26 @@ class Metric(BaseMetric):
                 early_verdata = xr.where(da_verdata_verif_metric < da_verdata_calib_metric_lower, 1, 0).mean(dim='member') * 100
                 late_verdata = xr.where(da_verdata_verif_metric > da_verdata_calib_metric_upper, 1, 0).mean(dim='member') * 100
 
+
+                mask_water_verdata_all = xr.where(mask_water_vardata == 1, 0, 1)
+                mask_water_verdata_all = xr.where(mask_water_verdata_all.min(dim='member') == 1, True, False)
+                mask_ice_verdata_all = xr.where(mask_ice_vardata == 1, 0, 1)
+                mask_ice_verdata_all = xr.where(mask_ice_verdata_all.min(dim='member') == 1, True, False)
+
                 combine_verdata = xr.where(late_verdata > early_verdata, late_verdata, early_verdata * -1)
-                combine_verdata = xr.where(mask_water_all, -101, combine_verdata)
-                combine_verdata = xr.where(mask_ice_all, 101, combine_verdata)
+                combine_verdata = xr.where(mask_water_verdata_all, -101, combine_verdata)
+                combine_verdata = xr.where(mask_ice_verdata_all, 101, combine_verdata)
                 combine_verdata = xr.where(np.isnan(lsm_full), np.nan, combine_verdata)
                 combine_verdata = combine_verdata.assign_attrs(da_fc_verif.attrs).squeeze()
                 data_plot.append(combine_verdata.rename(f'{self.verif_name}'))
                 data_plot.append(da_verdata_verif_metric.rename('da_vedata_verif_dates_noplot'))
 
 
-            fc_name = self.verif_expname[0]
-            if self.verif_modelname[0] is not None:
-                fc_name = f'{self.verif_modelname[0]} {fc_name}'
 
-            data_plot.append(combine.rename(f'{fc_name}'))
+            data_plot.append(combine.rename(f'{self.title_fcname}'))
             data_plot.append(da_fc_calib_metric_upper.rename('upper_q_calib_noplot'))
             data_plot.append(da_fc_calib_metric_lower.rename('lower_q_calib_noplot'))
+            data_plot.append(da_fc_calib_metric_median.rename('median_q_calib_noplot'))
 
             # these are masked BSS fields (using fc_verif mask for plotting)
             da_fc_calib_early_bss = xr.where(mask_water_all, -101, da_fc_calib_early_bss)
@@ -247,11 +256,11 @@ class Metric(BaseMetric):
         cmd_all = []
 
         cmd_all.append(dict(attr_type='ax.text',
-                            x=1.3, y=.75, s='Prob (later than upper tercile)',
+                            x=1.3, y=.75, s='Prob (within upper tercile)',
                   transform='True', fontsize=12,
                   verticalalignment='center', rotation=90))
         cmd_all.append(dict(attr_type='ax.text',
-                            x=1.3, y=.25, s='Prob (earlier than upper tercile)',
+                            x=1.3, y=.25, s='Prob (within lower tercile)',
                             transform='True', fontsize=12,
                             verticalalignment='center', rotation=90))
         cmd_all.append(dict(attr_type='cb.set_label', label=self.legendtext))
@@ -260,7 +269,6 @@ class Metric(BaseMetric):
             cmd_list = [f"{key}=\"{value}\"" if isinstance(value, str) else f"{key}={value}" for key, value in
                           cmd.items()]
 
-            data_xr = data_xr.assign_attrs({f'{fc_name}-{i}': cmd_list})
-        data_xr = data_xr.assign_attrs({f'{fc_name}-map_plot': 'pcolormesh'})
+            data_xr = data_xr.assign_attrs({f'{self.title_fcname}-{i}': cmd_list})
 
         self.result = data_xr

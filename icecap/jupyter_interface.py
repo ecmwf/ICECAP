@@ -129,13 +129,17 @@ class Icecap:
                     for file in filelist:
                         os.remove(file)
 
-            allowed_plottypes = ['ensmean', 'ice_distance','ice_extent']
+            allowed_plottypes = ['ensmean', 'ice_distance','ice_extent', 'plume', 'break_up']
             if 'ensmean' == self.conf.plotsets['001'].plottype:
                 needed_opts = ['verif_expname_fct', 'verif_dates_fct']
             elif 'ice_distance' == self.conf.plotsets['001'].plottype:
                 needed_opts = ['verif_expname_fct', 'verif_dates_fct', 'points_fct']
             elif 'ice_extent' == self.conf.plotsets['001'].plottype:
                 needed_opts = ['verif_expname_fct', 'verif_dates_fct','region_extent_fct','nsidc_region_fct']
+            elif 'plume' == self.conf.plotsets['001'].plottype:
+                needed_opts = ['verif_expname_fct', 'verif_dates_fct','region_extent_fct','nsidc_region_fct']
+            elif 'break_up' == self.conf.plotsets['001'].plottype:
+                needed_opts = ['verif_expname_fct', 'verif_dates_fct']
             else:
                 raise NotImplementedError(f'ERROR: Plottype must be one of {allowed_plottypes}')
 
@@ -286,6 +290,8 @@ class Icecap:
                     print('Setting start date to 1st of month for seasonal forecasts')
                 val = f'{val[:-2]}01'
                 self.verif_dates_fct.value = utils.string_to_datetime(val)
+        if self.conf.plotsets['001'].calib_exists == 'yes':
+            self.conf.plotsets['001'].calib_dates = val[4:]
 
     def update_expname_cds_fct(self, *args):
         """ Update expname and modelname for long-range fcsystem """
@@ -344,8 +350,9 @@ class ConfigurationJupyter(config.Configuration):
         self._init_config(conf_parser, 'environment')
 
         # change BASEDIR to path above
-        for value in ['sourcedir','scratchdir','permdir','cachedir']:
-            setattr(self, value,getattr(self, value).replace('BASEDIR', os.path.dirname(os.getcwd())))
+        for value in ['sourcedir','scratchdir','permdir','cachedir','calibrationdir']:
+            if getattr(self, value) is not None:
+                setattr(self, value,getattr(self, value).replace('BASEDIR', os.path.dirname(os.getcwd())))
 
         self._init_config(conf_parser, 'staging')
 

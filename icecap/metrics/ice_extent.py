@@ -50,12 +50,7 @@ class Metric(BaseMetric):
         else:
             da_fc_verif = processed_data_dict['da_fc_verif'].squeeze()
 
-        fc_name = self.verif_expname[0]
-        if self.verif_modelname[0] is not None:
-            fc_name = f'{self.verif_modelname[0]} {fc_name}'
-
-
-        data_plot.append(da_fc_verif.rename(f'{fc_name}'))
+        data_plot.append(da_fc_verif.rename(f'{self.title_fcname}'))
 
         if self.add_verdata == "yes":
             da_verdata_verif = processed_data_dict['da_verdata_verif'].squeeze()
