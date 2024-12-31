@@ -30,7 +30,7 @@
 }
 
 \newcommand{\ice}{\textit{ICECAP}\xspace}
-\newcommand{\version}{0.4\xspace}
+\newcommand{\version}{1.0\xspace}
 
 \newcommand{\tbd}[1]{\textcolor{red}{\textbf{#1}}}   
 \newcommand{\highlight}[1]{\textsc{\textbf{#1}}}  
@@ -54,22 +54,21 @@
 \chapter{Introduction}
 
 \section{What is \ice?}
-\highlight{\ice is still under development so not all capabilities described below are implemented in the current version of the software}
-
-\ice (sea-Ice Calibration, vErifiCAtion and Products) is a python-based software tool developed within the EU Horizon 2020 project ACCIBERG. \ice is developed to handle validation and calibration of Northern-hemisphere sea-ice forecasts provided by the project partners, CMEMS and C3S. The software will also support the production of prototypes for sea-ice forecast products on the WEkEO platform. 
+\ice (sea Ice Calibration, vErifiCAtion and Products) is a python-based software tool developed within the EU Horizon 2020 project ACCIBERG. \ice is developed to handle validation and calibration of Northern Hemisphere sea ice forecasts provided by the project partners, CMEMS and C3S. The software will also support the production of prototypes for sea ice forecast products on the WEkEO platform. 
 
 \ice is designed to 
 \begin{enumerate}
-	\item Retrieve and pre-process sea-ice cover fields from a set of retrospective ensemble forecasts both from C3S and CMEMS as well as the corresponding observations, compute and visualize a set of validation metrics, and compute calibration statistics. This functionality is targeted at scientific users who perform research on the forecasts and develop the forecasting systems.
-	\item Retrieve and pre-process sea-ice cover fields from a single (“real-time”) ensemble forecast, calibrate for known errors using calibration statistics computed in (1), and compute and visualize a set of user-relevant information products together with information on forecast quality from (1). This functionality is targeted at end users who need reliable sea-ice forecast information for their activities in potentially ice-infested waters.
+	\item Retrieve and pre-process sea ice cover fields from a set of retrospective ensemble forecasts both from C3S and CMEMS as well as the corresponding observations, compute and visualize a set of validation metrics, and compute calibration statistics. This functionality is targeted at scientific users who perform research on the forecasts and develop the forecasting systems. \notimplement{(In the latest version retrievals from CMEMS are not  possible as no ensemble forecasts are yet available.)}
+	\item Retrieve and pre-process sea ice cover fields from a single (“real-time”) ensemble forecast, calibrate for known errors using calibration statistics computed in (1), and compute and visualize a set of user-relevant information products together with information on forecast quality from (1). This functionality is targeted at end users who need reliable sea ice forecast information for their activities in potentially ice-infested waters.
 \end{enumerate}
 
 General information on \ice
 \begin{itemize}
 	\item \ice is written in object-oriented Python 3 for a Unix-like environment and follows established good practices for code design and documentation. It will rely as much as possible on widely used open source software.
-	\item Input data streams are daily-mean gridded sea-ice concentrations observations and forecasts stored locally in NetCDF files or retrieved remotely through appropriate protocols (e.g. from C3S).
+	\item Input data streams are daily-mean gridded sea ice concentrations observations and forecasts stored locally in NetCDF files or retrieved remotely through appropriate protocols (e.g. from C3S).
 	\item To make use of \ice's full capabilities an ecFlow workflow manager is necessary
-	\item An user-friendly interface based on jupyter notebooks is implemented to provide a convenient way to bundle documentation, selection of some execution parameters (such as geographical regions and seasons), code calls and graphical outputs. 
+	\item An user-friendly interface based on jupyter notebooks is implemented to provide a convenient way to
+	 produce selected graphical outputs. 
 	\item Outputs of \ice are (a) validation and calibration metrics stored locally in NetCDF files, (b) visualization of validation and calibration metrics in graphics files, (c) visualization of user product prototypes in graphics files
 \end{itemize}
 
@@ -83,23 +82,24 @@ Further information for scientific users:
 
 \FloatBarrier
 \section{Setting up your machine}\label{sec:setup}
-First clone the \ice repository to a user defined \texttt{icecap\_rootdir}.
+First clone the \ice repository.
 \begin{lstlisting}[language=bash]
-	$ git clone https://git.ecmwf.int/scm/~nedb/icecap.git
+	$ git clone https://github.com/ecmwf/ICECAP
 \end{lstlisting}
 
 
 It contains the following subdirectories:
 
 \dirtree{% This % is required
-	.1 icecap\_rootdir.
-	.2 doc/: contains documentation.
+	.1 ICECAP.
 	.2 conf/: configuration files.
+	.2 doc/: contains documentation.
 	.2 ecf/: ecFlow files.
 	.2 icecap/: python packages.
 	.2 etc/:  contains other files relevant throughout the software.
 	.2 notebooks/: contains jupyter notebook files for products.
 	.2 environment.yml.
+	.2 Makefile.
 	.2 README.md. 
 }
 
@@ -154,7 +154,7 @@ To use  \ice's end-user interface (jupyter notebooks) it is sufficient to instal
 	
 \subsection{Data from the Climate Data Store (CDS)}
 \label{subsec:cds}
-Registration is compulsory to retrieve data from the CDS. Please follow the instruction here \url{https://cds.climate.copernicus.eu/api-how-to} to set this up on your local machine. Note that it might be necessary to sign a license agreement to retrieve seasonal forecasts data from the CDS.
+Registration is compulsory to retrieve data from the CDS. Please follow the instruction here \url{https://cds.climate.copernicus.eu/how-to-api} to set this up on your local machine. Note that it might be necessary to sign a license agreement to retrieve seasonal forecasts data from the CDS.
 
 
 	
@@ -165,7 +165,7 @@ It is possible to derive forecast statistics for specific NSIDC regions \citep{M
 \chapter{\ice's user interface}
 
 \section{Getting started}
-Selected prototype end-user products are available within \ice to be run in a jupyter environment. The notebooks are stored under \texttt{icecap\_rootdir/notebooks}. When cloning \ice these notebooks are stored as \texttt{markdown} format. Please follow these steps to execute the notebooks
+Selected prototype end-user products are available in \ice and these can be run in a jupyter environment.  The notebooks are stored under \texttt{ICECAP/notebooks}. When cloning \ice these notebooks are stored as \texttt{markdown} format. Please follow these steps to execute the notebooks
 \begin{lstlisting}[language=bash]
 	$ cd notebooks
 	$ ./convert_notebooks.sh
@@ -176,7 +176,7 @@ Selected prototype end-user products are available within \ice to be run in a ju
 \end{lstlisting}
 
 \section{Existing notebooks}
-\notimplement{Currently, three different notebooks are available. These notebooks use existing configuration specifying the forecast model, forecast date etc. The notebooks are designed to work without any changes to the configuration file and some settings, e.g. forecast date can be changed interactively in the jupyter notebook. More advanced changes can be made by editing the respective configuration file.   }
+Currently, five different notebooks are available. These notebooks use existing configuration files specifying the forecast model, forecast date etc. The notebooks are designed to work without any changes to the configuration files. Some settings, e.g. forecast date can be changed interactively in the jupyter notebook. More advanced changes can be made by editing the respective configuration file.   
 
 \subsection{\texttt{ice\_area\_map}}
 This notebook produces spatial maps of predicted sea ice concentrations from TOPAZ5 medium-range and ECMWF/DWD seasonal forecasts. Two configuration files are used within the notebook: \texttt{ice\_area\_maps\_topaz5.conf} and \texttt{ice\_area\_maps\_cds.conf}.
@@ -207,7 +207,7 @@ This notebook produces spatial maps of predicted sea ice concentrations from TOP
 	source = nersc_tmp
 \end{lstlisting}
 
-The TOPAZ5 configuration file, defines that ice\_area\_maps should be derived for forecast day 1,2,3,4,7,10 (entry \texttt{target}) of the TOPAZ5 forecast initialized yesterday. Whereas the forecast day can be changed in the jupyter notebook, changes to which forecast days should be plotted need to be changed in the config file directly.
+The TOPAZ5 configuration file, defines that ice area maps should be derived for forecast day 1,2,3,4,7,10 (configuration file entry \texttt{target}) of the TOPAZ5 forecast initialized yesterday. Whereas the forecast initialization date can be changed in the jupyter notebook, changes to which forecast days should be plotted need to be changed in the config file directly.
 
 \paragraph{\texttt{ice\_area\_map\_cds.conf}}\mbox{}\\
 
@@ -237,14 +237,23 @@ verif_fcsystem = long-range
 verif_dates = 20241101
 \end{lstlisting}
 
-The CDS configuration file, defines that ice\_area\_maps should be derived for forecast day 15,45,75,105,135,165 (entry \texttt{target}) of the ECMWF SEAS5 forecast initialized on 1.11.2024. Whereas the forecast day and forecast model can be changed in the jupyter notebook, changes to which forecast days should be plotted need to be changed in the config file directly.
+The CDS configuration file, defines that ice area maps should be derived for forecast day 15,45,75,105,135,165 of the ECMWF SEAS5 forecast initialized on 1.11.2024. 
+
+\subsection{\texttt{break\_up}}
+\info{This notebook only works if the calibration file (model climatology of break-up dates) has been pre-computed and the respective file is located in the \texttt{calibrationdir} specified in the configuration file.}\\
+
+This notebook produces spatial plots of predicted sea ice break-up probabilities. The break-up date is defined as the last date when the sea ice concentration is above 15\%. The metric is available for seasonal forecasts. To account for systematic forecast errors, the break-up metric indicates whether the forecast predicts an early or late break-up date relative to its own climatology. Here, we use the year 1993 to 2016 (standard C3S hindcast period) to define the climatological distribution of break-up dates. The climatological distribution of dates needs to be pre-computed and saved in the calibrationdir specified in the configuration file  \texttt{break\_up\_cds.conf}).
 
 \subsection{\texttt{ice\_distance}}
 This notebook produces a line plot indicating the predicted distance of the chosen location to the sea ice edge based on the specified TOPAZ5 medium-range forecast. Most settings can be changed using the drop down menu in the jupyter notebook. more specific changes need to be made in the configuration file (\texttt{ice\_distance\_topaz5.conf}).
 
-\subsection{\texttt{ice\_extent}}
-This notebook produces line plots of predicted sea ice extent from TOPAZ5 medium-range and ECMWF/DWD seasonal forecasts. Most settings can be changed using the drop down menu in the jupyter notebook. more specific changes need to be made in the respective configuration files (\texttt{ice\_extent\_topaz5.conf} and \texttt{ice\_extent\_cds.conf} ).
+\subsection{\texttt{ice\_area}}
+This notebook produces line plots of predicted sea ice area from TOPAZ5 medium-range and ECMWF/DWD seasonal forecasts. Most settings can be changed using the drop down menu in the jupyter notebook. more specific changes need to be made in the respective configuration files (\texttt{ice\_area\_topaz5.conf} and \texttt{ice\_area\_cds.conf} ).
 
+\subsection{\texttt{ice\_extent}}
+This notebook produces line plots of predicted sea ice area from TOPAZ5 medium-range and ECMWF/DWD seasonal forecasts. Most settings can be changed using the drop down menu in the jupyter notebook. more specific changes need to be made in the respective configuration files (\texttt{ice\_extent\_topaz5.conf} and \texttt{ice\_extent\_cds.conf} ).
+
+\info{Those parts of this notebook producing calibrated plumes (removing systematic model biases) only work if the calibration file has been pre-computed and the respective file is located in the calibrationdir specified in the configuration file.}\\
 
 \chapter{Scientific Analyses using \ice}
 \section{Basic workflow}
@@ -266,26 +275,27 @@ This is an example how to run \ice on your local machine using a test configurat
 		
 	\item go to the directory of all python files provided with the package.
 	\begin{lstlisting}[language=bash]
-		$ cd icecap_rootdir/icecap
+		$ cd ICECAP/icecap
 	\end{lstlisting}
 	
-	\item choose one configuration file from \texttt{icecap\_rootdir/conf/test} and copy it to your working directory. Two configuration files, which should run machine independent, are implemented. One using TOPAZ5 forecast data provided by MetNorway (\texttt{test\_topaz.conf}) and one using seasonal forecasts from the CDS (\texttt{test\_cds.conf}). Note that for the latter it is necessary to set up access to the CDS (see section \ref{subsec:cds})\\
+	\item choose one configuration file from \texttt{ICECAP/conf/test} and copy it to your working directory. Two configuration files, which should run machine independent, are implemented. One using TOPAZ5 forecast data provided by MetNorway (\texttt{test\_topaz.conf}) and one using seasonal forecasts from the CDS (\texttt{test\_cds.conf}). Note that for the latter it is necessary to set up access to the CDS (see section \ref{subsec:cds})\\
 	\begin{lstlisting}[language=bash]
-		$ cp icecap_rootdir/conf/test/icecap_topaz.conf icecap.conf
+		$ cp ICECAP/conf/test/icecap_topaz.conf icecap.conf
 	\end{lstlisting}
 	
 	\item Change the following settings in \texttt{icecap.conf} (All settings of the configuration file are described in detail in chapter \ref{chap:config}). 
 	\begin{itemize}
 		\item \texttt{user} : should normally be your UNIX user name. 
-		\item \texttt{sourcedir}: source code directory (corresponds to \texttt{icecap\_rootdir}).
+		\item \texttt{sourcedir}: source code directory (corresponds to \texttt{ICECAP main directory}).
 		\item \texttt{permdir}:  Base directory for runtime scripts 
 		\item \texttt{scratchdir}: Base directory for post-processed files, and the plots. Please make sure you have enough space (see chapter \ref{chap:files} for more details). 
 		\item \texttt{cachedir}: Location of the local data cache. It should be considered that this can get quite large (see chapter \ref{chap:files} for details)
 		\item \texttt{ecfhomeroot}: Location of ecflow specific files
+		\item \texttt{python\_exe}: Location of the python3 conda environment binary
 	\end{itemize}
-	If your ecFlow server is running on your localmachine as described in section \ref{sec:setup} no changes to the \texttt{ecflow\_host} and  \texttt{ecflow\_port} of the configuration file are needed. If it is running on a different \texttt{Host} or \texttt{Port} it needs to be changed accordingly.
+	If your ecFlow server is running on your local machine as described in section \ref{sec:setup} no changes to the \texttt{ecflow\_host} and  \texttt{ecflow\_port} of the configuration file are needed. If it is running on a different \texttt{Host} or \texttt{Port} it needs to be changed accordingly.
 	
-	\notimplement{\info{For some reason the \texttt{ECF\_HOST} variable is set incorrect under MacOS. Thus, to run \ice on Macbooks you need to replace \texttt{ECF\_HOST=\%ECF\_PORT\%} by \texttt{ECF\_HOST=localhost} in \texttt{ecf/include/head.h}}}.
+	\info{For some reason the \texttt{ECF\_HOST} variable is set incorrect under MacOS. Thus, to run \ice on Macbooks you need to replace \texttt{ECF\_HOST=\%ECF\_PORT\%} by \texttt{ECF\_HOST=localhost} in \texttt{ecf/include/head.h}}.
 	
 	\item Load \ice configuration file on ecFlow server\\
 	\begin{lstlisting}[language=bash]
@@ -402,12 +412,14 @@ This directory includes all temporary files created by the \ice suite defined in
 \subsection{\texttt{ecfhomeroot}}
 This directory includes all files created when running the suite on the ecflow server, e.g. the output from running the .ecf scripts.
 
+\subsection{\texttt{Calibrationdir}}
+This directory stores the files computed for calibration. If these calibration files are already available, they can be used without computing the statistic again (see section \ref{subsec:calibration}).
 
 
 
 
 \section{The configuration file}\label{chap:config}
-The configuration file is the centre piece of {\ice}'s user interface. It stores  all the information that is needed to build an ecFlow suite that executes tasks with the correct parameters and in the correct order. Each time a Python script is started, it will create a configuration object based on the configuration file, and pass it down to the modules it uses, so that each module knows what it is expected to do and can take the necessary action. The configuration file is parsed using ConfigParser, so please refer to its documentation if in doubt about syntax. 
+The configuration file is the centre piece of {\ice}'s user interface. It stores  all the information that is needed to build an ecFlow suite that executes tasks with the correct parameters and in the correct order. Each time a python script is started, it will create a configuration object based on the configuration file, and pass it down to the modules it uses, so that each module knows what it is expected to do and can take the necessary action. The configuration file is parsed using ConfigParser, so please refer to its documentation if in doubt about syntax. 
 
 A few hints for the configuration file that might be helpful to remember:
 \begin{itemize}
@@ -424,7 +436,7 @@ A few hints for the configuration file that might be helpful to remember:
 
 
 \subsection{Understanding the sections of the configuration file}
-Although you could start from scratch building up the configuration file, it is easiest to use one of the test-configfiles provided in the repository. From within the \texttt{conf} directory, choose a test configuration file that most closely matches what you plan to do. In version \version there are currently two tests, one using TOPAZ5 medium-range forecasts from MetNorway and one test case using a seasonal forecast from the CDS. Copy it into the \texttt{sourcedir} folder and name it \texttt{icecap.conf}, which is the default filename expected by \texttt{icecap.py}. 
+Although you could start from scratch building up the configuration file, it is easiest to use one of the test configuration files provided in the repository. From within the \texttt{ICECAP/conf/test} directory, choose a test configuration file that most closely matches what you plan to do. In version \version there are currently two tests, one using TOPAZ5 medium-range forecasts from MetNorway and one test case using a seasonal forecast from the CDS. Copy it into the \texttt{sourcedir} folder and name it \texttt{icecap.conf}, which is the default filename expected by \texttt{icecap.py}. 
 
 
 The configuration file is organized in sections which reflect the different aspects of how \ice can be configured, while trying to be as user-friendly and intuitive as possible. Three section always need to be present. These are: \texttt{environment}, \texttt{ecflow} and \texttt{staging}. Here, the main directories used by \ice (local data cache, permanent and scratch directories etc.), the ecflow server and the staging options are defined. 
@@ -434,7 +446,7 @@ To produce staging data, at least one forecast configuration section \texttt{fc\
 
 It is important to realize that the \texttt{staging} and the \texttt{fc\_expID} sections work closely together as settings in both section determine which observational data is retrieved. Staging defines the observational reference dataset used for comparison to the forecast, wheres within the \texttt{fc\_expID} block the forecast experiment metadata is described (experiment name, dates etc). Based on the dates selected in the forecast block \texttt{fc\_expIDs} the dates needed to be retrieved for the reference dataset is determined automatically within \ice.
 
-Note that \ice only allows the verification and user product generation for sea-ice concentration data.
+Note that \ice only allows the verification and user product generation for sea ice concentration data.
 
 
 Finally, a remark on date selection: please note that dates are defined at two different places in the configuration file. Firstly, these are used in all \texttt{fc\_expID} blocks, which defines which data is retrieved from the archive. Secondly, dates are defined in \texttt{plot\_plotID}, which are those dates used to derive metrics and create graphic products. Naturally, all forecast/verification data for dates in \texttt{plot\_plotID} need to be retrieved, meaning that dates in \texttt{plot\_plotID} are usually a subset of the dates in \texttt{fc\_expID} (unless data has been retrieved earlier and is still in the cache).
@@ -455,7 +467,7 @@ This configures the basic setup, such as all directories and the name of the ecF
 	   \end{lstlisting}
 	   \item \texttt{python\_exe}: Specify location of python binary. This is useful in case of personal conda environments. If not specified the python3 binary used as default on executing shell will be used.
 	  \item \texttt{job\_memory}: Specify amount of memory to be used for this suite. This only works if there exists a \texttt{head\_JOB\_MEMORY.h} file in \texttt{/etc}
-	  \item \texttt{calibrationdir}: This is the location where \ice will save calibration files. It is also the location where \ice will look for those files in case the user specifies that the necessary files for calibration already exist.
+	  \item \texttt{calibrationdir}: This is the location where \ice will save calibration files. It is also the location where \ice will look for those files in case the user specifies that the necessary files for calibration already exist (see section \ref{subsec:calibration}).
 \end{itemize}
 	
 \subsubsection{Section \texttt{ecflow}} \label{sec:ecflow}
@@ -503,10 +515,10 @@ The following options are always required to be present in the section.
  \item \texttt{source}: This identifier determines the python routine used to retrieve the data. Implemented are:  \texttt{nersc\_tmp}, \texttt{cds} for seasonal forecasts from the Climate Data Store and \texttt{ecmwf} for internal ECMWF use (see chapter \ref{chap:data}).
  \item \texttt{enssize}: number of ensemble members to be staged. 
  \item \texttt{fcsystem}: name of forecast system, either: medium-range, extended-range or long-range
- \item \texttt{expname}: experiment name. This depends on the datasource (see chapter \ref{chap:data}).
+ \item \texttt{expname}: experiment name. This depends on the data source (see chapter \ref{chap:data}).
  \item \texttt{dates}: dates to be selected. This can be either in format YYYYMMDD or MMDD together with fromyear/toyear (see section \ref{sec:dates})
  \item \texttt{ndays}: number of forecast days to be retrieved
- \item \texttt{mode}: either fc (forecast) or hc (hindcast). The latter is only necessary if re-forecasts/hindcasts are produced for the model. An example is extended-range forecasts, e.g. from ECMWF for which for each forecast day a re-forecast set for the past 20\,years is calculated. Such re-forecasts are usually used for model calibration. \notimplement{Currently, \texttt{mode=hc} is only possible for internal ECMWF forecast data \texttt{source=ecmwf}}.
+ \item \texttt{mode}: either fc (forecast) or hc (hindcast). The latter is only necessary if re-forecasts/hindcasts are produced for the model. An example is extended-range forecasts, e.g. from ECMWF for which for each forecast day a re-forecast set for the past 20\,years is calculated. Such re-forecasts are usually used for model calibration. Currently, \texttt{mode=hc} is only possible for internal ECMWF forecast data \texttt{source=ecmwf}.
 
 \end{itemize}
 
@@ -551,7 +563,9 @@ The \texttt{verif\_} configuration name entry is used to define all attributes f
 	\item \texttt{calib\_method}: calibration method to be used (mean, mean+trend)
 \end{itemize}
 
-\texttt{calib\_expname} and \texttt{calib\_fcsystem} can not be set thorugh the configuration file as it is assumed that these values are the same as for the \texttt{verif\_} options. 
+\texttt{calib\_expname} and \texttt{calib\_fcsystem} can not be set through the configuration file as it is assumed that these values are the same as for the \texttt{verif\_} options. \\
+
+\info{Note that if \texttt{calib\_method} is not set no calibration will be performed, even if other \texttt{calib\_} options are set.}
 
 
 \subsection{Additional plot options}\label{subsec:add_options}
@@ -560,7 +574,7 @@ There are several options, which can be set by the user or are specific to some 
 The table \ref{tab:add_options} shows all options, which can be controlled via the configuration file and some of these options are further described below.
 
 \subsubsection{OPTION: \texttt{area\_statistic}}
-This options allows to derive a metric for a certain area. If not defined by \texttt{region\_extent} this is the region for which observations are available. \texttt{area\_statistic} is provided with a maximum of three values separated by \texttt{:} in the following format: \\
+This options allows to derive a metric for a certain area. If not defined by \texttt{region\_extent} of \texttt{nsidc\_region} this is the entire region for which observations/forecast data is available. \texttt{area\_statistic} is provided with a maximum of three values separated by \texttt{:} in the following format: \\
 
 \texttt{data/score:sum/mean:total/fraction/percent}. \\
 
@@ -576,6 +590,8 @@ Users can specify an additional mask, which is applied to forecast data. This mi
 \end{lstlisting}
 
 \subsubsection{OPTION: \texttt{copy\_id}}
+\info{This option is not fully tested, so please use with care.}
+
 Here the user can specify an existing plotID, from which to use the plot settings if not specified otherwise in this plot section. This is useful, e.g. to plot several different metrics for one forecast dataset. Example:
 
 \begin{lstlisting}[language=bash]
@@ -616,7 +632,6 @@ In this case, all settings from \texttt{plume} plot section are also used for th
 		nsidc\_region & NSIDC region identifier   & see Table \ref{tab:NSIDC} & all \\
 		cmap	& colormap name to be used 	& string giving cmap name & all \\
 		add\_verdata & add statistic for reference dataset & no/yes & all  \\
-		add\_verdata\_nomask & add statistic for reference dataset (no land-sea-mask from forecast has been applied) & no/yes & ice\_extent \\
 		points & coordinates (lon-lat) used in metric & None & ice\_distance \\
 		area\_statistic & derive metric over specific limited area & see details below & all\\
 		plot\_shading & plot shaded percentile ranges in timeseries plot &  csv given lower percentiles, e.g. \newline 10,25 will plot 10-90, 25-75 & all timeseries plots \\
@@ -644,7 +659,7 @@ The reasons for the implementation of these 4 methods is that it allows the user
 
 
 \section{Datasets implemented in \ice} \label{chap:data}
-\notimplement{Currently} the following datasets are implemented in \ice.
+The following datasets are implemented in \ice.
 
 \subsection{Observational Datasets (verdata)}
 
@@ -661,7 +676,7 @@ The reasons for the implementation of these 4 methods is that it allows the user
 		\item expname = topaz5 (10 member)
 	\end{itemize}
 	\item source = cds \\
-	(see \url{https://cds.climate.copernicus.eu/cdsapp#!/dataset/seasonal-original-single-levels?tab=doc} for further information)
+	(see \url{https://cds.climate.copernicus.eu/datasets/seasonal-original-single-levels?tab=documentation} for further information)
 	\begin{itemize}
 		\item modelname = ecmwf; expname = 4/5/51
 		\item expname = dwd; expname = 2/21
@@ -702,7 +717,7 @@ Four files will be created:
 	\item \texttt{nsidc\_osi-cdr.png}
 \end{itemize}
 
-The netcdf files are used in \ice for region selection, and the png files illustrate the available regions. These are listed in Table \ref{tab:NSIDC}.  \\
+The netcdf files are used in \ice for region selection, and the png files illustrate the available regions. These are listed in table \ref{tab:NSIDC}.  \\
 
 \begin{table}[!h]
 	\centering
@@ -732,19 +747,19 @@ The netcdf files are used in \ice for region selection, and the png files illust
 	\label{tab:NSIDC}
 \end{table}
 
-
+\clearpage
 
 \section{Metrics}\label{chap:metrics}
 \subsection{Understanding and using existing metrics}
 In \ice, a \emph{metric} is any set of fields or time series that is derived from forecast and reference data and represents some relevant aspect of the full data. The dimensions of metrics data are a subset of the dimensions of the full data. Thus, metrics data are orders of magnitude smaller than full forecast/verification data. Since metrics data are stored on disk as NetCDF files, they can be quickly read for further processing and plotting. 
 
-Currently, the following metrics are \notimplement{implemented}
+Currently, the following metrics are implemented
 \begin{enumerate}
 	\item timeseries only
 	\begin{itemize}
 		\item plume
 		\item ice\_extent
-		\item ice\_distance - distance of user given location to sea ice edge (not fully tested yet)
+		\item ice\_distance - distance of user given location to sea ice edge 
 		\item iiee - integrated ice edge error
 		\item sps - spatial probability score
 	\end{itemize}
@@ -763,7 +778,7 @@ Currently, the following metrics are \notimplement{implemented}
 	\end{itemize}
 \end{enumerate}
 
-The metrics are specified using the \texttt{plottype} option in the \texttt{plot\_plotID} configuration section. Depending on the actual metric, several configuration options need to be set or can optionally be set. Generally two types of plotting are implemented: (i) spatial maps and (ii) timeseries plots. The type of plot is determined automatically within \ice (depending on user defined options passed to \ice via the configuration file). There are many different options, which can be used for some metrics, e.g. changing map boundaries to focus on a specific region. These options are described in section \ref{subsec:add_options} and table \ref{tab:add_options} gives an overview which options are allowed for which metric.
+The metrics are specified using the \texttt{plottype} option in the \texttt{plot\_plotID} configuration section. Depending on the actual metric, several configuration options need to be set or can optionally be set. Generally two types of plotting methods are implemented: (i) spatial maps and (ii) timeseries plots. The type of plot is determined automatically within \ice (depending on user defined options passed to \ice via the configuration file). There are many different options, which can be used for some metrics, e.g. changing map boundaries to focus on a specific region. These options are described in section \ref{subsec:add_options} and table \ref{tab:add_options} gives an overview which options are allowed for which metric.
 
 
 \subsubsection{\texttt{plume}}
@@ -845,6 +860,8 @@ This metric allows to calculate the integrated ice edge error (IIEE). Per defini
 	area_statistic = data:sum
 \end{lstlisting}
 
+Within \ice the \texttt{IIEE} is computed by first deriving the ensemble mean, before setting grid cells with sea ice concentrations above 15\% to a fraction of 1 (and all others to 0). 
+
 \subsubsection{\texttt{sps}}
 This metric allows to calculate the Spatial probability Scorer (SPS). Per definition the SPS is a quantity averaged over a specific region multiplied by the grid cell size. For a deterministic forecast the SPS is equal to the IIEE. The example in \ref{subsec:iiee} can be simply used to derive the SPS instead of the IIEE by replacing the \texttt{plottype} parameter. 
 
@@ -869,6 +886,7 @@ This metric creates a 2-d spatial map of the forecast on the original grid (as r
 Two figures will be created, one with the suffix native and one with the suffix regrid. Comparing both files as well as the netcdf files allows to check for any problems when interpolating to the observational grid. In the example above, the desired output grid is specified to match the native grid of TOPAZ4. Not setting these options will create figures using the default projection.   
 
 \subsubsection{\texttt{ensmean}}
+\label{subsubsec:ensmean}
 The metric \texttt{ensmean} allows to derive the ensemble mean sea ice concentration for a specific date or averaged over a set of dates. An example is:
 
 \begin{lstlisting}[language=bash]
@@ -887,6 +905,9 @@ The metric \texttt{ensmean} allows to derive the ensemble mean sea ice concentra
 \end{lstlisting}
 
 In this case, \texttt{ensmean} is calculated for TOPAZ4 data using all 10 ensemble members. Ensemble mean statistics are derived for the first three forecast days (indicated by the \texttt{target} option) averaging over both start dates (given by \texttt{verif\_dates}). In this case, sea-ice data is only plotted over the region given by \texttt{plot\_extent}. Note that using e.g. \texttt{area\_statistic = data:mean:percent} would automatically create a timeseries plot over the selected region.
+
+\subsection{\texttt{forecast\_error}}
+The metric \texttt{forecast\_error} allows to derive the mean forecast error (bias) between forecast model and observations for a specific date or averaged over a set of dates. The example in \ref{subsubsec:ensmean} can be simply used to derive the bias instead of the ensemble mean by replacing the \texttt{plottype} parameter. 
 
 \subsubsection{\texttt{crpss}}
 The metric \texttt{CRPSS} allows to compute the continuous ranked probability skill score using persistence as reference. An example is
@@ -930,10 +951,13 @@ This calculates the average BSS over a selected region using a set of forecasts.
 Metric to derive the root mean square error (RMSE) for a given (set of) forecast(s). The example in \ref{subsec:iiee} can be simply used to derive the RMSE instead of the IIEE by replacing the \texttt{plottype} parameter. 
 
 \subsubsection{\texttt{ser}}
-Metric to derive the spread error ratio (SER) for a given (set of) forecast(s). The example in \ref{subsec:iiee} can be simply used to derive the SER instead of the IIEE by replacing the \texttt{plottype} parameter. Using this metric will automatically create plots for the \texttt{spread} (square root of teh average ensemble variance), the \texttt{RMSE} and the \texttt{SER}. When averaging over a user-specified area, two line-plots will be created: one including \texttt{SPREAD} and \texttt{RMSE} and one with the \texttt{SER}.
+\label{subsubsec:ser}
+Metric to derive the spread error ratio (SER) for a given (set of) forecast(s). The example in \ref{subsec:iiee} can be simply used to derive the SER instead of the IIEE by replacing the \texttt{plottype} parameter. Using this metric will automatically create plots for the \texttt{spread} (square root of the average ensemble variance), the \texttt{RMSE} and the \texttt{SER}. When averaging over a user-specified area, two line-plots will be created: one including \texttt{SPREAD} and \texttt{RMSE} and one with the \texttt{SER}.
+
+\info{The ensemble spread is scaled using the factor $\sqrt{N/N-1}$ and the ensemble RMSE is scaled using the factor $\sqrt{N/N+1}$.}
 
 \subsubsection{\texttt{freeze\_up}}
-Metric to derive the probability of early/late freeze-up (sea ice concentration above 15\%). The climatological distribution of freeze\_up dates is derived from the data for the calibration period (thus \texttt{calib\_*} entried need to be defined). For \texttt{freeze\_up} \texttt{calib\_method=score} must be set. An example is
+Metric to derive the probability of early/late freeze-up (sea ice concentration above 15\%). The climatological distribution of freeze\_up dates is derived from the data for the calibration period (thus \texttt{calib\_*} entries need to be defined). For \texttt{freeze\_up} \texttt{calib\_method=score} must be set. An example is
 
 \begin{lstlisting}[language=bash]
 [plot_seas5_freeze_calib]
@@ -952,31 +976,90 @@ Metric to derive the probability of early/late freeze-up (sea ice concentration 
 	calib_method = score
 	calib_enssize   = 25
 	target = r:180
-	calib_exists = no
 \end{lstlisting}
 
-In this example, \texttt{freeze\_up} probabilities are derived for the ECMWF SEAS5 forecast initialized on 1.10.2024 (using the climatological probability calculated suing all forecasts for 1.10 from 1993 to 2016). Setting \texttt{calib\_exists=no} indicates that the climatological distribution needs to be calculated. If this is the case, all infromation needed for calibration will be saved in a netcdf file in the specific \texttt{metricdir} and also in \texttt{calibrationdir} (if specified). When setting \texttt{calib\_exists=yes}, \ice expects the calibration file to exist in \texttt{calibrationdir}.
+In this example, \texttt{freeze\_up} probabilities are derived for the ECMWF SEAS5 forecast initialized on 1.10.2024 (using the climatological probability calculated suing all forecasts for 1.10 from 1993 to 2016). 
 
 \subsubsection{\texttt{break\_up}}
 Metric to derive the probability of early/late break-up (sea ice concentration below 15\%). The calculation to derive this metric is analogue to \texttt{freeze\_up}.
 
 \subsection{Calibration}
+\label{subsec:calibration}
 \ice allows the provision of calibrated forecasts. The forecast data used for calibration can be specified using the \texttt{calib\_} options in the configuration file. \\
 Currently the following methods are implemented:
 \begin{itemize}
 	\item \texttt{mean}: Correction of mean systematic biases 
 	\item \texttt{mean+trend}: Correction of mean systematic biases and errors in the linear trend.
 	\item \texttt{persistence}: removing the error between observations from the previous day and the forecast at day 1 from all forecast days. 
-	\item \texttt{score}: Calibration is conducted within the metric itself, instead of calibration of sea ice forecast fields. This is only available for some metrics, e.. \texttt{freeze\_up} and \texttt{break\_up.}
+	\item \texttt{score}: Calibration is conducted within the metric itself, instead of calibration of sea ice forecast fields. This is only available for some metrics, e.g. \texttt{freeze\_up} and \texttt{break\_up.}
 \end{itemize}
 
-\notimplement{In future releases, it will be possible to specify whether the files needed for calibration already exist and are located in \texttt{calibrationdir}. In case this is not the case and the necessary files for calibration are calculated they will automatically be stored in \texttt{calibrationdir}. This allows the usage of pre-computed calibration files. Currently, this is only possible for \texttt{freeze\_up} and \texttt{break\_up} metrics. }
+\ice allows to save the calibration files for \texttt{mean} and \texttt{score} if \texttt{calibrationdir} is specified in the configuration file. If the calibration file exists it can be used for calibration without the need to compute it again. To use the pre-computed file specify \texttt{calib\_exists = yes} in the \texttt{plot} entry of the configuration file. Using pre-computed calibration files has the advantage that it speeds up the metric calculations especially if the same type of calibration is used for several metrics. \\
+
+
+\ice's metric \texttt{calc\_calib} allows to efficiently compute the calibration file for \texttt{calib\_method = mean}, which can be used to compute calibrated metrics later. An example of \texttt{calc\_calib} is:
+
+\begin{lstlisting}[language=bash]
+	[plot_calc_calib]
+	plottype = calc_calib
+	source = cds
+	verif_modelname = cmcc
+	verif_fcsystem   = long-range
+	verif_expname     = 35
+	verif_enssize   = 1
+	verif_mode = fc
+	verif_dates = 19930201
+	calib_mode = fc
+	calib_dates = 0201
+	calib_fromyear = 1993
+	calib_toyear = 2016
+	calib_method = mean
+	calib_enssize   = 40
+	target = r:180
+\end{lstlisting}
+
+In this example the calibration file needed for the \texttt{mean} bias correction is computed for the seasonal forecast model from CMCC initialized on first of February over the common hindcast period from 1993 to 2016. Note that \texttt{calc\_calib} only produces the calibration file without any plotting. 
+
+Removing mean systematic biases to obtain calibrated sea ice concentration values can lead to concentrations below 0 and above 1. As these values are unphysical we clip the range of possible values to [0,1]. Whereas the mean bias correction is a linear process, the clipping of values is not, which has some implications. The following workflow is implemented in \ice: 
+\begin{enumerate}
+	\item Reading of ensemble forecast data
+	\item Calibrating each ensemble member 
+	\item Clipping sea ice fields from each ensemble member to values between 0 and 1
+	\item optional: deriving ensemble mean
+	\item optional: deriving spatial statistics
+	\end{enumerate}
+
+The following example illustrates the non-linear impact of clipping:
+
+\begin{lstlisting}[language=bash]
+	[plot_calibrated_forecast_error]
+	plottype = forecast_error 
+	source = cds
+	verif_modelname = cmcc
+	verif_fcsystem   = long-range
+	verif_mode = fc
+	verif_dates = 0201
+	verif_fromyear = 1993
+	verif_toyear = 2016
+	verif_enssize   = 40
+	calib_mode = fc
+	calib_dates = 0201
+	calib_fromyear = 1993
+	calib_toyear = 2016
+	calib_method = mean
+	calib_enssize   = 40
+	target = r:180
+\end{lstlisting}
+
+In this metric the mean forecast error (bias) for the calibrated CMCC seasonal forecast initialized on 1.2 between 1993 to 2016 is computed. Calibration is performed by removing the lead-time dependent mean bias between forecast and observations over the period from 1993 to 2016 for all initializations on 1st of February. As the verification and calibration period is the same one would expect the bias of the calibrated forecast to be exactly 0 for all lead times and all locations. However, as (calibrated) sea ice concentrations below 0/above 1 for each individual member are clipped to [0,1] before deriving the ensemble mean this is not necessarily the case.  
 
 \subsection{Not-fully tested capabilities}
 \info{These functions are currently implemented in \ice but not fully tested.}
 
 \begin{itemize}
-	\item \texttt{temporal\_average}: This can be used to average sea ice fields over time or metric output over time. The format is \texttt{data/score:UNIT:TIMESCALE}. Selecting \texttt{data} will perform temporal averaging of sea ice fields, whereas \texttt{score} performs this action for teh metric itself (not implemented in most metrics). \texttt{UNIT} can be either \texttt{days} or \texttt{months}, whereas {TIMESCALE} specifies the number of days or months. In case of months, a selection of lead time is also possible, e.g. \texttt{data:months:1-3} would perform temporal averaging over forecast months 1 to 3.
+	\item \texttt{temporal\_average}: This can be used to average sea ice fields over time or metric output over time. The format is \texttt{data/score:UNIT:TIMESCALE}. Selecting \texttt{data} will perform temporal averaging of sea ice fields, whereas \texttt{score} performs this action for the metric itself (not implemented in most metrics). \texttt{UNIT} can be either \texttt{days} or \texttt{months}, whereas {TIMESCALE} specifies the number of days or months. In case of months, a selection of lead time is also possible, e.g. \texttt{data:months:1-3} would perform temporal averaging over forecast months 1 to 3.
+	\item metric \texttt{linear\_trend}: Derives the linear trend for forecast and observations
+	\item \texttt{plot\_id} entry \texttt{copy\_id}: Setting \texttt{copy\_id} to the id name of another \textit{plot\_} entry allows to use all those plot attributes specified in that \textit{plot\_} entry except those settings, which are explicitly set in the current  \textit{plot\_id} section.
 \end{itemize}
 
 \section{Implementing new capabilities into  \ice}\label{chap:develop}
@@ -986,10 +1069,29 @@ Currently the following methods are implemented:
 \ice is designed to be further developed by the scientific community. This includes the implementation of new data sources and new metrics but also bug-fixes. If implementing new code the pylint package should be used to check the readability (beside a few exceptions, a score above 8 is requested before any changes can be merged into the master branch of the git repository).
 
 \subsection{Adding data sources}
-Whereas the necessary code to retrieve some public datasets is already implemented, \ice is designed to allow simple implementation to read in further datasets. This could be either data from remote servers but also data from local disks. \notimplement{If you like to implement new dataset retrievals in version \version, refer to the module \texttt{nersc\_tmp.py}, which includes the implementation of TOPAZ4/5 data from the THREDDS server. Also please get in touch with me as I am happy to provide support to scientific partners within the ACCIBERG project).}
+Whereas the necessary code to retrieve some public datasets is already implemented, \ice is designed to allow simple implementation to read in further datasets. This could be either data from remote servers but also data from local disks. If you plan to implement new dataset retrievals in version \version, refer to the module \texttt{nersc\_tmp.py}, which includes the implementation of TOPAZ4/5 data from the THREDDS server. \\
 
-\subsection{Adding new metrics}
-Similar to data sources, \ice should allow to implement further metrics, which can be either verification scores etc but also products. An explanation of how this can be done is currently \notimplement{not included in this user guide but will be made available at a later stage}. \\
+In general the following steps need to be performed:
+\begin{enumerate}
+	\item Retrieve/process raw forecast data from origin
+	\item Process each member separately (\ice expects each forecast member to be stored in an individual file)
+	\item  Rename sea ice concentration to \texttt{sic} (this is the variable name \ice expects)
+	\item Rename member dimension to \texttt{number} (this is the dimension name \ice expects)
+	\item Interpolate to grid of reference dataset (use the interpolation routine from \texttt{dataobjects.py})
+	\item compute daily means
+\end{enumerate}
+
+A couple of steps to consider: 
+
+\paragraph{make\_filelist}
+The new python module needs this function. \texttt{make\_filelist} creates a list of files, which are expected to be retrieved to the local \texttt{cachedir}. This function will be used by \texttt{dataobjects.py} to check whether the forecast data is already downloaded. Please make use of the function \texttt{\_filenaming\_convention} from  \texttt{dataobjects.py}, which sets a known file name formatting for forecast and reference data files. 
+
+\paragraph{spatial interpolation}
+The function  \texttt{interpolate} from  \texttt{dataobjects.py} should be used to interpolate the sea ice fields from the forecast to the observational grid. 
+
+\paragraph{saving the final files in \texttt{cachedir}}
+Please make use of the function \texttt{\_filenaming\_convention} from  \texttt{dataobjects.py}, which sets a known file name formatting for forecast and reference data files. 
+
 
 \subsection{New configuration file options}
 Implementing new data sources or metrics might demand for new configuration file options. Within \ice each options needs to be included in the \texttt{namelist.py} file.   \texttt{namelist.py} holds a dictionary \texttt{config\_optnames} with the following structure\\
@@ -1030,6 +1132,27 @@ After implementing the new option in \texttt{namelist.py}, it will now automatic
 
 \chapter{Changelog History}
 
+\paragraph{\textbf{\ice v1.0\\[5pt]}}
+\textit{Features}
+\begin{itemize}
+	\item pre-computed calibration files can now be 
+	\item \texttt{calc\_calib} metric can be used to calculate calibration files for \texttt{calib\_method = mean}
+	\item new notebooks (break\_up and ice\_area)
+	\item pcolormesh is now the standard 2D plotting method
+	\item \texttt{ser} metric is now weighted using ensemble size (see section \ref{subsubsec:ser})
+\end{itemize}
+
+\textit{Breaking changes}
+\begin{itemize}
+	\item Calibration is now performed on each ensemble member before clipping (see section \ref{subsec:calibration}). This might lead to slight differences compared to previous versions.
+\end{itemize}
+
+\textit{Bugfixes}
+\begin{itemize}
+	\item new title strings for map and line plots
+	\item fixed wrong ice mask for verdata in \texttt{freeze\_up} metric
+\end{itemize}
+
 \paragraph{\textbf{\ice v0.4\\[5pt]}}
 
 \textit{Features}
@@ -1044,7 +1167,7 @@ After implementing the new option in \texttt{namelist.py}, it will now automatic
 
 \textit{Bugfixes}
 \begin{itemize}
-	\item the forecast for a dummydate downloaded for regridding has previously not been used for this purpose
+	\item the forecast for a dummy date downloaded for regridding has previously not been used for this purpose
 	\item some netcdf metric files couldn't be opened with ncview in previous versions of \ice because of the \_FillValue. 
 \end{itemize}
 
