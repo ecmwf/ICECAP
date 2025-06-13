@@ -14,7 +14,7 @@ xr.set_options(keep_attrs=True)
 
 params_verdata = {
     'sic' : {
-        'osi-450-a' : 'ice_conc',
+        'osi-450-a1' : 'ice_conc',
         'osi-401-b' : 'ice_conc',
         'osi-cdr' : 'ice_conc',
     }
@@ -28,7 +28,7 @@ def VerifData(conf):
     :return: Verification object
     """
     selector = {
-        'osi-450-a': _OSIThreddsRetrieval(conf),
+        'osi-450-a1': _OSIThreddsRetrieval(conf),
         'osi-401-b': _OSIThreddsRetrieval(conf),
         'osi-cdr': _OSIThreddsRetrieval(conf), # was osi-450-a_osi-430-a_mixed'
     }
@@ -64,9 +64,9 @@ class _OSIThreddsRetrieval(VerifyingData):
         self.dummydate = None
 
         self.root_server = "https://thredds.met.no/thredds/dodsC/osisaf/met.no/"
-        if self.verif_name == 'osi-450-a':
-            self.server = [self.root_server+"reprocessed/ice/conc_450a_files/"]
-            self.filebase = ["ice_conc_nh_ease2-250_cdr-v3p0_"]
+        if self.verif_name == 'osi-450-a1':
+            self.server = [self.root_server+"reprocessed/ice/conc_450a1_files/"]
+            self.filebase = ["ice_conc_nh_ease2-250_cdr-v3p1_"]
             self.fileext = ["1200.nc"]
 
             self.dummydate = '20171130'
@@ -80,8 +80,8 @@ class _OSIThreddsRetrieval(VerifyingData):
             self.dummydate = '20171130'
 
         if self.verif_name == 'osi-cdr':
-            self.server = self.root_server+"reprocessed/ice/conc_450a_files/"
-            self.filebase = "ice_conc_nh_ease2-250_cdr-v3p0_"
+            self.server = self.root_server+"reprocessed/ice/conc_450a1_files/"
+            self.filebase = "ice_conc_nh_ease2-250_cdr-v3p1_"
             self.fileext = "1200.nc"
 
             self.server = [self.server, self.root_server+"reprocessed/ice/conc_cra_files/"]
