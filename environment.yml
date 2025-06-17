@@ -1,4 +1,4 @@
-name: %%ENVNAME%%
+name: icecap
 channels:
   - conda-forge
   - defaults
