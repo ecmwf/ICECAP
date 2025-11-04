@@ -7,7 +7,7 @@ all:
 	@rm -f TMP.yml $(YAML_TMP)
 	@echo "Standard config"
 	@echo $(ENVNAME) $(YAML_TMP)
-	@conda remove --name $(ENVNAME) --all
+	@conda remove --name $(ENVNAME) --all || true
 	@conda config --set channel_priority flexible
 	@sed "s#icecap#$(ENVNAME)#g" $(YAML) > $(YAML_TMP)
 	conda env create -f $(YAML_TMP)
