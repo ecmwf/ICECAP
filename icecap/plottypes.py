@@ -3,7 +3,7 @@
 import os
 import ast
 import xarray as xr
-
+import matplotlib
 
 
 import utils
@@ -26,6 +26,7 @@ class GenericPlot:
     """" Generic plot class """
     def __init__(self, conf, metric):
         self.load(metric)
+        matplotlib.rcParams.update(matplotlib.rcParamsDefault)
         self.verif_name = metric.verif_name
         self.metric = metric
         self.ofile = metric.ofile
@@ -80,7 +81,6 @@ class GenericPlot:
         """ load metric file
         :param metric: metric object
         """
-
         fname = metric.get_filename_metric()
         if os.path.isfile(fname):
             output = xr.open_dataset(fname)
@@ -92,6 +92,5 @@ class GenericPlot:
             output = []
             for f in files:
                 output.append(xr.open_dataset(fdir+f))
-
 
         self.xr_file = output

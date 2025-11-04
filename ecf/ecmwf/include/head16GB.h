@@ -4,6 +4,7 @@
 #SBATCH --time=24:00:00
 #SBATCH --output=%ECF_JOBOUT%
 #SBATCH --error=%ECF_JOBOUT%
+#SBATCH --mem=16GB
 
 
 # Define an error handler

@@ -26,7 +26,8 @@
 	frameround=ffff,
 	frame=single,
 	rulecolor=\color{black},
-	autogobble=true
+	autogobble=true,
+	columns=fullflexible
 }
 
 \newcommand{\ice}{\textit{ICECAP}\xspace}
@@ -107,8 +108,8 @@ It contains the following subdirectories:
 To install \ice in a Linux environment with its full capabilities execute the following command:
 \begin{lstlisting}[language=bash]
 	$ make
-	
 \end{lstlisting}
+\textit{Hint: The default name of the environment will be icecap. You can change this by providing the option ENVNAME= to the make command.}
 
 This will install \ice  on your local machine in a conda virtual environment. The installation will include the ecflow package. If you are unable to execute the Makefile you can follow the steps below to install \ice. \\
 
@@ -278,9 +279,9 @@ This is an example how to run \ice on your local machine using a test configurat
 		$ cd ICECAP/icecap
 	\end{lstlisting}
 	
-	\item choose one configuration file from \texttt{ICECAP/conf/test} and copy it to your working directory. Two configuration files, which should run machine independent, are implemented. One using TOPAZ5 forecast data provided by MetNorway (\texttt{test\_topaz.conf}) and one using seasonal forecasts from the CDS (\texttt{test\_cds.conf}). Note that for the latter it is necessary to set up access to the CDS (see section \ref{subsec:cds})\\
+	\item choose one configuration file from \texttt{../conf/test} and copy it to your working directory. Two configuration files, which should run machine independent, are implemented. One using TOPAZ5 forecast data provided by MetNorway (\texttt{test\_topaz.conf}) and one using seasonal forecasts from the CDS (\texttt{test\_cds.conf}). Note that for the latter it is necessary to set up access to the CDS (see section \ref{subsec:cds})\\
 	\begin{lstlisting}[language=bash]
-		$ cp ICECAP/conf/test/icecap_topaz.conf icecap.conf
+		$ cp ../conf/test/test_topaz.conf icecap.conf
 	\end{lstlisting}
 	
 	\item Change the following settings in \texttt{icecap.conf} (All settings of the configuration file are described in detail in chapter \ref{chap:config}). 
@@ -307,7 +308,7 @@ This is an example how to run \ice on your local machine using a test configurat
 	\item Inspect graphic products.  \\
 	After the ecFlow suite has been run successfully the graphic products should be produced and can be inspected.
 	\begin{lstlisting}[language=bash]
-		$ cd scratchdir/topaz_test/plots/[metric-name]/
+		$ cd scratchdir/test_topaz/plots/[metric-name]/
 	\end{lstlisting}
 	
 \end{enumerate}
@@ -498,7 +499,7 @@ This section controls which reference data is retrieved. Also it allows to selec
  \item \texttt{verdata}: determines which verification data is used. This can be 
  \begin{enumerate}
  	\item \texttt{osi-401-b}
- 	\item \texttt{osi-cdr}: this is a temporal combination of osi-450-a and osi-430-a
+ 	\item \texttt{osi-cdr}: this is a temporal combination of osi-450-a1 and osi-430-a
  \end{enumerate}
 As described, forecast data within \ice is always interpolated to the reference data grid. 
  
@@ -665,7 +666,7 @@ The following datasets are implemented in \ice.
 
 \begin{itemize}
 		\item \texttt{osi-401-b}
-		\item \texttt{osi-cdr}: this is a temporal combination of osi-450-a and osi-430-a
+		\item \texttt{osi-cdr}: this is a temporal combination of osi-450-a1 and osi-430-a
 \end{itemize}
 	
 \subsection{Forecast Datasets}
@@ -1131,6 +1132,27 @@ A new configuration options needs to be inserted at the correct place. The new o
 After implementing the new option in \texttt{namelist.py}, it will now automatically be read at the respective part of the \texttt{config.py} file. The function reading the config file section is called \texttt{\_init\_config(conf\_parser, 'section name')}. After reading the configuration file section the value of the new option should be available as a class attribute \texttt{self.new\_option}.
 
 \chapter{Changelog History}
+
+\paragraph{\textbf{\ice v1.1\\[5pt]}}
+\textit{Breaking changes}
+\begin{itemize}
+	\item  OSI-CDR dataset is now a combination of osi-450-a1 and osi-430-a. Any chache files previously retrieved with \ice need to be deleted before using this version.
+\end{itemize}
+
+\textit{Features}
+\begin{itemize}
+	\item added support for osi-450-a (also now part of osi-cdr)
+	\item moved to python 3.12
+	\item InsetPosition is deprecated in python 3.12 --> replaced by inset_axes
+\end{itemize}
+
+\textit{Bugfixes}
+\begin{itemize}
+	\item environment.yml now has icecap as standard environment name (updated manual)
+	\item head.h for ecmwf has been changed to work with RHEL 8.10 nodes
+	\item routine to derive combined (obs/fc) land-sea-mask now also works if first obs timestep is missing
+	\item IIEE: score can now handle missing observational dataå
+\end{itemize}
 
 \paragraph{\textbf{\ice v1.0\\[5pt]}}
 \textit{Features}

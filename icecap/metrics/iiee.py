@@ -46,9 +46,12 @@ class Metric(BaseMetric):
         da_persistence = processed_data_dict['da_verdata_persistence']
 
         # set sic>0.15 to 1 else 0
+        # set nan values if obs are missing
+        da_fc_verif = xr.where(~np.isnan(da_verdata_verif), da_fc_verif, np.nan)
         da_fc_verif = xr.where(da_fc_verif>0.15,1,0)
-        da_verdata_verif = xr.where(da_verdata_verif>0.15,1,0)
+        da_persistence = xr.where(~np.isnan(da_verdata_verif), da_persistence, np.nan)
         da_persistence = xr.where(da_persistence>0.15,1,0)
+        da_verdata_verif = xr.where(da_verdata_verif > 0.15, 1, 0)
 
         ensmean_over_fc = xr.ones_like(da_verdata_verif).where(da_fc_verif - da_verdata_verif == 1, 0)
         ensmean_under_fc = xr.ones_like(da_verdata_verif).where(da_fc_verif - da_verdata_verif == -1, 0)

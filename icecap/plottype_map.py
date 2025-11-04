@@ -98,7 +98,6 @@ class MapPlot(plottypes.GenericPlot):
         for _ds_file in xr_file_list:
             if 'time' not in _ds_file.dims:
                 _ds_file = _ds_file.expand_dims('time')
-
             var_list = list(_ds_file.data_vars)
 
             # remove lsm and noplot variables from metric

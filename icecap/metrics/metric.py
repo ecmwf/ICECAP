@@ -55,10 +55,7 @@ class BaseMetric(dataobjects.DataObject):
                 len(self.verif_toyear) == len(self.verif_dates)):
             raise ValueError('Length of verif_toyear must be 1 or equal to verif_dates')
 
-        if self.verif_fromyear[0] is not None and len(self.verif_fromyear)==1:
-            self.verif_fromyear = [self.verif_fromyear[0] for year in range(len(self.verif_dates))]
-        if self.verif_toyear[0] is not None and len(self.verif_toyear)==1:
-            self.verif_toyear = [self.verif_toyear[0] for year in range(len(self.verif_dates))]
+
 
 
         self.verif_refdate = utils.confdates_to_list(conf.plotsets[name].verif_refdate)
@@ -152,6 +149,11 @@ class BaseMetric(dataobjects.DataObject):
                     setattr(self, key, getattr(copy_metric, key))
                 elif value_self in ['None','none']:
                     setattr(self, key, None)
+
+        if self.verif_fromyear[0] is not None and len(self.verif_fromyear) == 1:
+            self.verif_fromyear = [self.verif_fromyear[0] for year in range(len(self.verif_dates))]
+        if self.verif_toyear[0] is not None and len(self.verif_toyear) == 1:
+            self.verif_toyear = [self.verif_toyear[0] for year in range(len(self.verif_dates))]
 
         if self.inset_position is None:
             self.inset_position = '2'
@@ -398,7 +400,7 @@ class BaseMetric(dataobjects.DataObject):
             raise NotImplementedError(f'No dummy observations specified for {self.verif_name}')
 
 
-        if None not in average_dim :
+        if average_dim is not None :
             for d in average_dim:
                 da = da.mean(dim=d)
 
@@ -842,7 +844,10 @@ class BaseMetric(dataobjects.DataObject):
         fc_dims['time'] = [0]
         ds_fc = ds_fc.isel(fc_dims)
         obs_dims = {d: 0 for d in alldims if d in ds_obs.dims}
-        obs_dims['time'] = [0]
+        for t in range(len(ds_obs['time'].values)):
+            if not np.isnan(ds_obs.isel(time=t, inidate=0, date=0).values).all():
+                obs_dims['time'] = [t]
+                break
         ds_obs = ds_obs.isel(obs_dims)
 
         ds_mask = mutils.create_combined_mask(ds_obs,
@@ -1097,5 +1102,5 @@ class BaseMetric(dataobjects.DataObject):
         else:
             if self.calibrationdir is not None:
                 outfilename = self.calibrationdir + '/' + filename
-                ds.to_netcdf(outfilename)
+                ds.compute().to_netcdf(outfilename)
                 utils.print_info(f'Saving calibration file to {outfilename}')

@@ -48,7 +48,7 @@ config_optnames = {
         'job_memory':{
             'printname': 'maximum memory per job',
             'optional' : True,
-            'allowed_values' : ["", "128GB"],
+            'allowed_values' : ["", "16GB","128GB"],
             'default_value' : [""],
         },
         'calibrationdir':{
@@ -174,7 +174,7 @@ config_optnames = {
             'optional' : False,
             'allowed_values' : ["interp_check","ensmean","forecast_error",
                                 "ice_distance", "plume", "freeze_up", "break_up", 'brier',
-                                'crps', 'rmse', 'ser','iiee','sps','iiee2',
+                                'crps', 'rmse', 'ser','iiee','sps','mae',
                                 'brier_edge','linear_trend',
                                 'rmse_edge',
                                 'ice_extent', 'cycle', 'mae','calc_calib']

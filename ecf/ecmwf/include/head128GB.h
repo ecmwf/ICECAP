@@ -30,7 +30,7 @@ ERROR() {
 
 # Trap any signal that may cause the script to fail
 # Note: don't trap SIGTERM/SIGCONT for Slurm to properly reach shell children on cancel/timeout
-export SIGNAL_LIST='1 2 3 4 5 6 7 8 10 11 13 24 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64'
+export SIGNAL_LIST='1 2 3 4 5 6 7 8 10 11 13 24 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63'
 
 for signal in $SIGNAL_LIST; do
   trap "ERROR $signal \"Signal $(kill -l $signal) ($signal) received \"" $signal

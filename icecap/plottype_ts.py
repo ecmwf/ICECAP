@@ -2,13 +2,13 @@
 
 import random
 from collections import Counter
+import cartopy
 import cartopy.crs as ccrs
 from matplotlib import pyplot as plt
 import numpy as np
 import matplotlib
 import xarray as xr
-from mpl_toolkits.axes_grid1.inset_locator import InsetPosition
-
+import matplotlib as mpl
 
 import plottypes
 import utils
@@ -209,18 +209,14 @@ class TsPlot(plottypes.GenericPlot):
                 _ylim = ax.get_ylim()
 
                 ax.set_ylim([_ylim[0],_ylim[1]+.3*(_ylim[1]-_ylim[0])])
-                # ax.set_ylim([0,260])
 
-
-                ax2 = plt.axes([0, 0, 1, 1],
-                               projection=ccrs.NorthPolarStereo())
+                
                 if self.inset_position == '1':
-                    ip = InsetPosition(ax, [0.05, 0.68, 0.25, 0.25])
+                    ax_pos = [0.05, 0.68, 0.25, 0.25]
                 elif self.inset_position == '2':
-                    ip = InsetPosition(ax, [0.72, 0.68, 0.25, 0.25])
-
-                ax2.set_axes_locator(ip)
-
+                    ax_pos = [0.72, 0.68, 0.25, 0.25]
+                ax2 = ax.inset_axes(ax_pos, projection=ccrs.NorthPolarStereo())
+                
                 self.region_extent = None
                 if metric.region_extent:
                     self.region_extent = metric.region_extent
@@ -386,6 +382,12 @@ class TsPlot(plottypes.GenericPlot):
             else:
                 _title += f' combined dates init-time {_init_time} ' \
                           f' ({_years})'
+
+            if self.calib:
+                _title += f'\n calibrated using {self.conf_calib_dates}'
+                if self.calib_fromyear[0] is not None:
+                    _title += f' averaged from {self.calib_fromyear[0]} to {self.calib_toyear[0]}'
+
         else:
             if len(self.verif_dates) == 1:
                 _init_time = self.verif_dates[0]

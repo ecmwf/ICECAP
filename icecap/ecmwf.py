@@ -210,11 +210,22 @@ class _EcmwfExtendedRangeRetrieval(EcmwfRetrieval):
     # stream, time, type, target
     def __init__(self, kwargs):
         super().__init__(kwargs)
-        self.kwargs['class'] = 'od'
-        stepsize = 6
+        if self.kwargs['expver'] == '0001':
+            self.kwargs['class'] = 'od'
+            stepsize = 6
+        else:
+            self.kwargs['class'] = 'rd'
+            stepsize = 12
+
+
         self.kwargs['step'] = [0, 'to', int(kwargs['ndays'])*24-stepsize, 'by', stepsize ]
 
-        if int(kwargs['cycle'][:2]) >= 48:
+        if kwargs['cycle'] == 'latest':
+            if kwargs['mode'] == 'hc':
+                self.kwargs['stream'] = 'enfh'
+            else:
+                self.kwargs['stream'] = 'enfo'
+        elif int(kwargs['cycle'][:2]) >= 48:
             if kwargs['mode'] == 'hc':
                 self.kwargs['stream'] = 'eefh'
             else:

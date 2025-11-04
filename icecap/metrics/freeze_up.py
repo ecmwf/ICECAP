@@ -116,11 +116,11 @@ class Metric(BaseMetric):
         lsm_full = processed_data_dict['lsm_full']
 
         da_fc_verif = processed_data_dict['da_fc_verif'].mean(dim='date')
-        da_verdata_verif = processed_data_dict['da_verdata_verif'].mean(dim='date')
-
-
         da_fc_verif_metric, mask_water, mask_ice = self.freeze_up(da_fc_verif)
-        da_verdata_verif_metric, mask_water_vardata, mask_ice_vardata = self.freeze_up(da_verdata_verif)
+
+        if self.add_verdata == 'yes':
+            da_verdata_verif = processed_data_dict['da_verdata_verif'].mean(dim='date')
+            da_verdata_verif_metric, mask_water_vardata, mask_ice_vardata = self.freeze_up(da_verdata_verif)
 
         if self.calib:
             if self.calib_exists == 'yes':
@@ -140,12 +140,9 @@ class Metric(BaseMetric):
 
                 da_fc_calib_metric, _, _ = self.freeze_up(da_fc_calib)
                 da_fc_calib_metric = da_fc_calib_metric.chunk(dict(date=-1, member=-1))
-                da_fc_calib_metric_upper = da_fc_calib_metric.quantile(2 / 3, dim=('member', 'date'),
-                                                                method='closest_observation')
-                da_fc_calib_metric_lower = da_fc_calib_metric.quantile(1 / 3, dim=('member', 'date'),
-                                                                method='closest_observation')
-                da_fc_calib_metric_median = da_fc_calib_metric.quantile(1 / 2, dim=('member', 'date'),
-                                                                       method='closest_observation')
+                da_fc_calib_metric_upper = da_fc_calib_metric.quantile(2 / 3, dim=('member', 'date'))
+                da_fc_calib_metric_lower = da_fc_calib_metric.quantile(1 / 3, dim=('member', 'date'))
+                da_fc_calib_metric_median = da_fc_calib_metric.quantile(1 / 2, dim=('member', 'date'))
                 da_fc_calib_metric_upper = da_fc_calib_metric_upper.drop_vars('quantile')
                 da_fc_calib_metric_median = da_fc_calib_metric_median.drop_vars('quantile')
 
@@ -153,10 +150,8 @@ class Metric(BaseMetric):
                 # verdata calib
                 da_verdata_calib_metric, _, _ = self.freeze_up(da_verdata_calib)
                 da_verdata_calib_metric = da_verdata_calib_metric.chunk(dict(date=-1))
-                da_verdata_calib_metric_upper = da_verdata_calib_metric.quantile(2 / 3, dim=('date'),
-                                                                                 method='closest_observation')
-                da_verdata_calib_metric_lower = da_verdata_calib_metric.quantile(1 / 3, dim=('date'),
-                                                                                 method='closest_observation')
+                da_verdata_calib_metric_upper = da_verdata_calib_metric.quantile(2 / 3, dim=('date'))
+                da_verdata_calib_metric_lower = da_verdata_calib_metric.quantile(1 / 3, dim=('date'))
                 da_verdata_calib_metric_lower = da_verdata_calib_metric_lower.drop_vars('quantile')
                 da_verdata_calib_metric_upper = da_verdata_calib_metric_upper.drop_vars('quantile')
 
@@ -224,7 +219,7 @@ class Metric(BaseMetric):
                 combine_verdata = xr.where(np.isnan(lsm_full), np.nan, combine_verdata)
                 combine_verdata = combine_verdata.assign_attrs(da_fc_verif.attrs).squeeze()
                 data_plot.append(combine_verdata.rename(f'{self.verif_name}'))
-                data_plot.append(da_verdata_verif_metric.rename('da_vedata_verif_dates_noplot'))
+                data_plot.append(da_verdata_verif_metric.rename('da_verdata_verif_dates_noplot'))
 
 
 

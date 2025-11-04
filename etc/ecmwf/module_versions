@@ -6,7 +6,7 @@
 # that do not contain a module name will be ignored.
 
 cdo=1.9.10
-ecmwf-toolbox=2024.04.0.0
+ecmwf-toolbox=2025.04.0.0
 ecflow=5.7.0
 nco=4.9.7
-python3=3.11.8-01
+python3=3.12.9-01

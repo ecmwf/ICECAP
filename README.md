@@ -12,7 +12,11 @@ Clone source code repository
 
     $ git clone https://github.com/ecmwf/ICECAP 
 
-Create conda environment and install necessary packages
+To install ICECAP in a Linux environment with its full capabilities execute the following command:
+    
+    $ make
+
+If you are unable to execute the Makefile you can follow the steps below to install ICECAP. Create conda environment and install necessary packages
 
     $ cd ICECAP
     $ conda remove --name icecap --all  # delete icecap env if it exists
