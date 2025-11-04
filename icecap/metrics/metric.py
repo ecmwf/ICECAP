@@ -845,7 +845,7 @@ class BaseMetric(dataobjects.DataObject):
         ds_fc = ds_fc.isel(fc_dims)
         obs_dims = {d: 0 for d in alldims if d in ds_obs.dims}
         for t in range(len(ds_obs['time'].values)):
-            if not np.isnan(ds_obs.isel(time=t, inidate=0, date=0).values).all():
+            if not np.isnan(ds_obs.isel(obs_dims).isel(time=t).values).all():
                 obs_dims['time'] = [t]
                 break
         ds_obs = ds_obs.isel(obs_dims)
