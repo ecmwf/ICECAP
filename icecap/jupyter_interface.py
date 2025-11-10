@@ -192,16 +192,18 @@ class Icecap:
         :return:
         """
         if self.ofiles is None:
-            utils.print_info('No output created yet. Did you run ICECAP?')
+            with jupyter_output:
+                utils.print_info('No output created yet. Did you run ICECAP?')
             with jupyter_output:
                 utils.print_info('No output created yet. Please run ICECAP first')
                 return
         ncols = len(self.ofiles)
+
         nrows = 1
         if ncols > maxcols:
             ncols = maxcols
             nrows = int(np.ceil(len(self.ofiles) / maxcols))
-
+       
         fig, axs = plt.subplots(nrows=nrows, ncols=ncols, figsize=figsize, squeeze=False)
         axs = axs.flatten()
         for ii, img in enumerate(self.ofiles):

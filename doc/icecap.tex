@@ -31,7 +31,7 @@
 }
 
 \newcommand{\ice}{\textit{ICECAP}\xspace}
-\newcommand{\version}{1.1\xspace}
+\newcommand{\version}{1.1.1\xspace}
 
 \newcommand{\tbd}[1]{\textcolor{red}{\textbf{#1}}}   
 \newcommand{\highlight}[1]{\textsc{\textbf{#1}}}  
@@ -1135,6 +1135,13 @@ A new configuration options needs to be inserted at the correct place. The new o
 After implementing the new option in \texttt{namelist.py}, it will now automatically be read at the respective part of the \texttt{config.py} file. The function reading the config file section is called \texttt{\_init\_config(conf\_parser, 'section name')}. After reading the configuration file section the value of the new option should be available as a class attribute \texttt{self.new\_option}.
 
 \chapter{Changelog History}
+
+\paragraph{\textbf{\ice v1.1.1\\[5pt]}}
+\textit{Bugfixes}
+\begin{itemize}
+	\item cartopy has been updated to 0.25.0
+	\item environment.yaml has been simplified 
+\end{itemize}
 
 \paragraph{\textbf{\ice v1.1\\[5pt]}}
 \textit{Breaking changes}
