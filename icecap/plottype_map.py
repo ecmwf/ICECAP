@@ -223,22 +223,6 @@ class MapPlot(plottypes.GenericPlot):
 
                     cb.set_label(cblabelstr, labelpad=10)
 
-                    for i in _ds_file.attrs:
-                        if _var in i and any(f'-{str(param)}' in i for param in np.arange(10)):
-                            kw = plottypes.attrsList_to_dict(_ds_file.attrs[i])
-
-                            atype = kw['attr_type']
-                            kw.pop('attr_type', None)
-
-                            if atype == 'ax.text':
-                                if 'transform' in kw:
-                                    kw.pop('transform', None)
-                                    ax.text(**kw, transform=ax.transAxes)
-                                else:
-                                    ax.text(**kw)
-                            elif atype == 'cb.set_label':
-                                cb.set_label(**kw, labelpad=5)
-
                     ax.set_title(self._create_title(_step, _var))
 
                     if self.points is not None:

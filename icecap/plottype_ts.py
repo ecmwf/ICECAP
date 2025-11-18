@@ -185,24 +185,6 @@ class TsPlot(plottypes.GenericPlot):
                             ax.plot(x_axis_values, _ds_file_var.sel(member=m).values,
                                     color=color, alpha=.1, linewidth=1,
                                     linestyle = linestyle)
-                    # for m in _ds_file_var['member'].values:
-                    #     ax.plot(_ds_file_var.time + 1, _ds_file_var.sel(member=m).values,
-                    #             color=color, alpha=.1, linewidth=1,
-                    #             linestyle=linestyle)
-
-                # check for timeseries plot attributes
-                for i in _ds_file.attrs:
-                    if _var in i and any(f'-{str(param)}' in i for param in np.arange(10)):
-                        kw = plottypes.attrsList_to_dict(_ds_file.attrs[i])
-
-                        atype = kw['attr_type']
-                        kw.pop('attr_type', None)
-
-                        if atype == 'ax.axhline':
-                            ax.axhline(**kw)
-
-
-
 
             if self.points is not None or metric.area_statistic_function is not None:
                 #metric.region_extent or metric.nsidc_region:
