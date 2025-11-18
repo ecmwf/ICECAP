@@ -499,10 +499,10 @@ This section controls which reference data is retrieved. Also it allows to selec
  
 \begin{itemize}
  \item \texttt{params}: as \ice only supports sea-ice concentration for now this needs to be set to \texttt{sic}
- \item \texttt{verdata}: determines which verification data is used. This can be 
+ \item \texttt{verdata}: determines which verification data is used. Currently supported are
  \begin{enumerate}
  	\item \texttt{osi-401-b}
- 	\item \texttt{osi-cdr}: this is a temporal combination of osi-450-a1 and osi-430-a
+ 	\item \texttt{osi-cdr}: This is a combination of osi-450-a1 for 10/1978 to 12/2020, osi-430-a for 01/2021 to 09/2025, and osi-438-a from 10/2025 onwards.
  \end{enumerate}
 As described, forecast data within \ice is always interpolated to the reference data grid. 
  

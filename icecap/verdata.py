@@ -34,7 +34,7 @@ def VerifData(conf):
         'osi-450-a1': _OSIThreddsRetrieval(conf),
         'osi-401-b': _OSIThreddsRetrieval(conf),
         'osi-408': _OSIThreddsRetrieval(conf),
-        'osi-cdr': _OSIThreddsRetrieval(conf), # was osi-450-a_osi-430-a_mixed'
+        'osi-cdr': _OSIThreddsRetrieval(conf), # OSI-450 + OSI-430 + OSI-438
     }
 
     return selector[conf.verdata]
@@ -85,15 +85,28 @@ class _OSIThreddsRetrieval(VerifyingData):
             self.dummydate = '20171130'
 
         if self.verif_name == 'osi-cdr':
-            self.server = self.root_server+"reprocessed/ice/conc_450a1_files/"
-            self.filebase = "ice_conc_nh_ease2-250_cdr-v3p1_"
-            self.fileext = "1200.nc"
-
-            self.server = [self.server, self.root_server+"reprocessed/ice/conc_cra_files/"]
-            self.filebase = [self.filebase, "ice_conc_nh_ease2-250_icdr-v3p0_"]
-            self.fileext = [self.fileext, "1200.nc"]
-
             self.dummydate = '20171130'
+            # This is composed of the 3 datasets listed below.
+            # The ordering matters, as last dataset is checked
+            # first for any given date.
+
+            # OSI-450-a1 (https://osi-saf.eumetsat.int/products/osi-450-a1)
+            # for time period 10/1978 to 12/2020
+            self.server = [self.root_server+"reprocessed/ice/conc_450a1_files/"]
+            self.filebase = ["ice_conc_nh_ease2-250_cdr-v3p1_"]
+            self.fileext = ["1200.nc"]
+
+            # OSI-430-a1 (https://osi-saf.eumetsat.int/products/osi-430-a)
+            # for time period 01/2021 to 09/2025
+            self.server.append(self.root_server+"reprocessed/ice/conc_cra_files/")
+            self.filebase.append("ice_conc_nh_ease2-250_icdr-v3p0_")
+            self.fileext.append("1200.nc")
+
+            # OSI-438 (https://osi-saf.eumetsat.int/products/osi-438)
+            # for time period since 10/2025
+            self.server.append(self.root_server+"reprocessed/ice/conc_438_files/")
+            self.filebase.append("ice_conc_nh_ease2-250_icdr-v3p0-amsr_")
+            self.fileext.append("1200.nc")
 
         if self.dummydate is None:
             utils.print_info(f'No verification data to be downloaded for {self.verif_name}.\n'
@@ -123,33 +136,33 @@ class _OSIThreddsRetrieval(VerifyingData):
 
 
         for _date in self.loopdates:
-            lfound = True
+            lfound = False
             _ofile = f'{self.obscachedir}/{filename.format(_date, self.params)}'
 
-
             if _ofile in self.files_to_retrieve:
-                try:
-                    file = f'{self.server[0]}{_date[:4]}/{_date[4:6]}/{self.filebase[0]}{_date}{self.fileext[0]}'
-                    da_in = xr.open_dataset(file)[params_verdata[self.params][self.verif_name]]
-                    if verbose:
-                        print(f'Processing file {file}')
-
-                except:
-                    if len(self.server) > 1:  # combined climate data and interim data record
+                if len(self.server) > 1:  # combined climate data and interim data record
+                    for i in range(len(self.server))[::-1]:
+                        file = f'{self.server[i]}{_date[:4]}/{_date[4:6]}/{self.filebase[i]}{_date}{self.fileext[i]}'
                         try:
-                            file = f'{self.server[1]}{_date[:4]}/{_date[4:6]}/{self.filebase[1]}{_date}{self.fileext[1]}'
                             da_in = xr.open_dataset(file)[params_verdata[self.params][self.verif_name]]
-                            if verbose:
-                                print(f'Processing file {file}')
-                        except:
-                            print(f'Data {file} not found')
-                            lfound = False
+                            lfound = True
+                            print(file, lfound)
+                            break
+                        except OSError:
+                            continue
+                else:
+                    file = f'{self.server[0]}{_date[:4]}/{_date[4:6]}/{self.filebase[0]}{_date}{self.fileext[0]}'
+                    if os.path.isfile(file):
+                        lfound = True
+
+                if verbose:
+                    if lfound:
+                        print(f'Processing file {file}')
                     else:
                         print(f'Data {file} not found')
-                        lfound = False
-
 
                 if lfound:
+                    da_in = xr.open_dataset(file)[params_verdata[self.params][self.verif_name]]
                     da_in = da_in.rename(self.params)
 
                     da_in = da_in/100
@@ -174,6 +187,8 @@ class _OSIThreddsRetrieval(VerifyingData):
 
 
                     da_in.to_netcdf(_ofile)
+                
+                    
 
         # copy dummy file to new id
         if not os.path.isfile(f'{self.obscachedir}/{self.verif_name}.nc'):
