@@ -130,7 +130,7 @@ class ExecutionHost:
             self._safe_copy(args, file, fromdir, target_dir)
 
     def _copy_nsidc_files(self, fromdir, args):
-        files = ['nsidc_osi-401-b.nc', 'nsidc_osi-cdr.nc']
+        files = ['nsidc_osi-401-b.nc', 'nsidc_osi-cdr.nc', 'nsidc_osi-408.nc']
         target_dir = self.etcdir
         for file in files:
             if os.path.isfile(f'{fromdir}/{file}'):

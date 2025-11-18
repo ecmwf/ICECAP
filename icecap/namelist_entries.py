@@ -163,7 +163,7 @@ config_optnames = {
         'verif_ref' : {
             'printname':'observation name for plotting',
             'optional' : True,
-            'allowed_values': ["osi-cdr", 'osi-401-b']
+            'allowed_values': ["osi-cdr", 'osi-401-b', 'osi-408']
         },
         'verif_expname' : {
             'printname':'experiment name for plotting',

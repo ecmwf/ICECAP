@@ -389,7 +389,7 @@ class BaseMetric(dataobjects.DataObject):
         Load the dummy verification file (specific date for obs))
         :return: xr DataArray
         """
-        if self.verif_name in ['osi-cdr', 'osi-401-b']:
+        if self.verif_name in ['osi-cdr', 'osi-401-b', 'osi-408']:
             filename = self._filenaming_convention('verif')
             _filename = f"{self.obscachedir}/" \
                         f"{filename.format('20171130', self.params, self.grid)}"

@@ -17,6 +17,7 @@ params_verdata = {
         'osi-450-a1' : 'ice_conc',
         'osi-450-a' : 'ice_conc',
         'osi-401-b' : 'ice_conc',
+        'osi-408' : 'ice_conc',
         'osi-cdr' : 'ice_conc',
     }
 }
@@ -32,11 +33,11 @@ def VerifData(conf):
         'osi-450-a': _OSIThreddsRetrieval(conf),
         'osi-450-a1': _OSIThreddsRetrieval(conf),
         'osi-401-b': _OSIThreddsRetrieval(conf),
+        'osi-408': _OSIThreddsRetrieval(conf),
         'osi-cdr': _OSIThreddsRetrieval(conf), # was osi-450-a_osi-430-a_mixed'
     }
 
     return selector[conf.verdata]
-
 
 
 class VerifyingData(dataobjects.DataObject):
@@ -50,14 +51,6 @@ class VerifyingData(dataobjects.DataObject):
         mask = dt_loopdates <= last_date
         dt_loopdates = dt_loopdates[mask].tolist()
         self.loopdates = [utils.datetime_to_string(_date) for _date in dt_loopdates]
-
-
-
-
-
-
-
-
 
 
 class _OSIThreddsRetrieval(VerifyingData):
@@ -85,6 +78,12 @@ class _OSIThreddsRetrieval(VerifyingData):
             self.fileext = ["1200.nc"]
             self.dummydate = '20171130'
 
+        if self.verif_name == 'osi-408':
+            self.server = [self.root_server+"ice/amsr2_conc/"]
+            self.filebase = ["ice_conc_nh_polstere-100_amsr2_"]
+            self.fileext = ["1200.nc"]
+            self.dummydate = '20171130'
+
         if self.verif_name == 'osi-cdr':
             self.server = self.root_server+"reprocessed/ice/conc_450a1_files/"
             self.filebase = "ice_conc_nh_ease2-250_cdr-v3p1_"
@@ -103,7 +102,6 @@ class _OSIThreddsRetrieval(VerifyingData):
 
         if self.dummydate not in self.loopdates:
             self.loopdates.append(self.dummydate)
-
 
 
     def make_filelist(self):
@@ -137,7 +135,7 @@ class _OSIThreddsRetrieval(VerifyingData):
                         print(f'Processing file {file}')
 
                 except:
-                    if len(self.server) > 1:
+                    if len(self.server) > 1:  # combined climate data and interim data record
                         try:
                             file = f'{self.server[1]}{_date[:4]}/{_date[4:6]}/{self.filebase[1]}{_date}{self.fileext[1]}'
                             da_in = xr.open_dataset(file)[params_verdata[self.params][self.verif_name]]

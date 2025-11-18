@@ -52,7 +52,7 @@ class Icecap:
             style=style)
 
         self.verdata_fct = widgets.Dropdown(
-            options=[('osi-cdr'), ('osi-401-b')],
+            options=[('osi-cdr'), ('osi-401-b'), ('osi-408')],
             value='osi-cdr',
             description='observations',
             style=style)
