@@ -45,13 +45,13 @@ if grid == 'osi-cdr':
         print(
             f'WARNING: If possible use NSIDC-0780_SeaIceRegions_EASE2-N25km_v1.0.nc when generating {grid} region file')
     ifile_osi = 'https://thredds.met.no/thredds/dodsC/osisaf/met.no/reprocessed/ice/conc_cra_files/2022/10/ice_conc_nh_ease2-250_icdr-v3p0_202210191200.nc'
-elif grid == 'osi-401-b':
+elif grid in ['osi-401-b', 'osi-408']:
     if os.path.basename(ifile_nsidc) != 'NSIDC-0780_SeaIceRegions_PS-N12.5km_v1.0.nc':
         print(
             f'WARNING: If possible use NSIDC-0780_SeaIceRegions_PS-N12.5km_v1.0.nc when generating {grid} region file')
     ifile_osi = 'https://thredds.met.no/thredds/dodsC/osisaf/met.no/ice/conc/2020/07/ice_conc_nh_polstere-100_multi_202007261200.nc'
 else:
-    raise NotImplementedError('Only osi-cdr or osi-401-b grids implemented')
+    raise NotImplementedError('Only osi-cdr or osi-401-b / osi-408 grids implemented')
 
 ds_osi = xr.open_dataset(ifile_osi)['ice_conc']
 ds_osi['xc'] = ds_osi['xc'] * 1000

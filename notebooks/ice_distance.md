@@ -45,7 +45,7 @@ The user can select:
 <li>the location from which to derive the distance to the ice edge (format: longitude, latitude) </li>
 </ol>
 
-OSI-401 is used as reference
+OSI-408 is used as reference
 </div>
 
 ```python
