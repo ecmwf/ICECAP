@@ -1008,13 +1008,23 @@ Currently the following methods are implemented:
 \ice's metric \texttt{calc\_calib} allows to efficiently compute the calibration file for \texttt{calib\_method = mean}, which can be used to compute calibrated metrics later. An example of \texttt{calc\_calib} is:
 
 \begin{lstlisting}[language=bash]
+	[fc_001]
+	source = cds
+	fcsystem = long-range
+	expname = 35
+	modelname = cmcc
+	enssize = 40
+	mode = fc
+	dates = 19930201/to/20160201/by/1y
+	ndays = 180
+
 	[plot_calc_calib]
 	plottype = calc_calib
 	source = cds
 	verif_modelname = cmcc
-	verif_fcsystem   = long-range
-	verif_expname     = 35
-	verif_enssize   = 1
+	verif_fcsystem = long-range
+	verif_expname = 35
+	verif_enssize = 1
 	verif_mode = fc
 	verif_dates = 19930201
 	calib_mode = fc
@@ -1022,7 +1032,7 @@ Currently the following methods are implemented:
 	calib_fromyear = 1993
 	calib_toyear = 2016
 	calib_method = mean
-	calib_enssize   = 40
+	calib_enssize = 40
 	target = r:180
 \end{lstlisting}
 
